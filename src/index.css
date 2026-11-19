@@ -641,6 +641,12 @@ button.tb-card:hover { background: rgba(255,255,255,.09); } button.tb-card:activ
 .mui-stick .ring { position: absolute; inset: 26px; border-radius: 50%; border: 1px dashed rgba(255,255,255,.13); }
 .mui-stick .knob { position: absolute; left: 50%; top: 50%; width: 62px; height: 62px; margin: -31px 0 0 -31px; border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, #e5e7eb, #6b7280 60%, #2b2f3a); box-shadow: 0 6px 16px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.7); }
+/* крестовина-кнопки (настройки → «Движение на телефоне» → Кнопки) */
+.mui-dpad { display: grid; grid-template-columns: repeat(3, 56px); grid-template-rows: repeat(3, 56px); gap: 4px; touch-action: none; opacity: .96; }
+.mui-dpad .mui-btn.dpadk { width: 56px; height: 56px; border-radius: 14px; font-size: 20px; }
+.mui-dpad-mid { border-radius: 50%; margin: 10px; background: radial-gradient(circle at 50% 40%, rgba(124,92,255,.25), rgba(9,11,17,.5)); border: 1px solid rgba(255,255,255,.14); }
+.mui-stick-wrap.padwrap { align-items: flex-end; }
+@media (max-width: 420px) { .mui-dpad { grid-template-columns: repeat(3, 48px); grid-template-rows: repeat(3, 48px); } .mui-dpad .mui-btn.dpadk { width: 48px; height: 48px; } }
 
 /* верхние быстрые кнопки — слева над стиком */
 .mui-top { position: absolute; left: calc(16px + var(--safe-l)); bottom: calc(168px + var(--safe-b)); display: flex; flex-direction: column; gap: 8px; }

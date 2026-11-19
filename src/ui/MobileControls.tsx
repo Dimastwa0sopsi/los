@@ -30,6 +30,46 @@ function Btn({ g, name, ico, sub, hold = true, cls = '', onTap, active }: {
   );
 }
 
+/** крестовина-кнопки вместо джойстика: диагонали работают при двух зажатых стрелках */
+function Dpad({ g }: { g: Game }) {
+  const dirs = useRef(new Set<string>());
+  const [, force] = useState(0);
+  const apply = () => {
+    let x = 0, y = 0;
+    if (dirs.current.has('l')) x -= 1; if (dirs.current.has('r')) x += 1;
+    if (dirs.current.has('u')) y += 1; if (dirs.current.has('d')) y -= 1;
+    const l = Math.hypot(x, y); if (l > 1) { x /= l; y /= l; }
+    g.input.joy.x = x; g.input.joy.y = y; force((n) => n + 1);
+  };
+  const press = (d: string, on: boolean) => (e: React.PointerEvent) => {
+    e.preventDefault(); e.stopPropagation();
+    const el = e.currentTarget as HTMLElement;
+    if (on) {
+      if (!g.input.enabled) return;
+      try { el.setPointerCapture(e.pointerId); } catch { /* */ }
+      buzz(5); dirs.current.add(d);
+    } else {
+      dirs.current.delete(d);
+      try { el.releasePointerCapture(e.pointerId); } catch { /* */ }
+    }
+    apply();
+  };
+  const Key = ({ d, ico }: { d: string; ico: string }) => (
+    <button className={`mui-btn mini dpadk ${dirs.current.has(d) ? 'on' : ''}`}
+      onPointerDown={press(d, true)} onPointerUp={press(d, false)} onPointerCancel={press(d, false)} onLostPointerCapture={press(d, false)}>
+      <span className="mui-ico">{ico}</span>
+    </button>
+  );
+  useEffect(() => () => { g.input.joy.x = 0; g.input.joy.y = 0; }, [g]);
+  return (
+    <div className="mui-dpad">
+      <span /><Key d="u" ico="▲" /><span />
+      <Key d="l" ico="◀" /><span className="mui-dpad-mid" /><Key d="r" ico="▶" />
+      <span /><Key d="d" ico="▼" /><span />
+    </div>
+  );
+}
+
 export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
   const stickRef = useRef<HTMLDivElement>(null);
   const [knob, setKnob] = useState({ x: 0, y: 0 });
@@ -124,25 +164,34 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
         </>
       )}
 
-      {/* ---------- лево: стик движения ---------- */}
-      <div className="mui-stick-wrap">
-        <div className={`mui-stick ${knob.x || knob.y ? 'active' : ''}`} ref={stickRef}
-          onPointerDown={(e) => {
-            e.preventDefault(); e.stopPropagation();
-            if (!g.input.enabled) return;
-            stickId.current = e.pointerId;
-            (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-            buzz(8);
-            stickMove(e);
-          }}
-          onPointerMove={stickMove} onPointerUp={stickEnd} onPointerCancel={stickEnd} onLostPointerCapture={stickEnd}>
-          <span className="ring" />
-          <span className="knob" style={{ transform: `translate(${knob.x}px, ${knob.y}px)` }} />
+      {/* ---------- лево: джойстик ИЛИ крестовина (настройки → «Движение на телефоне») ---------- */}
+      {g.settings.moveStyle === 'pad' ? (
+        <div className="mui-stick-wrap padwrap">
+          <Dpad g={g} />
+          {!v && (
+            <Btn g={g} ico={run ? '🏃' : '🚶'} hold={false} onTap={() => { const n = !run; setRun(n); buzz(8); g.input.setV('run', n); }} cls="mini" active={run} />
+          )}
         </div>
-        {!v && (
-          <Btn g={g} ico={run ? '🏃' : '🚶'} hold={false} onTap={() => { const n = !run; setRun(n); buzz(8); g.input.setV('run', n); }} cls="mini" active={run} />
-        )}
-      </div>
+      ) : (
+        <div className="mui-stick-wrap">
+          <div className={`mui-stick ${knob.x || knob.y ? 'active' : ''}`} ref={stickRef}
+            onPointerDown={(e) => {
+              e.preventDefault(); e.stopPropagation();
+              if (!g.input.enabled) return;
+              stickId.current = e.pointerId;
+              (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+              buzz(8);
+              stickMove(e);
+            }}
+            onPointerMove={stickMove} onPointerUp={stickEnd} onPointerCancel={stickEnd} onLostPointerCapture={stickEnd}>
+            <span className="ring" />
+            <span className="knob" style={{ transform: `translate(${knob.x}px, ${knob.y}px)` }} />
+          </div>
+          {!v && (
+            <Btn g={g} ico={run ? '🏃' : '🚶'} hold={false} onTap={() => { const n = !run; setRun(n); buzz(8); g.input.setV('run', n); }} cls="mini" active={run} />
+          )}
+        </div>
+      )}
 
       {/* ---------- низ центр: взаимодействие ---------- */}
       <div className="mui-ctx">

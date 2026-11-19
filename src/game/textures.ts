@@ -215,10 +215,19 @@ export function getTex(key: string): THREE.Texture {
       t = toTex(c); break;
     }
     case 'grass': {
-      const [c, g] = canvas(256, 256); noise(g, 256, 256, '#5a8a38', 22, 6000, 9);
+      // новый газон: разнотравный ковёр — пятна света/тени, проплешины, плотные травинки, микро-цветы
+      const [c, g] = canvas(256, 256); noise(g, 256, 256, '#4e8b3a', 20, 7000, 9);
       const r = new RNG(19);
-      for (let i = 0; i < 40; i++) { g.fillStyle = r.chance(0.5) ? 'rgba(120,150,60,0.18)' : 'rgba(40,80,30,0.18)'; g.beginPath(); g.arc(r.range(0, 256), r.range(0, 256), r.range(10, 40), 0, 7); g.fill(); }
-      g.strokeStyle = 'rgba(150,190,90,0.35)'; for (let i = 0; i < 900; i++) { const x = r.range(0, 256), y = r.range(0, 256); g.beginPath(); g.moveTo(x, y); g.lineTo(x + r.range(-1, 1), y - r.range(2, 5)); g.stroke(); }
+      const tones = ['rgba(96,158,62,0.16)', 'rgba(58,116,44,0.16)', 'rgba(128,170,72,0.13)', 'rgba(84,104,48,0.14)', 'rgba(40,86,34,0.16)'];
+      for (let i = 0; i < 56; i++) { g.fillStyle = r.pick(tones); g.beginPath(); g.arc(r.range(0, 256), r.range(0, 256), r.range(9, 42), 0, 7); g.fill(); }
+      for (let i = 0; i < 10; i++) { g.fillStyle = 'rgba(122,102,64,0.15)'; g.beginPath(); g.ellipse(r.range(0, 256), r.range(0, 256), r.range(6, 20), r.range(4, 12), r.range(0, 3), 0, 7); g.fill(); }
+      for (let i = 0; i < 1400; i++) {
+        const x = r.range(0, 256), y = r.range(0, 256);
+        g.strokeStyle = r.chance(0.62) ? 'rgba(152,196,92,0.34)' : 'rgba(64,110,46,0.30)';
+        g.lineWidth = r.chance(0.8) ? 1 : 1.6;
+        g.beginPath(); g.moveTo(x, y); g.lineTo(x + r.range(-1.2, 1.2), y - r.range(2, 6)); g.stroke();
+      }
+      for (let i = 0; i < 26; i++) { g.fillStyle = r.pick(['rgba(250,240,140,0.5)', 'rgba(240,240,245,0.45)', 'rgba(216,180,254,0.4)']); g.beginPath(); g.arc(r.range(0, 256), r.range(0, 256), r.range(0.8, 1.8), 0, 7); g.fill(); }
       t = toTex(c); break;
     }
     case 'cloud': {
@@ -434,6 +443,37 @@ export function getTex(key: string): THREE.Texture {
     case 'brickwall': {
       const [c, g] = canvas(128, 128); g.fillStyle = '#8f8a84'; g.fillRect(0, 0, 128, 128);
       for (let r = 0; r < 16; r++) for (let i = 0; i < 5; i++) { g.fillStyle = `rgb(${150 + ((r * 31 + i * 17) % 30)},${62 + ((r * 7 + i) % 15)},${45})`; g.fillRect(i * 28 + (r % 2) * 14 - 14, r * 8, 26, 7); }
+      t = toTex(c); break;
+    }
+    // ---------- шахта «Чёрная Жила»: скальная порода, угольный пласт, щебень ----------
+    case 'rockwall': {
+      const [c, g] = canvas(256, 256); const _r47 = new RNG(47); const rr = () => _r47.next();
+      g.fillStyle = '#3c3a38'; g.fillRect(0, 0, 256, 256);
+      for (let i = 0; i < 2600; i++) { const v = 46 + Math.floor(rr() * 34); g.fillStyle = `rgba(${v},${v - 3},${v - 6},.5)`; g.fillRect(rr() * 256, rr() * 256, 1 + rr() * 2, 1 + rr() * 2); }
+      for (let i = 0; i < 44; i++) { g.strokeStyle = `rgba(20,18,16,${0.25 + rr() * 0.3})`; g.lineWidth = 0.7 + rr() * 1.6; g.beginPath(); let x = rr() * 256, y = rr() * 256; g.moveTo(x, y); for (let s = 0; s < 5; s++) { x += (rr() - 0.5) * 60; y += (rr() - 0.5) * 60; g.lineTo(x, y); } g.stroke(); }
+      for (let i = 0; i < 26; i++) { g.fillStyle = `rgba(${90 + rr() * 30},${84 + rr() * 24},${74 + rr() * 18},.28)`; const rx = rr() * 256, ry = rr() * 256; g.beginPath(); g.ellipse(rx, ry, 8 + rr() * 26, 6 + rr() * 18, rr() * 3, 0, 7); g.fill(); }
+      for (let i = 0; i < 30; i++) { g.fillStyle = `rgba(176,168,158,${0.05 + rr() * 0.08})`; g.fillRect(rr() * 256, rr() * 256, 2 + rr() * 30, 1); }
+      t = toTex(c); break;
+    }
+    case 'coalseam': {
+      const [c, g] = canvas(256, 256); const _r83 = new RNG(83); const rr = () => _r83.next();
+      g.fillStyle = '#46433f'; g.fillRect(0, 0, 256, 256);
+      for (let i = 0; i < 1600; i++) { const v = 54 + Math.floor(rr() * 30); g.fillStyle = `rgba(${v},${v - 4},${v - 8},.5)`; g.fillRect(rr() * 256, rr() * 256, 2, 2); }
+      for (let y = 0; y < 256; y += 34 + rr() * 22) { // угольный пласт: чёрные жилы с блеском
+        g.fillStyle = '#0e0f11'; g.beginPath(); g.moveTo(0, y + 6);
+        for (let x = 0; x <= 256; x += 16) g.lineTo(x, y + Math.sin(x * 0.05 + y) * 5 + (rr() - 0.5) * 6);
+        g.lineTo(256, y + 26); for (let x = 256; x >= 0; x -= 16) g.lineTo(x, y + 20 + Math.sin(x * 0.06 + y) * 5);
+        g.closePath(); g.fill();
+        for (let k = 0; k < 16; k++) { g.fillStyle = `rgba(150,190,210,${0.14 + rr() * 0.2})`; g.fillRect(rr() * 256, y + 4 + rr() * 16, 1.4, 1); }
+      }
+      t = toTex(c); break;
+    }
+    case 'gravel': {
+      const [c, g] = canvas(256, 256); const _r59 = new RNG(59); const rr = () => _r59.next();
+      g.fillStyle = '#5c574e'; g.fillRect(0, 0, 256, 256);
+      for (let i = 0; i < 2400; i++) { const v = 70 + Math.floor(rr() * 44); g.fillStyle = `rgb(${v},${v - 5},${v - 12})`; const s = 1 + rr() * 3.4; g.beginPath(); g.ellipse(rr() * 256, rr() * 256, s, s * 0.8, rr() * 3, 0, 7); g.fill(); }
+      for (let i = 0; i < 400; i++) { g.fillStyle = `rgba(30,28,24,.5)`; g.fillRect(rr() * 256, rr() * 256, 1.5, 1.5); }
+      for (let i = 0; i < 90; i++) { g.fillStyle = `rgba(20,22,26,.7)`; const gx = rr() * 256, gy = rr() * 256; g.beginPath(); g.ellipse(gx, gy, 1.6 + rr() * 2.6, 1.3 + rr() * 2, rr() * 3, 0, 7); g.fill(); g.fillStyle = 'rgba(140,170,185,.25)'; g.fillRect(gx - 0.8, gy - 0.8, 1, 1); } // вкрапления угля
       t = toTex(c); break;
     }
     default: {

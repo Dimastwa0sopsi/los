@@ -254,7 +254,8 @@ function SettingsApp({ g, close }: { g: Game; close: () => void }) {
         <label>Авто-качество</label><Seg k="autoQuality" opts={[[true, 'Вкл'], [false, 'Выкл']]} />
       </div>}
       {tab === 'control' && <div className="lg-settings">
-        <label>Режим управления</label><Seg k="control" opts={[['auto', 'Авто'], ['pc', 'ПК'], ['mobile', 'Телефон']]} />
+        <label>Режим управления</label><Seg k="control" opts={[['auto', '🤖 Авто (по устройству)'], ['pc', '🖥 ПК'], ['mobile', '📱 Телефон']]} />
+        <label>Движение на телефоне</label><Seg k="moveStyle" opts={[['joy', '🕹 Джойстик'], ['pad', '✛ Кнопки-стрелки']]} />
         <label>Коробка передач</label><Seg k="transmission" opts={[['auto', 'Автомат'], ['manual', 'Механика']]} />
         <label>Чувствительность камеры</label><Range k="sensitivity" min={0.3} max={2.5} step={0.1} fmt={(v) => v.toFixed(1)} />
         <label>Масштаб мини-карты</label><Range k="minimapZoom" min={0.5} max={3} step={0.1} fmt={(v) => v.toFixed(1) + '×'} />
