@@ -1,21 +1,23 @@
 # ════════════════════════════════════════════════════════════════════════════
 #  LOS GOROD — СЕРВЕР В ОДНОЙ ЯЧЕЙКЕ. Одна ссылка — навсегда.
 #
-#  Как пользоваться: скопируйте весь этот код в одну ячейку Colab и жмите Run.
-#  ПЕРВЫЙ запуск задаст два вопроса (ответы сохранятся на ваш Google Drive):
-#    1) ngrok authtoken — https://dashboard.ngrok.com/get-started/your-authtoken
-#       (бесплатный аккаунт; токен держите в секрете, он теперь только у вас на Drive)
-#    2) постоянный домен — там же в дашборде: «Domains» → «New Domain». Один
-#       статичный домен дают бесплатно. Именно он делает ссылку вечной.
-#  Все следующие разы: просто Run. Ничего вводить не надо, ссылка не меняется,
-#  сейвы игроков лежат на Drive и переживают любые перезапуски. Играйте по ссылке
-#  из зелёной панели: https://dimastwa0sopsi.github.io/los/?srv=wss://<домен>/
+#  1) Вставьте NGROK_AUTHTOKEN в строку ниже (dashboard.ngrok.com → Your Authtoken).
+#     Токен храните как пароль: не коммитьте в git, не кидайте в чат.
+#  2) Runtime → Run. Через ~2 минуты внизу появится зелёная панель со ссылкой
+#     в игру: https://dimastwa0sopsi.github.io/los/?srv=wss://<домен>/
+#  3) Повторные запуски — просто Run: настройки читаются с Google Drive, ссылка
+#     постоянная, сейвы игроков переживают любые рестарты Colab.
 # ════════════════════════════════════════════════════════════════════════════
+
+NGROK_AUTHTOKEN = ''                                             # ← ВСТАВЬТЕ ТОКЕН СЮДА
+STATIC_DOMAIN   = 'sandbank-economic-zeppelin.ngrok-free.dev'    # ваш статичный домен ngrok
+
+# ─────────────────────────── служебное, не менять ───────────────────────────
 import getpass, json, os, shutil, subprocess, sys, time, urllib.request
 
-LG     = '/content/drive/MyDrive/los-gorod'          # всё игрока живёт здесь
-CFG_F  = LG + '/cfg.json'                            # токен+домен: спросим один раз
-PORT   = 7860
+LG       = '/content/drive/MyDrive/los-gorod'   # код, node, база и настройки игрока
+CFG_F    = LG + '/cfg.json'
+PORT     = 7860
 NODE_VER = 'v20.18.1'
 
 def say(icon, *m): print(f'{icon} \033[1m{" ".join(map(str, m))}\033[0m')
@@ -31,18 +33,18 @@ from google.colab import drive
 drive.mount('/content/drive', force_remount=False)
 for d in (LG + '/app', LG + '/data', LG + '/node'): os.makedirs(d, exist_ok=True)
 
-# ── настройки: спрашиваем только при самом первом запуске ──────────────────
-cfg = {}
+# ── настройки: строки сверху главные; остальное помним на Drive ─────────────
+saved = {}
 if os.path.exists(CFG_F):
-    try: cfg = json.load(open(CFG_F))
-    except Exception: cfg = {}
-if not cfg.get('NGROK_AUTHTOKEN'):
-    cfg['NGROK_AUTHTOKEN'] = getpass.getpass('1/2 · Ngrok authtoken (dashboard.ngrok.com → Your Authtoken): ').strip()
-if 'STATIC_DOMAIN' not in cfg:
-    cfg['STATIC_DOMAIN'] = input('2/2 · Постоянный домен (ngrok → Domains → New Domain; Enter — случайный адрес): ').strip()
-json.dump(cfg, open(CFG_F, 'w'))
-if not cfg['NGROK_AUTHTOKEN']:
+    try: saved = json.load(open(CFG_F))
+    except Exception: saved = {}
+token = NGROK_AUTHTOKEN.strip() or saved.get('NGROK_AUTHTOKEN', '')
+dom   = STATIC_DOMAIN.strip() or saved.get('STATIC_DOMAIN', '')
+if not token:
+    token = getpass.getpass('Ngrok authtoken (один раз, сохранится на Drive): ').strip()
+if not token:
     say('❌', 'Без authtoken туннель не поднять'); raise SystemExit(1)
+json.dump({'NGROK_AUTHTOKEN': token, 'STATIC_DOMAIN': dom}, open(CFG_F, 'w'))
 
 # ── свежий код игры (подтягивается при каждом Run) ─────────────────────────
 APP = LG + '/app'
@@ -76,16 +78,16 @@ run('npm install --no-audit --no-fund --loglevel=error', cwd=APP + '/server', ti
 # ── глушим старый сервер и поднимаем туннель ДО старта ─────────────────────
 run('pkill -f "node .*server\\.js" || true'); time.sleep(1)
 say('🌐', 'Туннель ngrok…')
-run(f'"{sys.executable}" -m pip install -q "pyngrok==7.2.3"')   # v8+ ломает поле domain — держим классический API
+run(f'"{sys.executable}" -m pip install -q "pyngrok==7.2.3"')   # v8+ ломает поле domain
 from pyngrok import conf, ngrok
-conf.get_default().auth_token = cfg['NGROK_AUTHTOKEN']
+conf.get_default().auth_token = token
 try:
-    dom = cfg.get('STATIC_DOMAIN', '')
     t = ngrok.connect(PORT, 'http', **({'domain': dom} if dom else {}))
 except Exception as e:
     say('❌', 'ngrok:', e)
-    if cfg.get('STATIC_DOMAIN'):
-        say('ℹ️', 'Домен должен быть создан в ngrok → Domains → New Domain (бесплатно, один раз).')
+    if dom:
+        say('ℹ️', 'Домен должен быть создан в ngrok → Domains → New Domain (бесплатно, один раз),')
+        say('ℹ️', 'и принадлежать тому же аккаунту, что и authtoken.')
     raise SystemExit(1)
 url_ws = str(t.public_url).replace('https://', 'wss://').replace('http://', 'ws://')
 
@@ -115,7 +117,7 @@ print(bar + '\033[0m')
 print('  ССЫЛКА В ИГРУ :', link)
 print('  Адрес сервера :', url_ws)
 print('  Сейвы         :', LG + '/data/game.db (Google Drive)')
-print('  Домен         :', ('постоянный ✓ — ссылка не изменится никогда' if cfg.get('STATIC_DOMAIN')
-                              else 'случайный ⚠ после рестарта адрес будет новый — создайте домен в ngrok'))
+print('  Домен         :', ('постоянный ✓ — ссылка не изменится никогда' if dom
+                              else 'случайный ⚠ после рестарта адрес будет новый'))
 print('\033[92m' + bar + '\033[0m')
 print('  Следующий раз: просто Run этой ячейки. Та же ссылка, тот же мир, тот же прогресс.\n')
