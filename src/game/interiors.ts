@@ -876,14 +876,30 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
       // неон, зеркальный шар, лампы
       ib.cyl('c:#9ca3af', 0, H - 0.4, 2.4, 0.04, 0.5);
       ib.cyl('chrome', 0, H - 0.9, 2.4, 0.62, 0.6);
-      ib.plane('sign:ДИСКО · БАР «ОГОНЁК»|#f472b6', 0, H - 1.6, -D / 2 + 0.2, 6.4, 0.7, 0);
+      ib.plane('sign:КЛУБ-БАР «ОГОНЁК» · ТАНЦЫ ДО УТРА|#f472b6', 0, H - 1.6, -D / 2 + 0.2, 7.4, 0.7, 0);
+      // световые столбы вдоль танцпола
+      for (let i = 0; i < 6; i++) ib.f('glow:' + ['#a855f7', '#22d3ee', '#f472b6', '#facc15'][i % 4], -5.0 + i * 2.0, 0.06, 2.6, 0.1, H - 1.5, 0.1, false);
+      // лазерные лучи из углов в центр пола
+      for (const [lx, lz, col] of [[-10, -7, '#22d3ee'], [10, -7, '#f472b6'], [-10, 7.4, '#facc15'], [10, 7.4, '#a855f7']] as const)
+        ib.f('glow:' + col, lx / 2, H - 1.9, lz / 2, Math.hypot(lx, lz), 0.05, 0.05, false, Math.atan2(-lz, -lx));
+      // VIP: бархатные стойки с лентой у западных диванов
+      for (const pz of [1.4, 4.6]) { ib.cyl('c:#b45309', -9.2, 0, pz, 0.06, 1.0); ib.cyl('c:#fbbf24', -9.2, 1.0, pz, 0.09, 0.06); }
+      ib.f('glow:#f472b6', -9.2, 0.72, 3.0, 0.05, 0.05, 3.4, false);
       ib.light(-7.5, H - 0.6, 1.0, 1.6, 0xa855f7, 20); ib.light(7.5, H - 0.6, 1.0, 1.6, 0x22d3ee, 20);
       ib.light(0, H - 0.5, 3.0, 1.8, 0xf472b6, 24); ib.light(-2.4, 2.6, -5.4, 1.0, 0xffd7a0, 12);
       ib.plant(-11.4, -6.4); ib.plant(11.4, -6.4);
-      // гости у стойки и на танцполе: с включённым диско-светом они пускаются в пляс
-      ib.npc(-5.4, 2.2, 0.6, 'dancer'); ib.npc(-1.2, 4.2, 2.4, 'dancer');
-      ib.npc(2.6, 3.4, -0.7, 'dancer'); ib.npc(5.8, 5.2, 3.0, 'dancer');
+      // толпа на танцполе: 18 гостей, часть — хостес; с диско-светом все пускаются в пляс
+      for (let i = 0; i < 18; i++) {
+        const cx = ((i * 7) % 11) - 5.0 + ((i * 13) % 5) * 0.22;
+        const cz = -0.6 + ((i * 11) % 7) * 0.95 + ((i * 3) % 4) * 0.14;
+        ib.npc(cx, cz, ((i * 37) % 63) / 10, i % 4 === 0 ? 'hostess' : 'dancer');
+      }
+      // хостес у сцены и в VIP, бармен за стойкой, гости на диванах и у бара
+      ib.npc(-2.6, 6.3, Math.PI, 'hostess'); ib.npc(2.6, 6.3, Math.PI, 'hostess');
+      ib.npc(-10.4, 3.0, Math.PI / 2, 'hostess');
       ib.npc(-2.4, -4.0, Math.PI, 'bartender');
+      ib.npc(-10.8, 4.4, Math.PI / 2, 'guest'); ib.npc(10.8, 5.8, -Math.PI / 2, 'guest');
+      ib.npc(-0.4, -4.2, Math.PI, 'guest'); ib.npc(3.6, -4.2, Math.PI, 'guest');
       break;
     }
     case 'ozgim': {

@@ -529,6 +529,9 @@ export class Game {
       if (n.role === 'police') { look.top = 'shirt'; look.topColor = '#1e3a8a'; look.bottom = 'trousers'; look.bottomColor = '#111827'; }
       if (n.role === 'doctor') { look.top = 'shirt'; look.topColor = '#f8fafc'; }
       if (n.role === 'cashier') { look.top = 'tshirt'; look.topColor = '#16a34a'; }
+      if (n.role === 'dancer') { look.gender = 'f'; look.top = 'tshirt'; look.topColor = ['#db2777', '#a855f7', '#22d3ee', '#facc15'][n.x.toFixed(1).length % 4]; look.bottom = 'skirt'; look.bottomColor = '#1f2937'; look.hairColor = ['#f5d76e', '#8b5cf6', '#111827', '#b91c1c'][Math.abs(Math.round(n.z)) % 4]; }
+      if (n.role === 'hostess') { look.gender = 'f'; look.top = 'tshirt'; look.topColor = '#dc2626'; look.bottom = 'skirt'; look.bottomColor = '#7f1d1d'; look.hairColor = '#f5d76e'; look.lips = 'full'; look.lipColor = '#dc2626'; }
+      if (n.role === 'bartender') { look.top = 'shirt'; look.topColor = '#111827'; look.bottom = 'trousers'; look.bottomColor = '#1f2937'; }
       this.peds.addStatic(look, n.x, n.z, n.a, n.role);
     }
     this.scene.background = new THREE.Color(0x1a1a1f);
