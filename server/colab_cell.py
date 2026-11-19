@@ -17,14 +17,16 @@
 import os
 
 CFG = {
-    'NGROK_TOKEN':  '3LIMieFrzz3NgqQXEOr5RxxsoIG_3gZMCtBAoXKmMPDxgCzET',   # автозапуск туннеля без ручного ввода
+    # ⚠️ НИКОГДА не вписывайте токен в файл — он попадает в репозиторий и утекает.
+    # Оставьте пустым: при запуске ячейка сама спросит токен скрытым вводом.
+    'NGROK_TOKEN':  '',                        # можно задать здесь ИЛИ через переменную окружения NGROK_TOKEN
     'NGROK_DOMAIN': '',                        # необязательно: статический домен ngrok
     'GH_TOKEN':     '',                        # необязательно: contents:write → live.json обновится сам
     'ADMIN_TOKEN':  'losgorod-admin',
     'PORT':         3000,
     'GAME_DIR':     '/content/drive/MyDrive/MyGame',
-    'GAME_SITE':    'https://dimastwa0sopsi.github.io/File/',
-    'GH_REPO':      'Dimastwa0sopsi/File',
+    'GAME_SITE':    'https://dimastwa0sopsi.github.io/los/',
+    'GH_REPO':      'Dimastwa0sopsi/los',
     'GH_BRANCH':    'main',
     'FORCE_UPDATE': 0,                         # 1 — перекачать server.js в любом случае
     'RESTART':      '0',                       # '1' — перезапустить сервер
@@ -303,7 +305,16 @@ def step_tunnel():
         return saved
     try:
         from pyngrok import ngrok, conf
-        token = CFG['NGROK_TOKEN'].strip()
+        token = (CFG['NGROK_TOKEN'] or os.environ.get('NGROK_TOKEN', '')).strip()
+        if not token:
+            # токен не хранится в коде — спрашиваем один раз скрытым вводом
+            try:
+                import getpass
+                token = getpass.getpass('🔑 Вставьте authtoken ngrok (ввод не отображается): ').strip()
+            except Exception:                     # noqa: BLE001
+                token = input('🔑 Вставьте authtoken ngrok: ').strip()
+            if token:
+                CFG['NGROK_TOKEN'] = token       # только в памяти этой сессии Colab
         if token:
             conf.get_default().auth_token = token
         for t in ngrok.get_tunnels():
@@ -1029,6 +1040,14 @@ def show_panel():
                 return
         say_msg(False, 'Сервер не ответил за 15 секунд — смотрите «Логи»')
 
+    def stop_only():
+        say_msg(True, 'Останавливаю сервер…')
+        if stop_server():
+            say_msg(True, '⏹ Сервер остановлен. Запустить — кнопкой «▶️ Старт».')
+        else:
+            say_msg(False, 'Сервер сейчас не запущен')
+        draw_status()
+
     public_url.observe(lambda _c: rebuild_link(), names='value')
     log_lines.observe(lambda _c: refresh_log(), names='value')
     log_errors.observe(lambda _c: refresh_log(), names='value')
@@ -1036,8 +1055,9 @@ def show_panel():
     tab_server = W.VBox([
         head('Адрес и постоянная ссылка'),
         W.HBox([public_url, plain('🔄 Взять адрес', tunnel_now, width='150px'),
-                plain('📡 Опубликовать', publish_now, 'success', width='160px'),
-                plain('🔁 Перезапустить', restart_server, 'warning', width='165px')]),
+                plain('📡 Опубликовать', publish_now, 'success', width='160px')]),
+        W.HBox([plain('▶️ Старт / Рестарт', restart_server, 'success', width='190px'),
+                plain('⏹ Стоп сервера', stop_only, 'danger', width='160px')]),
         link_box, head('Служебные действия'),
         W.HBox([button('Инфо сервера', 'server_info'), button('Размер базы', 'db_size'),
                 button('Бэкап базы', 'backup'), button('Техработы ВКЛ', 'maintenance_on', 'warning'),
