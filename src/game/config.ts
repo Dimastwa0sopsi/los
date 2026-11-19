@@ -76,6 +76,8 @@ export const isMobileDevice = () =>
 // ---------- Настройки ----------
 export interface Settings {
   control: 'auto' | 'pc' | 'mobile';
+  /** чем двигаться на телефоне: джойстик или крестовина-кнопки */
+  moveStyle: 'joy' | 'pad';
   quality: 'low' | 'medium' | 'high' | 'ultra';
   drawDistance: number; // м
   renderScale: number; // 0.5..1
@@ -94,7 +96,7 @@ export interface Settings {
 export function defaultSettings(): Settings {
   const mob = isMobileDevice();
   return {
-    control: 'auto', quality: mob ? 'low' : 'high', drawDistance: mob ? 220 : 560,
+    control: 'auto', moveStyle: 'joy', quality: mob ? 'low' : 'high', drawDistance: mob ? 220 : 560,
     renderScale: mob ? 0.68 : 1, shadows: !mob, effects: !mob, traffic: mob ? 0.35 : 0.8,
     peds: mob ? 0.35 : 0.8, volume: 0.6, muted: false, sensitivity: 1, minimapZoom: 1.2,
     minimapRotate: true, transmission: 'auto', autoQuality: true,

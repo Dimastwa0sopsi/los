@@ -215,10 +215,19 @@ export function getTex(key: string): THREE.Texture {
       t = toTex(c); break;
     }
     case 'grass': {
-      const [c, g] = canvas(256, 256); noise(g, 256, 256, '#5a8a38', 22, 6000, 9);
+      // новый газон: разнотравный ковёр — пятна света/тени, проплешины, плотные травинки, микро-цветы
+      const [c, g] = canvas(256, 256); noise(g, 256, 256, '#4e8b3a', 20, 7000, 9);
       const r = new RNG(19);
-      for (let i = 0; i < 40; i++) { g.fillStyle = r.chance(0.5) ? 'rgba(120,150,60,0.18)' : 'rgba(40,80,30,0.18)'; g.beginPath(); g.arc(r.range(0, 256), r.range(0, 256), r.range(10, 40), 0, 7); g.fill(); }
-      g.strokeStyle = 'rgba(150,190,90,0.35)'; for (let i = 0; i < 900; i++) { const x = r.range(0, 256), y = r.range(0, 256); g.beginPath(); g.moveTo(x, y); g.lineTo(x + r.range(-1, 1), y - r.range(2, 5)); g.stroke(); }
+      const tones = ['rgba(96,158,62,0.16)', 'rgba(58,116,44,0.16)', 'rgba(128,170,72,0.13)', 'rgba(84,104,48,0.14)', 'rgba(40,86,34,0.16)'];
+      for (let i = 0; i < 56; i++) { g.fillStyle = r.pick(tones); g.beginPath(); g.arc(r.range(0, 256), r.range(0, 256), r.range(9, 42), 0, 7); g.fill(); }
+      for (let i = 0; i < 10; i++) { g.fillStyle = 'rgba(122,102,64,0.15)'; g.beginPath(); g.ellipse(r.range(0, 256), r.range(0, 256), r.range(6, 20), r.range(4, 12), r.range(0, 3), 0, 7); g.fill(); }
+      for (let i = 0; i < 1400; i++) {
+        const x = r.range(0, 256), y = r.range(0, 256);
+        g.strokeStyle = r.chance(0.62) ? 'rgba(152,196,92,0.34)' : 'rgba(64,110,46,0.30)';
+        g.lineWidth = r.chance(0.8) ? 1 : 1.6;
+        g.beginPath(); g.moveTo(x, y); g.lineTo(x + r.range(-1.2, 1.2), y - r.range(2, 6)); g.stroke();
+      }
+      for (let i = 0; i < 26; i++) { g.fillStyle = r.pick(['rgba(250,240,140,0.5)', 'rgba(240,240,245,0.45)', 'rgba(216,180,254,0.4)']); g.beginPath(); g.arc(r.range(0, 256), r.range(0, 256), r.range(0.8, 1.8), 0, 7); g.fill(); }
       t = toTex(c); break;
     }
     case 'cloud': {
