@@ -78,8 +78,13 @@ run('npm install --no-audit --no-fund --loglevel=error', cwd=APP + '/server', ti
 # ── глушим старый сервер и поднимаем туннель ДО старта ─────────────────────
 run('pkill -f "node .*server\\.js" || true'); time.sleep(1)
 say('🌐', 'Туннель ngrok…')
-run(f'"{sys.executable}" -m pip install -q "pyngrok==7.2.3"')   # v8+ ломает поле domain
+# v8 ломает поле domain; ядро Colab кэширует импорты между Run — вычищаем под ноль
+run(f'"{sys.executable}" -m pip uninstall -y pyngrok || true')
+run(f'"{sys.executable}" -m pip install -q --force-reinstall "pyngrok==7.2.3"')
+for _m in [k for k in list(sys.modules) if k == 'pyngrok' or k.startswith('pyngrok.')]: del sys.modules[_m]
 from pyngrok import conf, ngrok
+import pyngrok as _pg
+say('📦', 'pyngrok', getattr(_pg, '__version__', '?'))
 conf.get_default().auth_token = token
 try:
     t = ngrok.connect(PORT, 'http', **({'domain': dom} if dom else {}))

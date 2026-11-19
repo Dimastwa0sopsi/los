@@ -277,7 +277,9 @@ def step_deps():
         import pyngrok                            # noqa: F401
     except Exception:                            # noqa: BLE001
         say('📦', 'Ставим pyngrok…')
-        subprocess.run(f'{sys.executable} -m pip install -q "pyngrok==7.2.3"', shell=True)  # v8+ не принимает 'domain'
+        subprocess.run(f'{sys.executable} -m pip uninstall -y pyngrok || true', shell=True)
+        subprocess.run(f'{sys.executable} -m pip install -q --force-reinstall "pyngrok==7.2.3"', shell=True)  # v8+ не принимает 'domain'
+        for _m in [k for k in list(sys.modules) if k == 'pyngrok' or k.startswith('pyngrok.')]: del sys.modules[_m]
 
 
 def start_server():
