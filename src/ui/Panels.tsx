@@ -81,7 +81,7 @@ export function GamePanel({ g, panel, close }: { g: Game; panel: Panel; close: (
     }
     case 'factory': { const on = g.job?.type === 'factory'; return (<Modal title="Проходная завода" onClose={close}><p>Работа грузчиком: возьмите деталь на складе (жёлтый маркер), донесите и загрузите в указанную фуру у рампы. Оплата $120 за рейс, бонус $400 за смену из 6 рейсов.</p>
       <button className="lg-btn lg-btn-main mt-3" onClick={() => { g.factoryHire(); close(); }}>{on ? 'Уволиться со смены' : 'Устроиться на смену'}</button></Modal>); }
-    case 'farm': return (<Modal title="Агрохолдинг «Нива»" onClose={close}><p>Садитесь в зелёный комбайн у поля (F) и проезжайте по пшенице. За каждый убранный участок — $5, за полосу из 4 рядов — бонус $200, за всё поле — $500.</p><button className="lg-btn mt-3" onClick={close}>Понятно</button></Modal>);
+    case 'farm': return (<Modal title="Агрохолдинг «Нива»" onClose={close}><p>Садитесь в зелёный комбайн у поля (E) и проезжайте по пшенице. За каждый убранный участок — $5, за полосу из 4 рядов — бонус $200, за всё поле — $500.</p><button className="lg-btn mt-3" onClick={close}>Понятно</button></Modal>);
     case 'trucker': return (
       <Modal title="🚚 Диспетчерская · Дальнобойщик" onClose={close} wide>
         <p className="mb-2 opacity-80">Выберите заказ: фура появится на площадке терминала. Довезите груз до точки и остановитесь — оплата сразу, повреждения снижают её до 50%. Возврат фуры — бонус $120. Заказы обновляются каждые 5 минут.</p>
