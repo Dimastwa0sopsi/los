@@ -216,23 +216,63 @@ def step_files():
     if not pkg.get('name'):
         pkg['name'] = 'losgorod-server'
         changed = True
+    deps = {'ws': '^8', 'better-sqlite3': '^12'}
+    if pkg.get('dependencies') != deps:          # закрепляем версии — старый lock больше не подтянет древний sqlite
+        pkg['dependencies'] = deps
+        changed = True
     if changed:
         json.dump(pkg, open(pkg_path, 'w', encoding='utf-8'), ensure_ascii=False, indent=2)
         say('🧩', 'package.json поправлен (убрано type: module)')
 
 
+def node_modules_ok():
+    """честная проверка: модули должен уметь загрузить NODE, а не питон (иначе ловим segfault молча)"""
+    probe = subprocess.run(['node', '-e', "require('ws'); require('better-sqlite3'); console.log('deps-ok')"],
+                           cwd=GAME_DIR, capture_output=True, text=True, timeout=60)
+    return probe.returncode == 0 and 'deps-ok' in probe.stdout
+
+
+def npm_install(log_tail_lines=12):
+    """ставим закрепённые версии и ПОКАЗЫВАЕМ хвост вывода — прятать ошибки себе дороже"""
+    say('📦', 'npm install ws@8 better-sqlite3@12 …')
+    p = subprocess.run('npm install --no-audit --no-fund ws@8 better-sqlite3@12 2>&1 | tail -n %d' % log_tail_lines,
+                       shell=True, cwd=GAME_DIR, text=True, capture_output=True, timeout=900)
+    if p.stdout.strip():
+        print(p.stdout.strip())
+    return p.returncode == 0
+
+
 def step_deps():
-    need = []
-    for mod, pkg in (('ws', 'ws'), ('better_sqlite3', 'better-sqlite3')):
+    try:
+        if node_modules_ok():
+            say('✅', 'Зависимости на месте (ws, better-sqlite3 — загружаются)')
+            return
+    except Exception as e:                        # noqa: BLE001
+        say('⚠️', f'Проверка зависимостей: {e}')
+    npm_install()
+    try:
+        if node_modules_ok():
+            say('✅', 'Зависимости установлены и загружаются')
+            return
+    except Exception:                             # noqa: BLE001
+        pass
+    # вторая попытка: снос старых модулей (типичная причина — собраны под другой node)
+    say('♻️', 'Первая попытка не помогла — сносим старые node_modules и ставим заново')
+    import shutil
+    for junk in ('node_modules', 'package-lock.json'):
+        fp = os.path.join(GAME_DIR, junk)
         try:
-            __import__(mod)
-        except Exception:                        # noqa: BLE001
-            need.append(pkg)
-    if need:
-        say('📦', 'Ставим: ' + ', '.join(need))
-        subprocess.run(f'npm install {" ".join(need)} > /dev/null 2>&1', shell=True)
-    else:
-        say('✅', 'Зависимости на месте (ws, better-sqlite3)')
+            if os.path.isdir(fp):
+                shutil.rmtree(fp)
+            elif os.path.isfile(fp):
+                os.remove(fp)
+        except Exception as e:                    # noqa: BLE001
+            say('⚠️', f'не удалось удалить {junk}: {e}')
+    npm_install(24)
+    if not node_modules_ok():
+        raise SystemExit('❌ Зависимости не ставятся. Выполните в ячейке вручную и пришлите вывод:\n'
+                         f'   !cd "{GAME_DIR}" && node -v && npm install --foreground-scripts better-sqlite3 2>&1 | tail -30')
+    say('✅', 'Зависимости переустановлены начисто')
     try:
         import pyngrok                            # noqa: F401
     except Exception:                            # noqa: BLE001
@@ -257,9 +297,14 @@ def start_server():
             return True
         if proc.poll() is not None:
             break
-    say('❌', 'Сервер не поднялся, лог ниже:')
+    code = proc.poll()
+    say('❌', f'Сервер не поднялся (код выхода: {code}), лог ниже:')
     try:
-        print(open(log_path, encoding='utf-8', errors='replace').read()[-2500:])
+        tail = open(log_path, encoding='utf-8', errors='replace').read()[-2500:]
+        print(tail or '(лог пуст)')
+        if not tail.strip():
+            print('Лог пуст — обычно это падение нативного модуля (segfault). Чинится так:')
+            print(f'   !cd "{GAME_DIR}" && rm -rf node_modules package-lock.json && npm install --no-audit --no-fund ws@8 better-sqlite3@12')
     except Exception:                            # noqa: BLE001
         pass
     return False
