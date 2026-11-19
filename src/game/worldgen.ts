@@ -1333,6 +1333,13 @@ export function generateLayout(): WorldLayout {
       }
     }
   }
+  // станция аренды самокатов прямо у входа в мэрию (центр города)
+  {
+    const mx = 494, mz = 496;
+    if (!solidNear(mx, mz, 1.4)) {
+      scooterDocks.push({ x: mx, z: mz, a: 0 }); addProp({ t: 'scooterdock', x: mx - 1.9, z: mz, r: 0 }, { w: 0.3, d: 0.3, h: 2 });
+    }
+  }
   const inRect = (x: number, z: number, r: { x0: number; x1: number; z0: number; z1: number }, m = 0) => x > r.x0 - m && x < r.x1 + m && z > r.z0 - m && z < r.z1 + m;
 
   // Деревья за городом (леса), без деревьев на пляже, в воде, на полях и в деревнях

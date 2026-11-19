@@ -69,6 +69,8 @@ const MEDS = [
   { name: 'Обезболивающее', sym: 'острая боль в пояснице, не может разогнуться' },
   { name: 'Антисептик и бинт', sym: 'глубокий порез предплечья, кровотечение' },
 ];
+/** радиус «границы леса»: дальше начинается пустой мир, поэтому возвращаем игрока в город */
+const WORLD_BOUND_R = 2300;
 const POI_ICON: Record<string, string> = { shop24: '🛒', supermarket: '🛍️', cafe: '☕', pharmacy: '💊', gunshop: '🔫', service: '🔧', clothes: '👕', barber: '✂️', mall: '🏬', dealer: '🚗', market: '🚙', gas: '⛽', police: '👮', hospital: '🏥', fire: '🚒', cityhall: '🏛️', bank: '🏦', vshop: '🛒', vpharmacy: '💊', vguntruck: '🔫', vadmin: '🏛️', checkpoint: '🏭', farm: '🌾', fishshop: '🎣', bar: '🍸', ozgim: '🛍️', greenhouse: '🌱' };
 export { POI_ICON };
 const POI_COLOR: Record<string, string> = { shop24: '#e11d48', supermarket: '#f59e0b', cafe: '#a16207', pharmacy: '#059669', gunshop: '#374151', service: '#2563eb', clothes: '#8b5cf6', barber: '#db2777', mall: '#7c3aed', dealer: '#0ea5e9', market: '#0369a1', gas: '#16a34a', police: '#1d4ed8', hospital: '#dc2626', fire: '#b91c1c', cityhall: '#1e3a8a', bank: '#0f766e', vshop: '#e11d48', vadmin: '#1e3a8a', checkpoint: '#57534e', farm: '#a16207', beach: '#0891b2', fishshop: '#0e7490', bar: '#a21caf', ozgim: '#0ea5e9' };
@@ -658,6 +660,7 @@ export class Game {
     if (this.intro) { this.updateIntro(dt); this.updateWorldSystems(dt); this.emitHud(dt); return; }
     if (!this.panel) this.handleInput(dt);
     this.updatePlayer(dt);
+    this.enforceWorldBounds();
     this.updateWorldSystems(dt);
     if (!this.interior) this.updateGates(dt);
     this.updateCamera(dt);
@@ -874,6 +877,17 @@ export class Game {
     else if (w !== 'fists') { this.toast(`🔫 ${WEAPONS[w].name} · ${this.combat.mag}/${this.combat.reserve}`); if (!this.combat.mag && this.combat.reserve > 0) this.combat.startReload(); }
   }
   // ================= ИГРОК =================
+  /** мягкая граница мира: если уйти/уехать слишком далеко в лес — возвращаем в Лос-Город */
+  private enforceWorldBounds() {
+    if (this.interior || this.intro || this.rideRemote || this.admFreeze || this.camMode || this.lying) return;
+    const dx = this.px - 540, dz = this.pz - 540;
+    if (dx * dx + dz * dz < WORLD_BOUND_R * WORLD_BOUND_R) return;
+    const x = 516, z = 491.5; // городской спавн
+    if (this.inVeh) { this.inVeh.speed = 0; this.inVeh.place(x + 3, z, Math.PI); }
+    this.px = x; this.pz = z; this.py = this.col.groundAt(x, z, 5, 10); this.pvy = 0; this.fallT = 0;
+    this.state.pos = { x, z, a: this.pa };
+    this.toast('🌲 Вы забрались слишком далеко — вас вернули в город');
+  }
   private updatePlayer(dt: number) {
     const I = this.input;
     if (this.inVeh) { this.updateDriving(dt); return; }
