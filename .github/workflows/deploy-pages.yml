@@ -2,7 +2,7 @@ name: Deploy game to GitHub Pages
 
 on:
   push:
-    branches: [arena/09eb356d-los, main]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
