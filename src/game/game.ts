@@ -2897,15 +2897,18 @@ export class Game {
   }
   marketPeriod() { return Math.floor(Date.now() / (10 * 60 * 1000)); }
   getOffers(): MarketOffer[] { const sold = new Set(JSON.parse(sessionStorage.getItem('lg_sold') ?? '[]') as string[]); return marketOffers(this.marketPeriod()).filter((o) => !sold.has(o.id)); }
-  buyMarket(offerId: string) {
+  /** покупка с авторынка; finalPrice — итог торга с продавцом (не может быть выше цены и ниже разумного дна) */
+  buyMarket(offerId: string, finalPrice?: number) {
     const o = this.getOffers().find((x) => x.id === offerId); if (!o) return;
-    if (!this.pay(o.price)) return;
+    const floor = Math.round(carValue(o.type, o.year, o.mileage, o.condition) * 0.7);
+    const price = finalPrice && finalPrice > 0 && finalPrice <= o.price && finalPrice >= floor ? Math.round(finalPrice) : o.price;
+    if (!this.pay(price)) return;
     const sold = JSON.parse(sessionStorage.getItem('lg_sold') ?? '[]') as string[]; sold.push(o.id); sessionStorage.setItem('lg_sold', JSON.stringify(sold));
     const ml = this.L.marketLot.sort((a, b) => Math.hypot(a.x - this.px, a.z - this.pz) - Math.hypot(b.x - this.px, b.z - this.pz))[0];
     const spot = this.freeSpotNear(ml.x, ml.z);
-    const ov = this.newOwned(o.type, o.color, { condition: o.condition, mileage: o.mileage, year: o.year, paid: o.price, fuel: 40 });
+    const ov = this.newOwned(o.type, o.color, { condition: o.condition, mileage: o.mileage, year: o.year, paid: price, fuel: 40 });
     this.spawnOwned(ov, spot.x, spot.z, 0);
-    this.toast(`Куплен ${VEHICLES[o.type].name} ${o.year} г. Стоит на площадке рынка`);
+    this.toast(price < o.price ? `🤝 Выторговано! ${VEHICLES[o.type].name} за ${price.toLocaleString('ru')} вместо ${o.price.toLocaleString('ru')}` : `Куплен ${VEHICLES[o.type].name} ${o.year} г. Стоит на площадке рынка`);
   }
   sellVehicle(uidv: string) {
     const v = this.vehicles.find((x) => x.owned?.uid === uidv); const o = this.state.vehicles.find((x) => x.uid === uidv); if (!o) return;

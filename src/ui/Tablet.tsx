@@ -550,10 +550,10 @@ const APPS = [
   { id: 'limited', short: 'LIMITED', name: 'LIMITED Drop', icon: '💎', color: '#a855f7', desc: 'Лимитированные вещи: радужные волосы, корона, золото', size: '40 МБ' },
 ];
 const MENUS: Record<string, { name: string; items: string[] }> = {
-  food: { name: 'Вкусно Доставка', items: ['burger', 'shawarma', 'pizza', 'cola', 'icecream', 'water'] },
-  coffee: { name: 'Кофейня «Зерно»', items: ['coffee', 'tea', 'croissant', 'chocolate', 'juice'] },
-  pizza: { name: 'Пиццерия «Сыр»', items: ['pizza', 'cola', 'juice', 'icecream'] },
-  pharm: { name: 'Аптека 24', items: ['medkit', 'pills', 'vitamins', 'water'] },
+  food: { name: 'Вкусно Доставка', items: ['burger', 'shawarma', 'hotdog', 'sushi', 'pelmeni', 'pizza', 'donut', 'cola', 'lemonade', 'icecream', 'water'] },
+  coffee: { name: 'Кофейня «Зерно»', items: ['coffee', 'tea', 'croissant', 'donut', 'cake', 'chocolate', 'juice', 'smoothie'] },
+  pizza: { name: 'Пиццерия «Сыр»', items: ['pizza', 'hotdog', 'cola', 'kvass', 'juice', 'icecream'] },
+  pharm: { name: 'Аптека 24', items: ['medkit', 'pills', 'vitamins', 'bandage', 'antiseptic', 'sunscreen', 'water'] },
 };
 function Store({ g, go }: P) {
   const [busy, setBusy] = useState<{ id: string; p: number } | null>(null);
