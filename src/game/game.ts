@@ -3882,8 +3882,31 @@ export class Game {
     setTimeout(() => this.receiveDm(id, opts[Math.floor(Math.random() * opts.length)]), 1500 + Math.random() * 2000);
     void text;
   }
+  /** покупка номера телефона: +09XXXXXXXX (девять случайных цифр после префикса) */
+  buyPhone() {
+    const PRICE = 99;
+    if (this.state.phoneNum) { this.toast(`Ваш номер уже активен: ${this.formatPhone(this.state.phoneNum)}`); return; }
+    if (this.state.money < PRICE) { this.sound.error(); this.routeToBank(`💳 SIM-карта стоит $${PRICE}, а у вас недостаточно средств.`); return; }
+    let d = '9'; for (let i = 0; i < 8; i++) d += Math.floor(Math.random() * 10);
+    this.state.money -= PRICE; this.state.phoneNum = '+0' + d;
+    this.save(); this.sound.coin();
+    this.toast(`📱 Новый номер куплен: ${this.formatPhone(this.state.phoneNum)} · SIM закреплена за вами`);
+  }
+  formatPhone(n: string) { return /^\+0\d{9}$/.test(n) ? `${n.slice(0, 3)} ${n.slice(3, 6)}-${n.slice(6, 8)}-${n.slice(8)}` : n; }
+  /** сохранить имя контакта по номеру/нику */
+  addContact(key: string, name: string) { (this.state.contacts ??= {})[key] = name; this.save(); }
+  /** маршрут до ближайшего банка — для подсказки «пополните счёт» */
+  private routeToBank(msg: string) {
+    const banks = this.L.buildings.filter((b) => b.kind === 'bank').sort((a, c) => Math.hypot(a.x - this.px, a.z - this.pz) - Math.hypot(c.x - this.px, c.z - this.pz));
+    const b = banks[0];
+    if (b) { this.destination = { x: b.door.x, z: b.door.z }; this.toast(`${msg} Маршрут до банка проложен 🏦`); }
+    else this.toast(msg);
+  }
   sendDm(to: string, text: string) {
     const t = text.trim().slice(0, 300); if (!t) return;
+    const FEE = 5;
+    if (this.state.money < FEE) { this.sound.error(); this.routeToBank(`💳 Недостаточно средств: СМС стоит $${FEE}.`); return; }
+    this.state.money -= FEE;
     (this.state.dms ??= {})[to] = [...(this.state.dms[to] ?? []), { me: true, text: t, t: Date.now() }].slice(-60);
     const p = this.net?.findByNick(to);
     if (p && this.net) this.net.sendEvent({ e: 'dm', t: p.id, text: t, n: this.state.nick ?? '' });
