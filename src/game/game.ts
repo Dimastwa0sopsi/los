@@ -606,8 +606,15 @@ export class Game {
   private globalKey(code: string) {
     if (this.intro) return;
     if (code === 'Tab') { this.togglePanel({ type: 'phone' }); return; }
-    if (code === 'Enter' && !this.panel && !this.camMode) { this.input.releaseAll(); this.input.unlock(); this.chatFocus?.(); return; }
-    // T — радио в машине (чат теперь на Enter)
+    // Enter или C — чат
+    if ((code === 'Enter' || code === 'KeyC') && !this.panel && !this.camMode) { this.input.releaseAll(); this.input.unlock(); this.chatFocus?.(); return; }
+    // F — эмоции (открывает и закрывает колесо анимаций)
+    if (code === 'KeyF' && !this.camMode) {
+      if (this.panel?.type === 'emotes') { this.closePanel(); return; }
+      if (!this.panel && !this.inVeh) { this.openPanel({ type: 'emotes' }); return; }
+      if (!this.panel && this.inVeh) { this.toast('💃 Эмоции доступны пешком (F)'); return; }
+    }
+    // T — радио в машине (чат теперь на Enter/C)
     if (code === 'KeyT' && !this.camMode) {
       if (this.panel?.type === 'radio') { this.closePanel(); return; }
       if (!this.panel && this.inVeh && !this.passenger) { this.openPanel({ type: 'radio' }); return; }
@@ -834,12 +841,17 @@ export class Game {
       }
       if (I.pressed('KeyZ') || I.vPressed('autopilot')) this.toggleAutopilot();
     }
-    if ((I.pressed('KeyF') || I.vPressed('enter'))) { if (this.inVeh) this.exitVehicle(); else if (this.rideRemote) this.exitRemoteRide(); else this.tryEnterVehicle(); }
-    const eKey = (I.pressed('KeyE') && !(v && v.isHeli)) || I.vPressed('interact');
+    // E — универсальная клавиша действия: сесть/выйти из транспорта ИЛИ контекстное действие.
+    // Если на это нажатие произошёл вход/выход — контекст не дёргаем, чтобы не было двойных срабатываний.
+    const wantAct = I.pressed('KeyE') || I.vPressed('enter');
+    const vehBefore = this.inVeh, rideBefore = this.rideRemote;
+    if (wantAct) { if (this.inVeh) this.exitVehicle(); else if (this.rideRemote) this.exitRemoteRide(); else this.tryEnterVehicle(); }
+    const switched = this.inVeh !== vehBefore || this.rideRemote !== rideBefore;
+    const eKey = ((!switched && I.pressed('KeyE')) && !(v && v.isHeli)) || I.vPressed('interact');
     if (eKey && this.prompt) this.prompt.act();
     if ((I.pressed('KeyR') || I.vPressed('work')) && this.prompt?.r) this.prompt.r();
     else if (I.pressed('KeyR') && !this.lying) this.cycleWeapon();
-    if (I.pressed('KeyB') && !this.inVeh) this.togglePanel({ type: 'emotes' });
+    // эмоции переехали на F (см. globalKey — работает даже при открытой панели)
     if ((I.pressed('KeyL') || I.vPressed('rob')) && this.prompt?.l) this.prompt.l();
     if (I.vPressed('phone')) this.togglePanel({ type: 'phone' });
     if (I.vPressed('inventory')) this.togglePanel({ type: 'inventory' });
@@ -922,7 +934,7 @@ export class Game {
       if (this.coverOn) this.exitCover();
       else if (!this.panel && !this.carrying && !this.crouch) this.enterCover();
     }
-    if (I.pressed('KeyC') || I.vPressed('crouch')) { this.crouch = !this.crouch; }
+    if (I.pressed('ControlLeft') || I.vPressed('crouch')) { this.crouch = !this.crouch; } // C отдан чату — присед на Ctrl
     let run = (I.down('ShiftLeft') || I.vDown('run')) && !this.carrying;
     if (run && this.crouch && (I.down('ShiftLeft'))) this.crouch = false;
     if (this.crouch) run = false;
@@ -1086,7 +1098,7 @@ export class Game {
     if (v.role === 'rental') {
       if (this.state.money < SCOOTER_RATE) { this.toast(`Аренда самоката: $${SCOOTER_RATE}/мин — недостаточно денег`); return; }
       this.state.money -= SCOOTER_RATE; this.rental = { v, t: 0, paid: SCOOTER_RATE };
-      this.toast(`🛴 Аренда началась: $${SCOOTER_RATE} в минуту. X — трюк, F — завершить`);
+      this.toast(`🛴 Аренда началась: $${SCOOTER_RATE} в минуту. X — трюк, E — завершить`);
     }
     if (v.role === 'deco') { this.toast(v.spec.body === 'semi' ? 'Фура заперта — используется для погрузки' : 'Машина заперта — это товар продавца'); return; }
     if (v.role === 'aicombine') { this.toast('Комбайн занят работой'); return; }
@@ -1502,7 +1514,7 @@ export class Game {
     const spot = this.roadSpotNear(this.px, this.pz);
     const ai = this.routeFor(v, spot);
     if (!ai) { v.dispose(); this.toast('Такси не может проехать к вам'); return; }
-    ai.onArrive = () => { if (this.taxi?.v === v && this.taxi.stage === 'coming') { this.taxi.stage = 'waiting'; v.speed = 0; this.toast('Такси прибыло и ждёт вас (F — сесть)'); } };
+    ai.onArrive = () => { if (this.taxi?.v === v && this.taxi.stage === 'coming') { this.taxi.stage = 'waiting'; v.speed = 0; this.toast('Такси прибыло и ждёт вас (E — сесть)'); } };
     v.ai = ai; ai.obeyLights = true; this.addVehicle(v);
     this.taxi = { v, stage: 'coming', dist: 0, t: 0 };
     this.toast('Такси вызвано — следите за значком 🚕 на карте');
@@ -1512,7 +1524,7 @@ export class Game {
     if (t.stage === 'riding') {
       const fare = Math.round(3 + (t.dist / 1000) * 10);
       this.state.money -= Math.min(this.state.money, fare); t.v.ai!.mode = 'idle'; t.v.speed = 0; t.stage = 'arrived';
-      this.toast(`Поездка прервана. Оплата $${fare}. Можно выйти (F)`); return;
+      this.toast(`Поездка прервана. Оплата $${fare}. Можно выйти (E)`); return;
     }
     if (this.passenger && this.inVeh === t.v) { t.stage = 'arrived'; this.exitVehicle(true); }
     t.stage = 'leaving'; t.t = 0; t.v.ai = new AIDriver(); t.v.ai.route = [nearestNodeFast(this.L, t.v.x, t.v.z)]; t.v.ai.route.push(this.L.adj[t.v.ai.route[0]][0].n); t.v.ai.mode = 'wander';
@@ -1627,7 +1639,7 @@ export class Game {
     v.speed = 0; v.fuel = 100; v.condition = 1; v.hasDriver = false; v.lightsUserOff = true;
     this.addVehicle(v);
     const d = Math.round(Math.hypot(v.x - this.px, v.z - this.pz));
-    this.toast(`🎁 ${v.spec.name} рядом (${d} м) · F — сесть · в собственность не переходит`);
+    this.toast(`🎁 ${v.spec.name} рядом (${d} м) · E — сесть · в собственность не переходит`);
     this.sound.coin();
     return true;
   }
@@ -2055,13 +2067,13 @@ export class Game {
   private findPrompt(): Prompt | null {
     const px = this.px, pz = this.pz;
     if (this.intro) return null;
-    if (this.rideRemote) return { text: 'F — выйти из машины', keys: ['F'], act: () => this.exitRemoteRide() };
+    if (this.rideRemote) return { text: 'E — выйти из машины', keys: ['E'], act: () => this.exitRemoteRide() };
     if (this.lying) return { text: 'E — встать · I — еда из холодильника', keys: ['E'], act: () => { this.lying = false; if (this.interior?.bed) { this.px = this.interior.bed.x + 1.2; this.pz = this.interior.bed.z; } } };
     if (this.inVeh) {
       const v = this.inVeh;
       if (this.passenger) {
         if (this.taxi?.v === v && this.taxi.stage === 'waiting') return { text: 'E — выбрать точку на карте', keys: ['E'], act: () => this.openPanel({ type: 'map', mode: 'taxi' }) };
-        if (this.taxi?.v === v && this.taxi.stage === 'arrived') return { text: 'F — выйти из такси', keys: ['F'], act: () => this.exitVehicle() };
+        if (this.taxi?.v === v && this.taxi.stage === 'arrived') return { text: 'E — выйти из такси', keys: ['E'], act: () => this.exitVehicle() };
         return null;
       }
       if (v.owned) {
@@ -2131,8 +2143,8 @@ export class Game {
         if (myl) { vp = { text: `Ваше объявление: $${myl.price.toLocaleString('ru')} · E — снять с продажи`, keys: ['E'], act: () => this.unlist(myl.uid) }; break; }
         if (v.role === 'npcpuppet' || (v.role === 'remote' && !this.remoteOwnerOf(v))) continue;
         const owner = v.role === 'remote' ? this.remoteOwnerOf(v) : null;
-        const label = v.role === 'rental' ? `F — арендовать самокат ($${SCOOTER_RATE}/мин)` : v.role === 'job' && v.spec.body === 'bus' ? 'F — сесть за руль автобуса' : v.role === 'job' && v.spec.body === 'semi' ? 'F — сесть в фуру (рейс)' : owner ? `F — сесть ${owner.taxi ? 'в такси' : 'пассажиром'} к ${owner.name}` : v.role === 'parked' ? `F — угнать: ${v.spec.name}` : (v.role === 'traffic' && v.dummy) ? `F — выкинуть водителя: ${v.spec.name}` : this.taxi?.v === v ? 'F — сесть в такси' : v.role === 'job' ? 'F — Комбайн: начать уборку поля' : v.owned ? `F — сесть: ${v.spec.name}` : v.role === 'deco' ? `${v.spec.name} — заперто` : `F — сесть: ${v.spec.name}`;
-        vp = { text: label, keys: ['F'], act: () => this.tryEnterVehicle() };
+        const label = v.role === 'rental' ? `E — арендовать самокат ($${SCOOTER_RATE}/мин)` : v.role === 'job' && v.spec.body === 'bus' ? 'E — сесть за руль автобуса' : v.role === 'job' && v.spec.body === 'semi' ? 'E — сесть в фуру (рейс)' : owner ? `E — сесть ${owner.taxi ? 'в такси' : 'пассажиром'} к ${owner.name}` : v.role === 'parked' ? `E — угнать: ${v.spec.name}` : (v.role === 'traffic' && v.dummy) ? `E — выкинуть водителя: ${v.spec.name}` : this.taxi?.v === v ? 'E — сесть в такси' : v.role === 'job' ? 'E — Комбайн: начать уборку поля' : v.owned ? `E — сесть: ${v.spec.name}` : v.role === 'deco' ? `${v.spec.name} — заперто` : `E — сесть: ${v.spec.name}`;
+        vp = { text: label, keys: ['E'], act: () => this.tryEnterVehicle() };
         break;
       }
     }
@@ -2683,7 +2695,7 @@ export class Game {
     this.addVehicle(bus);
     this.job = { type: 'bus', line: route.line, next: 0, riders: 0, earned: 0, bus, stage: 'toBus' };
     this.destination = { x: d.x, z: d.z };
-    this.toast(`🚌 Маршрут ${route.line} «${route.name}»: автобус в автопарке. Садитесь за руль (F)`);
+    this.toast(`🚌 Маршрут ${route.line} «${route.name}»: автобус в автопарке. Садитесь за руль (E)`);
     this.closePanel();
   }
   /** маршрут, на котором сейчас работает игрок */
@@ -4409,7 +4421,7 @@ export class Game {
     this.seatChar(this.player, v, free);
     this.camDist = Math.max(5, v.spec.len * 1.1 + 2.5);
     this.sound.door();
-    this.toast(`Вы сели в машину к ${r.name}. F — выйти`);
+    this.toast(`Вы сели в машину к ${r.name}. E — выйти`);
   }
   private updateRideRemote() {
     const rr = this.rideRemote!; const r = this.remotes.get(rr.id);

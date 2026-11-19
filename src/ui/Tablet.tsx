@@ -626,7 +626,7 @@ function Vzhuh({ g, close }: P) {
   const mine = g.getState().vehicles.filter((o) => VEHICLES[o.type].body === 'scooter');
   return (
     <div className="tb-list">
-      <div className="tb-card big">🛴 <div><b>Тариф: ${SCOOTER_RATE} в минуту</b><small>Подойдите к самокату и нажмите F · X — трюк · F — завершить аренду</small></div></div>
+      <div className="tb-card big">🛴 <div><b>Тариф: ${SCOOTER_RATE} в минуту</b><small>Подойдите к самокату и нажмите E · X — трюк · E — завершить аренду</small></div></div>
       <h4 className="tb-h">Ближайшие станции</h4>
       {docks.slice(0, 6).map(({ d, dist, free }, i) => <div className="tb-card" key={i}>📍 <div className="grow"><b>Станция · {Math.round(dist)} м</b><small>свободно: {free}</small></div><button className="ui-btn sm" onClick={() => { g.destination = { x: d.x, z: d.z }; g.toast('Маршрут к станции проложен'); close(); }}>Маршрут</button></div>)}
       <h4 className="tb-h">Свой самокат</h4>

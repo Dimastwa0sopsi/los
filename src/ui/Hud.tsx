@@ -119,7 +119,7 @@ export function Hud({ g, hud, mobile }: { g: Game; hud: HudState; mobile: boolea
         {hud.rental && <div className="hx-task">🛴 Аренда: {hud.rental.min} мин · ${hud.rental.cost}</div>}
         {hud.tradeInvite && <div className="hx-task">🔁 {hud.tradeInvite} предлагает обмен — /obm да</div>}
         {hud.taxi && <div className="hx-task">🚕 {hud.taxi}</div>}
-        {hud.riding && <div className="hx-task">🧍 Вы пассажир · F — выйти</div>}
+        {hud.riding && <div className="hx-task">🧍 Вы пассажир · E — выйти</div>}
       </div>
       {v && !v.passenger && <Speedo kmh={v.kmh} rpm={v.rpm} gear={v.gear} heli={v.heli} alt={v.alt} fuel={v.fuel} name={v.name} lights={v.lights} auto={v.autopilot} cruise={v.cruise} diag={v.diag} canHydro={v.canHydro} hydro={v.hydro} onHydro={() => { if (v.hydro >= 100) g.hydroDown(); else g.hydroUp(); }} onCruise={() => { g.cruise = g.cruise > 0 ? 0 : Math.max(4.5, Math.abs(v.kmh / 3.6)); g.toast(g.cruise > 0 ? `Круиз-контроль: ${Math.round(g.cruise * 3.6)} км/ч` : 'Круиз-контроль выключен'); }} />}
       {hud.trip > 0 && <div className="hx-trip" style={{ opacity: hud.trip * 0.55 }} />}
