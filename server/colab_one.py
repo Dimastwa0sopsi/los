@@ -76,7 +76,7 @@ run('npm install --no-audit --no-fund --loglevel=error', cwd=APP + '/server', ti
 # ── глушим старый сервер и поднимаем туннель ДО старта ─────────────────────
 run('pkill -f "node .*server\\.js" || true'); time.sleep(1)
 say('🌐', 'Туннель ngrok…')
-run(f'"{sys.executable}" -m pip install -q pyngrok')
+run(f'"{sys.executable}" -m pip install -q "pyngrok==7.2.3"')   # v8+ ломает поле domain — держим классический API
 from pyngrok import conf, ngrok
 conf.get_default().auth_token = cfg['NGROK_AUTHTOKEN']
 try:
