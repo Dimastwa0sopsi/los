@@ -13,10 +13,12 @@ export interface Interior {
   lights: THREE.Light[];
   bed?: { x: number; z: number; y: number; a: number }; doorSpots: Record<string, { x: number; z: number; a: number; y: number }>;
   pots?: { x: number; z: number }[];
+  /** динамические объекты интерьера (анимируются игрой): вагонетки шахты */
+  carts?: THREE.Object3D[];
   dispose: () => void;
 }
 export type InteriorKind = 'shop24' | 'supermarket' | 'cafe' | 'pharmacy' | 'gunshop' | 'clothes' | 'barber' | 'police' | 'hospital' | 'cityhall' | 'bank' | 'fishshop' |
-  'dealer' | 'service' | 'mall' | 'hall' | 'apt_eco' | 'apt_mid' | 'apt_lux' | 'house_city' | 'house_village' | 'vshop' | 'vpharmacy' | 'vguntruck' | 'vadmin' | 'checkpoint' | 'fire' | 'gas' | 'mallfood' | 'basement' | 'truckoffice' | 'office' | 'scootershop' | 'greenhouse' | 'bar' | 'ozgim';
+  'dealer' | 'service' | 'mall' | 'hall' | 'apt_eco' | 'apt_mid' | 'apt_lux' | 'house_city' | 'house_village' | 'vshop' | 'vpharmacy' | 'vguntruck' | 'vadmin' | 'checkpoint' | 'fire' | 'gas' | 'mallfood' | 'basement' | 'truckoffice' | 'office' | 'scootershop' | 'greenhouse' | 'bar' | 'ozgim' | 'mine';
 
 const WALLS = {
   white: 'c:#f1efe9', beige: 'c:#e8dcc4', mint: 'c:#d1e7dd', grey: 'c:#d4d4d8', blue: 'c:#c7d2fe', wood: 'c:#b08060', dark: 'c:#3f3f46',
@@ -28,7 +30,7 @@ const GOODS = ['#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#a855f7', '#f97316',
 class IB {
   b = new Batcher(); cols: Box[] = []; acts: Interact[] = []; npcs: Interior['npcs'] = []; lights: THREE.Light[] = []; group = new THREE.Group();
   ox = INTERIOR_ORIGIN.x; oz = INTERIOR_ORIGIN.z; doorSpots: Interior['doorSpots'] = {};
-  bed?: Interior['bed']; pots: { x: number; z: number }[] = [];
+  bed?: Interior['bed']; pots: { x: number; z: number }[] = []; carts: THREE.Object3D[] = [];
 
   floor(x0: number, z0: number, x1: number, z1: number, mk: string, s = 2, y = 0) { this.b.add(mk, T.box, M(this.ox + (x0 + x1) / 2, y - 0.05, this.oz + (z0 + z1) / 2, 0, x1 - x0, 0.1, z1 - z0), s); }
   ceil(x0: number, z0: number, x1: number, z1: number, h: number, c = '#f4f4f0') { this.b.add('c:' + c, T.box, M(this.ox + (x0 + x1) / 2, h + 0.05, this.oz + (z0 + z1) / 2, 0, x1 - x0, 0.1, z1 - z0)); }
@@ -256,7 +258,7 @@ class IB {
     return {
       group: g, colliders: this.cols, acts: this.acts, npcs: this.npcs, spawn: { ...spawn, x: this.ox + spawn.x, z: this.oz + spawn.z },
       bounds: { x0: this.ox + bounds.x0, x1: this.ox + bounds.x1, z0: this.oz + bounds.z0, z1: this.oz + bounds.z1, h: bounds.h },
-      bed: this.bed, doorSpots: this.doorSpots, pots: this.pots.map((p) => ({ x: this.ox + p.x, z: this.oz + p.z })), lights: this.lights,
+      bed: this.bed, doorSpots: this.doorSpots, pots: this.pots.map((p) => ({ x: this.ox + p.x, z: this.oz + p.z })), lights: this.lights, carts: this.carts,
       dispose: () => { g.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) m.geometry.dispose(); }); g.parent?.remove(g); },
     };
   }
@@ -1267,6 +1269,53 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
       ib.light(0, H - 0.3, -1, 1.0, 0xffe0b0); ib.light(0, H - 0.3, D / 2 - 1.2, 0.5, 0xffe0b0, 6);
       break;
     }
+    // ---------------- ШАХТА «ЧЁРНАЯ ЖИЛА»: штрек, крепи, жилы, рельсы и вагонетки ----------------
+    case 'mine': {
+      S(24, 40, 4.2); ib.room(W, D, H, 'tex:gravel', 'tex:rockwall', 'Выйти из шахты');
+      for (let z = -D / 2 + 4; z < D / 2 - 2; z += 5) { // крепи: стойки + верхняк
+        ib.f('c:#5b3a1e', -W / 2 + 0.9, 0, z, 0.42, H - 0.4, 0.42);
+        ib.f('c:#5b3a1e', W / 2 - 0.9, 0, z, 0.42, H - 0.4, 0.42);
+        ib.f('c:#4a2f18', 0, H - 0.6, z, W - 1.4, 0.34, 0.46, false);
+      }
+      for (const rx of [-0.5, 0.5]) ib.f('chrome', rx, 0.02, -D / 2 + 8, 0.12, 0.07, 16, false);      // рельсы к тёмному стволу
+      for (let z = -D / 2 + 1; z < 1; z += 1.2) ib.f('c:#3f2d1c', 0, 0.012, z, 1.9, 0.06, 0.24, false); // шпалы
+      ib.plane('c:#040507', 0, 1.55, -D / 2 + 0.18, 3.6, 3.0, 0);                                     // зев тоннеля
+      const veins: [number, number][] = [[-W / 2 + 1.5, -6], [-W / 2 + 1.5, 2], [-W / 2 + 1.5, 10], [W / 2 - 1.5, -2]];
+      for (const [vx, vz] of veins) {                                                                  // угольные жилы с подсветкой
+        const west = vx < 0;
+        ib.f('tex:coalseam', vx, 0, vz, 2.4, 2.3, 3.0);
+        for (let k = 0; k < 6; k++) ib.f('glow:#7dd3fc', vx + (west ? -0.9 : 0.9), 0.5 + (k % 3) * 0.5, vz - 1 + Math.floor(k / 2) * 0.9, 0.18, 0.18, 0.12, false);
+        ib.act(vx + (west ? 2.6 : -2.6), vz, 1.7, '⛏️ Рубить уголь', 'mine');
+      }
+      ib.f('c:#57534e', 0, 0.03, 3.4, 2.6, 0.06, 2.6, false);                                          // площадка клети
+      ib.f('c:#3f3f46', -1.3, 0, 3.4, 0.1, 2.6, 0.1, false); ib.f('c:#3f3f46', 1.3, 0, 3.4, 0.1, 2.6, 0.1, false);
+      ib.act(0, 3.4, 2.0, '⬇️ Спуститься в забой', 'mine_down');
+      ib.f('c:#f59e0b', -W / 2 + 1.3, 0, D / 2 - 3.2, 1.6, 1.9, 0.5);                                   // стойка формы
+      ib.f('c:#fde68a', -W / 2 + 1.3, 1.95, D / 2 - 3.2, 1.7, 0.12, 0.6, false);
+      ib.plane('sign:ФОРМА · КАСКИ · КИРКИ|#b45309', -W / 2 + 1.3, 2.6, D / 2 - 3.2, 2.1, 0.42, Math.PI);
+      ib.act(-W / 2 + 2.7, D / 2 - 3.2, 1.6, '🦺 Устроиться: форма и кирка', 'mine_uniform');
+      ib.f('c:#14532d', W / 2 - 1.0, 0, D / 2 - 3.2, 1.5, 2.1, 0.14, false);                            // доска объявлений
+      ib.plane('sign:ШАХТА «ЧЁРНАЯ ЖИЛА» · $540 ЗА ВАГОНЕТКУ|#14532d', W / 2 - 1.0, 2.5, D / 2 - 3.1, 2.7, 0.5, Math.PI);
+      ib.act(0, -D / 2 + 8.4, 2.1, '🚃 Отгрузить уголь в вагонетку', 'mine_cart');                     // отгрузка
+      const mkCart = (z: number) => {                                                                   // динамические вагонетки
+        const gr = new THREE.Group();
+        const body = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.8, 2.2), new THREE.MeshStandardMaterial({ color: 0x6b4a2f, roughness: 0.9 }));
+        body.position.y = 0.75; gr.add(body);
+        const coal = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.34, 2.0), new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.6, metalness: 0.15 }));
+        coal.position.y = 1.28; coal.visible = false; coal.name = 'coal'; gr.add(coal);
+        for (const wx of [-0.68, 0.68]) for (const wz of [-0.72, 0.72]) {
+          const whl = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.12, 10), new THREE.MeshStandardMaterial({ color: 0x2b2f36 }));
+          whl.rotation.z = Math.PI / 2; whl.position.set(wx, 0.28, wz); gr.add(whl);
+        }
+        gr.position.set(ib.ox, 0, ib.oz + z);
+        ib.group.add(gr);
+        return gr;
+      };
+      ib.carts.push(mkCart(-D / 2 + 6), mkCart(-D / 2 + 1.5));
+      for (let z = -D / 2 + 6; z < D / 2 - 4; z += 8) ib.light(0, H - 0.7, z, 0.95, 0xffd9a0, 15);
+      ib.light(-W / 2 + 2.4, 2.4, -6, 0.5, 0x9fd8ff, 8); ib.light(-W / 2 + 2.4, 2.4, 10, 0.5, 0x9fd8ff, 8);
+      break;
+    }
   }
   const spawnZ = D / 2 - 1.6;
   return ib.finish({ x: 0, z: spawnZ, a: Math.PI }, { x0: -W / 2, x1: W / 2, z0: -D / 2, z1: D / 2, h: H });
@@ -1278,7 +1327,7 @@ export function interiorForBuilding(kind: string, cls?: string): InteriorKind | 
     police: 'police', hospital: 'hospital', cityhall: 'cityhall', bank: 'bank', dealer: 'dealer', service: 'service', mall: 'mall', apartment: 'hall',
     house: 'house_city', vhouse: 'house_village', vshop: 'vshop', vpharmacy: 'vpharmacy', vguntruck: 'vguntruck', vadmin: 'vadmin',
     checkpoint: 'checkpoint', fire: 'fire', gas: 'gas', depot: 'truckoffice', office: 'office', scootershop: 'scootershop', fishshop: 'fishshop',
-    greenhouse: 'greenhouse', bar: 'bar', ozgim: 'ozgim',
+    greenhouse: 'greenhouse', bar: 'bar', ozgim: 'ozgim', mine: 'mine',
   };
   void cls;
   return m[kind] ?? null;

@@ -11,7 +11,7 @@ export interface Box { x0: number; y0: number; z0: number; x1: number; y1: numbe
 export type BKind = 'tower' | 'apartment' | 'house' | 'vhouse' | 'shop24' | 'supermarket' | 'cafe' | 'pharmacy' | 'gunshop' | 'clothes' | 'barber' |
   'mall' | 'dealer' | 'market' | 'service' | 'gas' | 'police' | 'hospital' | 'fire' | 'cityhall' | 'bank' | 'vshop' | 'vadmin' |
   'factory' | 'warehouse' | 'checkpoint' | 'garage' | 'farm' | 'parking' | 'parkade' | 'garages' | 'storage' | 'depot' | 'scootershop' | 'office' | 'barn' | 'coop' | 'livestock' |
-  'fishshop' | 'vpharmacy' | 'vguntruck' | 'greenhouse' | 'bar' | 'ozgim';
+  'fishshop' | 'vpharmacy' | 'vguntruck' | 'greenhouse' | 'bar' | 'ozgim' | 'mine';
 export interface Building {
   id: number; kind: BKind; name: string; x: number; z: number; w: number; d: number; h: number;
   door: { x: number; z: number; a: number }; cls?: 'eco' | 'mid' | 'lux'; price?: number; forSale?: boolean;
@@ -77,6 +77,7 @@ const SIGN: Record<string, string> = {
   barber: 'Парикмахерская', mall: 'ТЦ «Орбита»', dealer: 'Автосалон «Драйв»', market: 'Авторынок', service: 'Автосервис и тюнинг', gas: 'АЗС',
   police: 'Полиция', hospital: 'Больница', fire: 'Пожарная часть', cityhall: 'Мэрия', bank: 'Банк', vshop: 'Сельмаг', vadmin: 'Администрация',
   checkpoint: 'Проходная завода', vpharmacy: 'Аптека', vguntruck: 'Оружейный грузовик', office: 'Бизнес-центр «ЛосТех»', scootershop: 'Электросамокаты «Вжух Store»', farm: 'Агрохолдинг «Нива»', warehouse: 'Склад деталей', fishshop: 'Рыболовный магазин «Поплавок»',
+  mine: 'Шахта «Чёрная Жила»',
 };
 
 export function generateLayout(): WorldLayout {
@@ -1512,6 +1513,15 @@ export function generateLayout(): WorldLayout {
   for (const e of edges) { adj[e.a].push({ n: e.b, e: e.id }); adj[e.b].push({ n: e.a, e: e.id }); }
   // Проверка индексов блоков
   for (const b of blocks) if (b.ox === undefined && !inGrid(b.i, b.j)) throw new Error('Блок вне сетки');
+
+  // ---------- шахта «Чёрная Жила»: вход за городом, в холмах к северо-востоку ----------
+  {
+    const mx = 1450, mz = -160;
+    addBuilding({ kind: 'mine', name: SIGN.mine, x: mx, z: mz, w: 16, d: 12, h: 7, door: doorFor(mx, mz, 16, 12, 's'), facade: 'civic', roof: 'flat', enter: true });
+    addProp({ t: 'driveway', x: mx, z: mz + 13, r: 0 }, { w: 10, d: 14, h: 0.02 });            // грунтовый пятак у входа
+    for (const fx of [-9.8, 9.8]) for (let fz = -7; fz <= 9; fz += 3.2) addProp({ t: 'fence', x: mx + fx, z: mz + fz, r: 0 }, { w: 2.4, d: 0.2, h: 1.5 });
+    for (let fz = -7; fz <= 9; fz += 3.2) addProp({ t: 'fence', x: mx, z: mz - 7.6, r: Math.PI / 2 }, { w: 2.4, d: 0.2, h: 1.5 });
+  }
 
   void beachRoad; void wh; void clamp;
   return {

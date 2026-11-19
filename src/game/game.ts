@@ -705,6 +705,7 @@ export class Game {
     this.updateAimFear(dt);
     this.updateRobbery(dt);
     this.updateJobs(dt);
+    this.updateMine(dt);
     this.updateRace(dt);
     if (this.online) this.updateNet(dt);
     // погода вокруг камеры (в помещениях дождя нет)
@@ -2269,6 +2270,11 @@ export class Game {
     if (action === 'coffee') return { text: 'E — Кофе ($3, +бодрость)', keys: ['E'], act: () => { if (this.pay(3)) { this.state.energy = Math.min(100, this.state.energy + 25); this.toast('☕ Бодрит!'); } } };
     if (action === 'trucker') return { text: 'E — ' + label, keys: ['E'], act: () => this.openPanel({ type: 'trucker' }) };
     if (action === 'basement') return { text: 'E — ' + label, keys: ['E'], act: () => this.enterBasement(b) };
+    // ---------- ШАХТА «ЧЁРНАЯ ЖИЛА» ----------
+    if (action === 'mine_uniform') return { text: 'E — ' + label, keys: ['E'], act: () => this.mineHire() };
+    if (action === 'mine_down') return { text: 'E — Спуститься в забой · L — наверх', keys: ['E', 'L'], act: () => this.mineLift(true), l: () => this.mineLift(false) };
+    if (action === 'mine') return { text: 'E — ' + label, keys: ['E'], act: () => this.mineSwing() };
+    if (action === 'mine_cart') return { text: 'E — ' + label + (this.state.mineCoal ? ` (в забое: ${this.state.mineCoal} т)` : ''), keys: ['E'], act: () => this.mineLoadCart() };
     if (action === 'water') return { text: 'E — умыться и напиться из крана', keys: ['E'], act: () => { this.state.water = Math.min(100, this.state.water + 20); this.toast('💧 Вода из крана (+20)'); } };
     if (action.startsWith('pot:')) return this.plantPrompt(`${b.id}:pot:${action.slice(4)}`, true, this.interiorKind === 'greenhouse');
     if (action === 'bed') return { text: 'E — ' + label, keys: ['E'], act: () => { this.lying = true; this.toast('Вы отдыхаете. Бодрость восстанавливается (I — холодильник)'); } };
@@ -3737,6 +3743,82 @@ export class Game {
   // ================= РАБОТА: ОФИС И ФЕРМА =================
   hireOffice() { if (this.state.officeJob) return; if (this.job) { this.toast('Сначала завершите текущую работу'); return; } this.state.officeJob = true; this.state.officeDone = 0; this.save(); this.toast('💻 Вы приняты в «ЛосТех»! Садитесь за любой свободный ПК'); }
   quitOffice() { this.state.officeJob = false; this.save(); this.toast('Вы уволились из «ЛосТех»'); }
+  // ================= РАБОТА: ШАХТА «ЧЁРНАЯ ЖИЛА» =================
+  private mineSwingT = 0; private cartAnim: { phase: 'idle' | 'away' | 'wait' | 'back'; t: number } | null = null;
+  static MINE_CART_CAP = 6; static MINE_CART_PAY = 540;
+  mineHire() {
+    if (this.state.mineJob) { this.toast('🦺 Форма уже получена — спускайтесь в забой и рубите уголь!'); return; }
+    this.state.mineJob = true; this.state.inventory.pickaxe = (this.state.inventory.pickaxe ?? 0) + 1;
+    this.state.inventory.hardhat = (this.state.inventory.hardhat ?? 0) + 1; this.state.mineCoal = 0;
+    this.save(); this.sound.coin(); this.toast('🦺 Вы приняты на шахту! Кирка и каска выданы. E у клети — спуск.');
+  }
+  mineLift(down: boolean) {
+    if (!this.state.mineJob) { this.toast('Сначала получите форму на стойке слева от входа'); return; }
+    const it = this.interior; if (!it || this.interiorKind !== 'mine') return;
+    const bnd = it.bounds; const cx = (bnd.x0 + bnd.x1) / 2;
+    if (down === !!this.state.mineDepth) { this.toast(down ? 'Вы уже внизу' : 'Вы уже наверху'); return; }
+    this.sound.door(); this.toast(down ? '🛗 Клеть пошла вниз…' : '🛗 Подъём на поверхность…');
+    setTimeout(() => {
+      if (this.interiorKind !== 'mine') return;
+      this.px = cx; this.pz = down ? bnd.z0 + 9.5 : bnd.z1 - 2.6; this.pa = down ? Math.PI : 0; this.camYaw = this.pa;
+      this.state.mineDepth = down; this.save();
+      this.toast(down ? 'Горизонт −120 м. Рубите уголь у жил с голубыми искрами ⛏️' : 'Вы на поверхности. Свежий воздух!');
+    }, 900);
+  }
+  mineSwing() {
+    if (!this.state.mineJob) { this.toast('Нужна форма — стойка слева от входа'); return; }
+    if (!this.state.mineDepth) { this.toast('Сначала спуститесь в забой (E у клети)'); return; }
+    const now = performance.now(); if (now - this.mineSwingT < 350) return; this.mineSwingT = now;
+    if (this.state.energy < 4) { this.toast('Нет сил — поешьте или отдохните'); this.sound.error(); return; }
+    this.state.energy = Math.max(0, this.state.energy - 1.3);
+    this.sound.click();
+    const n = 1 + (Math.random() < 0.25 ? 1 : 0);
+    this.state.mineCoal = (this.state.mineCoal ?? 0) + n;
+    const c = this.state.mineCoal ?? 0;
+    if (Math.random() < 0.06) { const g = 25 + Math.floor(Math.random() * 40); this.state.money += g; this.sound.coin(); this.toast(`✨ Самородок! +$${g}`); }
+    else if (c % Game.MINE_CART_CAP === 0) this.toast(`⛏️ Угля хватит на вагонетку (${c} т) — к точке отгрузки!`);
+    else this.toast(`⛏️ +${n} т угля (всего ${c})`);
+  }
+  mineLoadCart() {
+    if (!this.state.mineJob) { this.toast('Нужна форма — стойка слева от входа'); return; }
+    const its = this.interior; if (!its?.carts || its.carts.length < 2 || !this.cartAnim) { this.toast('Вагонетка ещё не подана'); return; }
+    if (this.cartAnim.phase !== 'idle') { this.toast('Вагонетка занята — дождитесь её возвращения'); return; }
+    const have = this.state.mineCoal ?? 0;
+    if (have < Game.MINE_CART_CAP) { this.toast(`Мало угля: нужно ${Game.MINE_CART_CAP} т, есть ${have}. Рубите у жил ⛏️`); this.sound.error(); return; }
+    this.state.mineCoal = have - Game.MINE_CART_CAP;
+    this.state.money += Game.MINE_CART_PAY;
+    this.sound.coin(); this.toast(`🚃 Вагонетка ушла в ствол! +$${Game.MINE_CART_PAY}`);
+    const fullC = its.carts[0]; const coal = fullC.getObjectByName('coal'); if (coal) coal.visible = true;
+    this.cartAnim.phase = 'away'; this.cartAnim.t = 0;
+  }
+  /** анимация вагонеток шахты: гружёная уезжает в тёмный штрек, пустая приезжает на её место */
+  private updateMine(dt: number) {
+    if (this.interiorKind !== 'mine') { this.cartAnim = null; return; }
+    const its = this.interior; if (!its?.carts || its.carts.length < 2) return;
+    const [fullC, emptyC] = its.carts;
+    const bnd = its.bounds; const dockZ = bnd.z0 + 6, deepZ = bnd.z0 + 0.4, cx = (bnd.x0 + bnd.x1) / 2;
+    if (!this.cartAnim) {
+      fullC.position.set(cx, 0, dockZ); emptyC.position.set(cx, 0, deepZ - 2); emptyC.visible = false;
+      this.cartAnim = { phase: 'idle', t: 0 };
+    }
+    const a = this.cartAnim; const v = 2.4;
+    if (a.phase === 'away') {
+      fullC.position.z -= v * dt; a.t += dt;
+      if (fullC.position.z <= deepZ) { fullC.visible = false; a.phase = 'wait'; a.t = 0; }
+    } else if (a.phase === 'wait') {
+      a.t += dt;
+      if (a.t > 1.1) { emptyC.visible = true; emptyC.position.set(cx, 0, deepZ - 2); a.phase = 'back'; }
+    } else if (a.phase === 'back') {
+      emptyC.position.z += v * dt;
+      if (emptyC.position.z >= dockZ) {
+        emptyC.position.z = dockZ; a.phase = 'idle';
+        // пустая стала дежурной, старая прячется за стволом
+        const tmp = its.carts[0]; its.carts[0] = its.carts[1]; its.carts[1] = tmp;
+        tmp.visible = false; tmp.position.z = deepZ - 2;
+        const coal = tmp.getObjectByName('coal'); if (coal) coal.visible = false;
+      }
+    }
+  }
   pcReward(mode: 'office' | 'home', ok: boolean) {
     if (!ok) { this.sound.error(); return 0; }
     let pay = mode === 'office' ? 45 : 18;

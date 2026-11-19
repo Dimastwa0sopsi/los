@@ -85,6 +85,10 @@ export const ITEMS: Record<string, ItemDef> = {
   antiseptic: { id: 'antiseptic', name: 'Антисептик', icon: '🧴', price: 10, health: 15 },
   sunscreen: { id: 'sunscreen', name: 'Солнцезащитный крем', icon: '🧴', price: 12, health: 6 },
   gum: { id: 'gum', name: 'Жвачка', icon: '🍬', price: 1, food: 2, energy: 3 },
+  // ---------- шахта «Чёрная Жила» ----------
+  coal: { id: 'coal', name: 'Уголь', icon: '⬛', price: 0, sell: 68 },
+  pickaxe: { id: 'pickaxe', name: 'Кирка шахтёра', icon: '⛏️', price: 0 },
+  hardhat: { id: 'hardhat', name: 'Каска', icon: '🪖', price: 0 },
 };
 
 export type ShopKind = 'shop24' | 'supermarket' | 'cafe' | 'pharmacy' | 'gunshop' | 'vshop' | 'gas' | 'mallfood' | 'fishshop';
