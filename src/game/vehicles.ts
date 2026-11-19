@@ -185,13 +185,13 @@ export function playerDrive(v: Vehicle, inp: DriveInput, dt: number, col: Collis
     if (forwardSp < -0.5) a = acc * 2; // движемся назад — газ тормозит
   }
   if (inp.brake > 0) {
-    if (forwardSp > 0.5) a -= 11 * inp.brake;
+    if (forwardSp > 0.5) a -= 13.5 * inp.brake; // тормоза мощнее: короткий уверенный стоп
     else if (g !== 0 || !manual) a = -acc * 0.6 * inp.brake; // задний ход
   }
   // дрифт: на пробел на скорости заднюю ось срывает — машина идёт боком, теряя скорость медленно
   const canDrift = !v.isRide && !v.isHeli && v.spec.body !== 'combine';
   const drifting = canDrift && inp.handbrake && Math.abs(forwardSp) > 7 && (Math.abs(inp.steer) > 0.15 || Math.abs(v.slip) > 0.2);
-  if (inp.handbrake && !drifting) a -= Math.sign(forwardSp) * 14;
+  if (inp.handbrake && !drifting) a -= Math.sign(forwardSp) * 16;
   if (drifting) { a *= 0.45; a -= Math.sign(forwardSp) * (2.4 + Math.abs(v.slip) * 2.8); }
   // сопротивление
   a -= Math.sign(forwardSp) * (0.6 + Math.abs(forwardSp) * 0.025);
@@ -207,13 +207,13 @@ export function playerDrive(v: Vehicle, inp: DriveInput, dt: number, col: Collis
   if (inp.throttle > 0 && !s.unbreakable) v.fuel = Math.max(0, v.fuel - dt * 0.06 * inp.throttle * (s.ev ? 0.7 : 1));
   // руль
   let driftRes: DriveResult['stunt'] | undefined;
-  v.steer += (inp.steer - v.steer) * Math.min(1, dt * (inp.steer === 0 ? 5 : 3.2)); // руль набирается плавнее
+  v.steer += (inp.steer - v.steer) * Math.min(1, dt * (inp.steer === 0 ? 5.5 : 3.9)); // руль откликается живее
   // габаритные машины (грузовик, автобус, тягач, лимузин) поворачивают круче — им это нужнее;
   // мотоцикл наоборот чуть «мягче», чтобы не закладывать нереальные дуги
   const bulky = v.spec.len >= 6.5 || v.spec.body === 'truck' || v.spec.body === 'semi' || v.spec.body === 'bus';
   const moto = v.spec.body === 'moto';
-  const steerBase = moto ? 0.5 : bulky ? 0.86 : v.isRide ? 0.62 : 0.52;
-  const speedFall = bulky ? 0.05 : moto ? 0.07 : 0.065;
+  const steerBase = moto ? 0.54 : bulky ? 0.86 : v.isRide ? 0.66 : 0.58;
+  const speedFall = bulky ? 0.05 : moto ? 0.06 : 0.055;
   const maxSteer = steerBase / (1 + Math.abs(v.speed) * speedFall); // на скорости руль менее острый
   const wb = Math.max(1.2, s.len * (bulky ? 0.5 : 0.6));
   const grip = 1 - Math.min(0.35, Math.max(0, Math.abs(v.speed) - 16) * 0.012 * Math.abs(v.steer)); // снос на скорости

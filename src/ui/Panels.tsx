@@ -7,7 +7,7 @@ import { PcPanel, OfficeHr, Livestock } from './Work';
 import { BAR_DRINKS, DRESSES, ITEMS, VEHICLES, KIOSK_TYPES, PAINT_COLORS, NEON_COLORS, LIGHT_COLORS, HAIR_STYLES, HAIR_COLORS, TOPS, BOTTOMS, CLOTH_COLORS, SKINS, EYE_COLORS, BROWS, NOSES, LIP_SHAPES, LIP_COLORS, type Tuning, type Look, TUNE_PRICES, TUNE_CATALOG, TUNE_CATS, randomPlate, type TuneCat } from '../game/data';
 import { CarPreview } from './CarPreview';
 import { LookPreview } from './LookPreview';
-import { repairCost, sellPrice, demand, carValue } from '../game/state';
+import { repairCost, sellPrice, demand, carValue, type MarketOffer } from '../game/state';
 
 const $ = (n: number) => '$' + Math.round(n).toLocaleString('ru');
 
@@ -204,18 +204,118 @@ function Dealer({ g, close, scooter }: { g: Game; close: () => void; scooter?: b
   </Modal>);
 }
 
+/** реплики продавцов авторынка — 50 фраз по пяти темам */
+const SELLER_LINES: string[] = [
+  // похвала товару
+  'Бери не пожалеешь — машина огонь, сам бы ездил!',
+  'Это ж жемчужина! Таких на всём рынке одна.',
+  'Двигатель шепчет, коробка шелестит — сел и поехал.',
+  'По трассе идёт как по рельсам, честно говорю.',
+  'Салон чистый, не курили, возили только тёщу в церковь.',
+  'Крашена один раз, и то кисточкой… шучу, родная краска!',
+  'Гаражное хранение, дедушка ездил летом за грибами.',
+  'Масло менял каждые 5 тысяч, есть записи в тетрадке.',
+  'Резина почти новая — зиму отстояла в тепле.',
+  'Номера красивые, считай бонусом идут.',
+  // честность и уклончивость
+  'Ну… стучит там что-то. Это возраст, пройдёт само.',
+  'Подтекает чуть-чуть — зато масло всегда с собой, практично!',
+  'После ДТП была, но удар был в дерево. Дерево в хлам!',
+  'Спидометр скручен? Нет, он просто устал считать.',
+  'Ржавчина? Это патина, сейчас так модно.',
+  'Кондиционер работает. Если ехать с горки и открыть окна.',
+  'Один владелец. Ну два. Ладно, их было много, но все хорошие люди.',
+  'Check engine горит для красоты, как ночник.',
+  'Коробка пинается — это она здоровается.',
+  'Документы чистые. Почти. Там мелкий нюанс, решаемый.',
+  // про торг
+  'Торгуешься — значит душа лежит к машине. Уважаю!',
+  'Цена окончательная… хотя для хорошего человека подумаю.',
+  'Дешевле только угнанную, но мы же честные люди?',
+  'Скину, если без рассрочки и прямо сейчас.',
+  'За такие деньги тебе её ещё и помоют. Ладно, не помоют.',
+  'У конкурентов дороже и кот в подарок — а кот кому нужен?',
+  'Могу скинуть, но тогда без запаски. Шучу. Или нет.',
+  'Друг, я эту машину сам искал год, оцени труд!',
+  'Ниже себестоимости никак — семья, дети, ипотека на авторынок.',
+  'Так и быть, последняя цена. Точно последняя. Наверное.',
+  // про жизнь
+  'Я на этом рынке двадцать лет, меня каждая собака знает.',
+  'Раньше гонял фуры в Магадан, а теперь вот отдыхаю душой.',
+  'Купил-продал — это не бизнес, это философия.',
+  'Вчера продал такую же твоему соседу. Он доволен. Кажется.',
+  'Машины как люди: одни сразу любят, других надо заслужить.',
+  'Жена говорит — хватит. А я говорю — ещё одну и хватит.',
+  'К чаю ничего не предлагаю, потому что чая нет. Бизнес.',
+  'Зимой торговля мёртвая, греюсь тем, что считаю деньги… свои.',
+  'Мне этот рынок как дом родной. Даже сплю тут иногда.',
+  'Если что сломается — звони. Телефон сменил, но ты всё равно звони.',
+  // давление и закрытие сделки
+  'Бери сегодня — завтра её уже купят, зуб даю.',
+  'За ней очередь стоит, просто они ещё об этом не знают.',
+  'Пока думаешь, инфляция растёт. Машина — лучшая инвестиция!',
+  'Уходишь — теряешь мечту. Подумай о ней ночью.',
+  'Давай рукопожатием закрепим, бумаги потом.',
+  'Оформим за пять минут, у меня всё схвачено.',
+  'В кредит не даю, но могу дать слово, что машина хорошая.',
+  'Тест-драйв? Конечно! Два метра вперёд и два назад.',
+  'Деньги вперёд, ключи назад — старая добрая традиция.',
+  'Ну что, по рукам? У меня ещё три встречи и обед через час.',
+];
+const HAGGLE_NO = ['😤 Ни копейкой меньше!', '🙅 Дешевле никак, друг!', '😏 Смешно. Давай серьёзно.', '🚫 Цена окончательная, проверял дважды.'];
+
 function Market({ g, close, sellUid }: { g: Game; close: () => void; sellUid?: string }) {
   const [, f] = useState(0); const r = () => f((x) => x + 1);
   const offers = g.getOffers(); const per = g.marketPeriod(); const s = g.getState();
+  const [talk, setTalk] = useState<string | null>(null);
+  const [log, setLog] = useState<string[]>([]);
+  const [deals, setDeals] = useState<Record<string, { price: number; tries: number }>>({});
+  const dealOf = (o: MarketOffer) => deals[o.id] ?? { price: o.price, tries: 0 };
+  const say = (line: string) => setLog((l) => [...l.slice(-7), line]);
+  const talkTo = (o: MarketOffer) => { setTalk(o.id); setLog([`Приветствую, уважаемый! ${SELLER_LINES[Math.floor(Math.random() * SELLER_LINES.length)]}`]); };
+  const moreLine = () => say(SELLER_LINES[Math.floor(Math.random() * SELLER_LINES.length)]);
+  const bargain = (o: MarketOffer) => {
+    const d = dealOf(o);
+    if (d.tries >= 4) { say('🙅 Хватит торговаться! Цена и так подарочная.'); return; }
+    const chance = [0.65, 0.45, 0.3][Math.min(d.tries, 2)];
+    if (Math.random() < chance) {
+      const cut = 0.02 + Math.random() * 0.05; // уступка 2–7 %
+      const floor = Math.round(carValue(o.type, o.year, o.mileage, o.condition) * 0.72 / 10) * 10;
+      const np = Math.max(floor, Math.round(d.price * (1 - cut) / 10) * 10);
+      setDeals({ ...deals, [o.id]: { price: np, tries: d.tries + 1 } });
+      say(`🤝 Ладно-ладно, ${$(np)}. Но это между нами!`);
+    } else {
+      setDeals({ ...deals, [o.id]: { price: d.price, tries: d.tries + 1 } });
+      say(HAGGLE_NO[Math.floor(Math.random() * HAGGLE_NO.length)]);
+    }
+  };
+  const buy = (o: MarketOffer) => { g.buyMarket(o.id, dealOf(o).price); setTalk(null); r(); };
   return (<Modal title="🚙 Авторынок" onClose={close} wide>
     <p className="lg-money-line">Ваши деньги: <b>{$(s.money)}</b> · предложения обновляются каждые 10 минут</p>
     <h3 className="font-bold mt-2">Продавцы</h3>
-    <div className="lg-list">{offers.map((o) => { const val = carValue(o.type, o.year, o.mileage, o.condition); return <div className="lg-row wrap" key={o.id}>
-      <span className="lg-swatch" style={{ background: o.color }} /><div className="flex-1 min-w-[160px]"><b>{VEHICLES[o.type].name}</b><small>{o.year} г. · {o.mileage.toLocaleString('ru')} км · состояние {Math.round(o.condition * 100)}% · продавец {o.seller}</small><small>Оценка: {$(val)} · спрос ×{demand(o.type, per).toFixed(2)}</small></div>
-      <button className="lg-btn sm" onClick={() => { g.buyMarket(o.id); r(); }}>{$(o.price)}</button></div>; })}</div>
+    <div className="lg-list">{offers.map((o) => { const val = carValue(o.type, o.year, o.mileage, o.condition); const d = dealOf(o); const open = talk === o.id; return (
+      <div className="lg-col-row" key={o.id}>
+        <div className="lg-row wrap">
+          <span className="lg-swatch" style={{ background: o.color }} /><div className="flex-1 min-w-[160px]"><b>{VEHICLES[o.type].name}</b><small>{o.year} г. · {o.mileage.toLocaleString('ru')} км · состояние {Math.round(o.condition * 100)}% · продавец {o.seller}</small><small>Оценка: {$(val)} · спрос ×{demand(o.type, per).toFixed(2)}</small></div>
+          <div className="flex gap-1">
+            <button className="lg-btn sm" onClick={() => (open ? setTalk(null) : talkTo(o))}>{open ? '✕' : '💬'}</button>
+            <button className="lg-btn sm lg-btn-main" onClick={() => buy(o)}>{d.price < o.price && d.tries > 0 ? <>{<s>{$(o.price)}</s>} <b>→ ${d.price.toLocaleString('ru')}</b></> : $(d.price)}</button>
+          </div>
+        </div>
+        {open && (
+          <div className="lg-card mt-1" style={{ background: '#0b1220', border: '1px solid #334155' }}>
+            <div style={{ maxHeight: 150, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>{log.map((m, i) => <p key={i} className="text-sm" style={{ color: '#e2e8f0' }}>🧑‍🔧 <i>{o.seller}:</i> «{m}»</p>)}</div>
+            <div className="flex flex-wrap gap-1 mt-2">
+              <button className="lg-btn sm" onClick={moreLine}>🗣 Ещё реплика</button>
+              <button className="lg-btn sm" disabled={d.tries >= 4} onClick={() => bargain(o)}>🤝 Поторговаться ({Math.max(0, 4 - d.tries)})</button>
+              <button className="lg-btn sm lg-btn-main" onClick={() => buy(o)}>Купить за {$(d.price)}</button>
+            </div>
+          </div>
+        )}
+      </div>); })}</div>
     <h3 className="font-bold mt-3">Продать свою машину</h3>
     <div className="lg-list">{s.vehicles.map((o) => <div className={`lg-row ${o.uid === sellUid ? 'hl' : ''}`} key={o.uid}><div className="flex-1"><b>{VEHICLES[o.type].name}</b><small>куплена за {$(o.paid)} · состояние {Math.round(o.condition * 100)}% · ремонт {$(repairCost(o))}</small></div><button className="lg-btn sm" onClick={() => { g.sellVehicle(o.uid); r(); }}>Продать {$(sellPrice(o, per))}</button></div>)}{!s.vehicles.length && <p className="opacity-70">Нет машин</p>}</div>
-    <p className="text-xs opacity-70 mt-2">Машина должна стоять на площадке рынка. Выгодно: покупать ниже оценки, чинить в автосервисе и продавать при высоком спросе (рынок берёт 10%).</p>
+    <p className="text-xs opacity-70 mt-2">Нажмите 💬 — продавец разговорится, а кнопкой «Поторговаться» можно сбить цену на пару процентов. Выгодно покупать ниже оценки и продавать при высоком спросе (рынок берёт 10%).</p>
   </Modal>);
 }
 

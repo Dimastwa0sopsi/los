@@ -64,19 +64,40 @@ export const ITEMS: Record<string, ItemDef> = {
   bucket: { id: 'bucket', name: 'Ведро', icon: '🪣', price: 90, fridge: true },
   fish: { id: 'fish', name: 'Карась', icon: '🐟', price: 3, food: 14, fridge: true, sell: 35 },
   fish_big: { id: 'fish_big', name: 'Щука', icon: '🐠', price: 10, food: 26, fridge: true, sell: 140 },
+  // ---------- расширенный ассортимент магазинов ----------
+  kvass: { id: 'kvass', name: 'Квас', icon: '🍺', price: 3, drink: 32, energy: 4, fridge: true },
+  lemonade: { id: 'lemonade', name: 'Лимонад «Тархун»', icon: '🧉', price: 4, drink: 30, energy: 8, fridge: true },
+  smoothie: { id: 'smoothie', name: 'Смузи ягодный', icon: '🥤', price: 6, drink: 25, food: 10, energy: 10, fridge: true },
+  hotdog: { id: 'hotdog', name: 'Хот-дог', icon: '🌭', price: 5, food: 42, fridge: true },
+  donut: { id: 'donut', name: 'Пончик', icon: '🍩', price: 3, food: 18, energy: 6 },
+  cake: { id: 'cake', name: 'Кусок торта', icon: '🍰', price: 7, food: 30, energy: 12, fridge: true },
+  sushi: { id: 'sushi', name: 'Суши-сет', icon: '🍣', price: 14, food: 50, drink: 5, fridge: true },
+  pelmeni: { id: 'pelmeni', name: 'Пельмени', icon: '🥟', price: 6, food: 45, fridge: true },
+  borscht: { id: 'borscht', name: 'Борщ', icon: '🥣', price: 7, food: 42, drink: 18 },
+  salo: { id: 'salo', name: 'Сало с чесноком', icon: '🥓', price: 8, food: 35, fridge: true },
+  cheese: { id: 'cheese', name: 'Сыр', icon: '🧀', price: 6, food: 22, fridge: true },
+  eggs: { id: 'eggs', name: 'Яйца (десяток)', icon: '🥚', price: 4, food: 18, fridge: true },
+  honey: { id: 'honey', name: 'Мёд', icon: '🍯', price: 9, food: 20, energy: 15, health: 5 },
+  corn: { id: 'corn', name: 'Кукуруза', icon: '🌽', price: 2, food: 14, fridge: true },
+  grapes: { id: 'grapes', name: 'Виноград', icon: '🍇', price: 4, food: 12, drink: 8, fridge: true },
+  watermelon: { id: 'watermelon', name: 'Арбуз', icon: '🍉', price: 6, food: 25, drink: 20, fridge: true },
+  bandage: { id: 'bandage', name: 'Бинт', icon: '🩹', price: 8, health: 12 },
+  antiseptic: { id: 'antiseptic', name: 'Антисептик', icon: '🧴', price: 10, health: 15 },
+  sunscreen: { id: 'sunscreen', name: 'Солнцезащитный крем', icon: '🧴', price: 12, health: 6 },
+  gum: { id: 'gum', name: 'Жвачка', icon: '🍬', price: 1, food: 2, energy: 3 },
 };
 
 export type ShopKind = 'shop24' | 'supermarket' | 'cafe' | 'pharmacy' | 'gunshop' | 'vshop' | 'gas' | 'mallfood' | 'fishshop';
 export const SHOP_ITEMS: Record<ShopKind, string[]> = {
-  shop24: ['water', 'cola', 'coffee', 'bread', 'sandwich', 'chips', 'chocolate', 'energy', 'cigarettes'],
-  supermarket: ['seed_tomato', 'seed_cucumber', 'seed_strawberry', 'water', 'cola', 'juice', 'milk', 'bread', 'sausage', 'pizza', 'apple', 'banana', 'chocolate', 'icecream', 'chips', 'cigarettes'],
-  cafe: ['coffee', 'tea', 'burger', 'pizza', 'soup', 'croissant', 'juice'],
-  pharmacy: ['medkit', 'pills', 'vitamins', 'water'],
+  shop24: ['water', 'cola', 'kvass', 'lemonade', 'coffee', 'bread', 'sandwich', 'hotdog', 'chips', 'chocolate', 'donut', 'gum', 'energy', 'cigarettes'],
+  supermarket: ['seed_tomato', 'seed_cucumber', 'seed_strawberry', 'water', 'cola', 'juice', 'smoothie', 'milk', 'bread', 'sausage', 'salo', 'cheese', 'eggs', 'pelmeni', 'pizza', 'apple', 'banana', 'grapes', 'watermelon', 'corn', 'honey', 'chocolate', 'icecream', 'chips', 'cigarettes'],
+  cafe: ['coffee', 'tea', 'burger', 'hotdog', 'pizza', 'soup', 'borscht', 'croissant', 'donut', 'cake', 'juice', 'lemonade'],
+  pharmacy: ['medkit', 'pills', 'vitamins', 'bandage', 'antiseptic', 'sunscreen', 'water'],
   gunshop: ['knife', 'machete', 'seed_durman', 'pistol', 'revolver', 'smg', 'shotgun', 'rifle', 'sniper', 'ammo', 'ammo_m', 'shells', 'ammo_r'],
-  vshop: ['knife', 'seed_tomato', 'seed_potato', 'seed_cucumber', 'seed_strawberry', 'seed_sunflower', 'bread', 'milk', 'water', 'sausage', 'apple', 'cigarettes', 'tea'],
-  gas: ['water', 'cola', 'coffee', 'sandwich', 'chips', 'cigarettes', 'energy'],
-  mallfood: ['burger', 'pizza', 'cola', 'icecream', 'coffee'],
-  fishshop: ['rod', 'rod_pro', 'bait', 'lure', 'net', 'bucket', 'water', 'sandwich'],
+  vshop: ['knife', 'seed_tomato', 'seed_potato', 'seed_cucumber', 'seed_strawberry', 'seed_sunflower', 'bread', 'milk', 'water', 'kvass', 'sausage', 'eggs', 'cheese', 'honey', 'apple', 'cigarettes', 'tea'],
+  gas: ['water', 'cola', 'kvass', 'coffee', 'sandwich', 'hotdog', 'donut', 'chips', 'cigarettes', 'energy'],
+  mallfood: ['burger', 'hotdog', 'sushi', 'pizza', 'donut', 'cola', 'lemonade', 'smoothie', 'icecream', 'coffee'],
+  fishshop: ['rod', 'rod_pro', 'bait', 'lure', 'net', 'bucket', 'water', 'sandwich', 'kvass'],
 };
 
 export interface WeaponDef { id: string; name: string; slot: number; dmg: number; rpm: number; mag: number; reload: number; spread: number; pellets: number; auto: boolean; range: number; ammo: string; zoom: number; recoil: number; heavy: boolean; vol: number;

@@ -4,14 +4,14 @@ import { VEHICLES, KIOSK_TYPES, ITEMS, AMMO_NAMES, LIMITED, limitedAvailable, li
 import { carValue } from '../game/state';
 import { loadPhotos, deletePhoto, QUEST_STEPS } from '../game/game';
 import { MapCanvas } from './Hud';
-import { BusMap } from './BusMap';
 import { InventoryGrid } from './InventoryGrid';
 import { SUPPORT_BOT } from '../game/support';
 import { type Settings, defaultSettings } from '../game/config';
+import { currentAccount, removeAccount, logout } from '../game/accounts';
 
 const $ = (n: number) => '$' + Math.round(n).toLocaleString('ru');
-type Scr = 'bus' | 'store' | 'tg' | 'gallery' | 'vzhuh' | 'food' | 'coffee' | 'pizza' | 'pharm' | 'limited' | 'quest' | 'home' | 'map' | 'taxi' | 'sos' | 'homes' | 'cars' | 'bazaar' | 'jobs' | 'biz' | 'bank' | 'inv' | 'players' | 'support' | 'promo' | 'settings' | 'profile' | 'estate' | 'all' | 'tasks' | 'ach';
-const TITLES: Record<Scr, string> = { bus: 'Карта автобусов', store: 'LosSt — магазин приложений', tg: 'Телеграм', gallery: 'Галерея', vzhuh: 'Вжух Самокаты', food: 'Вкусно Доставка', coffee: 'Кофейня «Зерно»', pizza: 'Пиццерия «Сыр»', pharm: 'Аптека 24', limited: 'LIMITED Drop', quest: 'Сюжет', home: '', map: 'Карта и GPS', taxi: 'Такси', sos: 'Экстренные службы', homes: 'Недвижимость', cars: 'Мой транспорт', bazaar: 'Автобазар', jobs: 'Работа', biz: 'Бизнес', bank: 'Банк', inv: 'Инвентарь', players: 'Игроки онлайн', support: 'Поддержка', promo: 'Промокод', settings: 'Настройки', profile: 'Профиль', estate: 'Имущество', all: 'Все сервисы', tasks: 'Задания дня', ach: 'Достижения' };
+type Scr = 'store' | 'tg' | 'gallery' | 'vzhuh' | 'food' | 'coffee' | 'pizza' | 'pharm' | 'limited' | 'quest' | 'home' | 'map' | 'taxi' | 'sos' | 'homes' | 'cars' | 'bazaar' | 'jobs' | 'biz' | 'bank' | 'inv' | 'players' | 'support' | 'promo' | 'settings' | 'profile' | 'estate' | 'all' | 'tasks' | 'ach' | 'danger';
+const TITLES: Record<Scr, string> = { store: 'LosSt — магазин приложений', tg: 'Телеграм', gallery: 'Галерея', vzhuh: 'Вжух Самокаты', food: 'Вкусно Доставка', coffee: 'Кофейня «Зерно»', pizza: 'Пиццерия «Сыр»', pharm: 'Аптека 24', limited: 'LIMITED Drop', quest: 'Сюжет', home: '', map: 'Карта и GPS', taxi: 'Такси', sos: 'Экстренные службы', homes: 'Недвижимость', cars: 'Мой транспорт', bazaar: 'Автобазар', jobs: 'Работа', biz: 'Бизнес', bank: 'Банк', inv: 'Инвентарь', players: 'Игроки онлайн', support: 'Поддержка', promo: 'Промокод', settings: 'Настройки', profile: 'Профиль', estate: 'Имущество', all: 'Все сервисы', tasks: 'Задания дня', ach: 'Достижения', danger: '⚠️ Опасная зона' };
 interface P { g: Game; go: (s: Scr) => void; close: () => void }
 
 export function Tablet({ g, close, initial }: { g: Game; close: () => void; initial?: string }) {
@@ -33,7 +33,6 @@ export function Tablet({ g, close, initial }: { g: Game; close: () => void; init
           {scr !== 'home' && <div className="tb2-head"><button className="tb2-back" onClick={() => go('home')} aria-label="Домой">‹</button><h3>{TITLES[scr]}</h3><button className="tb2-close" onClick={close} aria-label="Закрыть">✕</button></div>}
           {scr === 'home' && <Home g={g} go={go} close={close} />}
           {scr === 'map' && <MapCanvas g={g} mode="waypoint" height="min(52vh, 420px)" />}
-          {scr === 'bus' && <BusMap g={g} />}
           {scr === 'taxi' && <Taxi g={g} go={go} close={close} />}
           {scr === 'sos' && <Sos g={g} go={go} close={close} />}
           {scr === 'homes' && <Homes g={g} go={go} close={close} />}
@@ -59,6 +58,7 @@ export function Tablet({ g, close, initial }: { g: Game; close: () => void; init
           {scr === 'all' && <AllServices g={g} go={go} close={close} />}
           {scr === 'tasks' && <Daily g={g} />}
           {scr === 'ach' && <Ach g={g} />}
+          {scr === 'danger' && <Danger g={g} go={go} close={close} />}
         </div>
         <button className="tb-home" onClick={() => (scr === 'home' ? close() : go('home'))} aria-label="Домой" />
       </div>
@@ -133,7 +133,6 @@ function Home({ g, go }: P) {
     {
       name: 'Транспорт', ico: '🚗', items: [
         { ico: '🏷️', label: 'Автобазар', color: '#14b8a6', on: () => go('bazaar'), badge: s.listings?.length || undefined },
-        { ico: '🚌', label: 'Автобусы', color: '#f59e0b', on: () => go('bus'), badge: g.job?.type === 'bus' ? '•' : undefined },
         { ico: '🚕', label: 'Такси', color: '#eab308', on: () => go('taxi'), badge: t ? '•' : undefined },
         { ico: '🛠️', label: 'Тюнинг', color: '#0ea5e9', on: () => (s.vehicles[0] ? g.openPanel({ type: 'tuning', uid: s.vehicles[0].uid }) : go('cars')) },
       ],
@@ -174,6 +173,8 @@ function Home({ g, go }: P) {
       name: 'Система', ico: '⚙️', items: [
         { ico: '⚙️', label: 'Настройки', color: '#64748b', on: () => go('settings') },
         { ico: '🧩', label: 'Все сервисы', color: '#8b5cf6', on: () => go('all') },
+        // опасная зона видна только в офлайн-игре: онлайн-прогресс трогать нельзя
+        ...(g.online ? [] : [{ ico: '☠️', label: 'Опасно', color: '#7f1d1d', on: () => go('danger') } as Item]),
       ],
     },
   ];
@@ -423,7 +424,8 @@ function Jobs({ g, go, close }: P) {
       <button className="tb-card" onClick={() => { g.destination = { ...g.L.depot.office }; g.toast('Маршрут к логистическому терминалу проложен'); close(); }}>🚚 <div><b>Дальнобойщик</b><small>грузы по городу и деревням · $300–1500 за рейс</small></div></button>
       <button className="tb-card" onClick={() => { g.destination = { ...g.L.industrial.office }; g.toast('Маршрут к проходной завода проложен'); close(); }}>🏭 <div><b>Завод</b><small>грузчик: $120 за рейс + бонус</small></div></button>
       <button className="tb-card" onClick={() => { g.destination = { x: g.L.farm.combineSpawn.x, z: g.L.farm.combineSpawn.z }; g.toast('Маршрут к комбайну проложен'); close(); }}>🌾 <div><b>Комбайн</b><small>$5 за участок поля</small></div></button>
-      <button className="tb-card" onClick={() => { go('bus'); }}>🚌 <div><b>Водитель автобуса</b><small>3 маршрута по городу и в Кленовку · пассажиры платят на каждой остановке</small></div></button>
+      <div className="tb-card col">🚌 <div><b>Водитель автобуса</b><small>пассажиры платят на остановках · премия за круг · автобус ждёт в автопарке</small></div>
+        <div className="btns">{g.L.busRoutes.map((r) => <button key={r.line} className="ui-btn sm" onClick={() => { g.startBusJob(r.line); close(); }}>Маршрут {r.line}: {r.name}</button>)}</div></div>
       <div className="tb-card">🛒 <div><b>Смена в магазине</b><small>R у кассы любого магазина</small></div></div>
       <div className="tb-card">🚕 <div><b>Таксист</b><small>купите такси в автосалоне — игроки-пассажиры платят за поездку</small></div></div>
     </div>
@@ -548,10 +550,10 @@ const APPS = [
   { id: 'limited', short: 'LIMITED', name: 'LIMITED Drop', icon: '💎', color: '#a855f7', desc: 'Лимитированные вещи: радужные волосы, корона, золото', size: '40 МБ' },
 ];
 const MENUS: Record<string, { name: string; items: string[] }> = {
-  food: { name: 'Вкусно Доставка', items: ['burger', 'shawarma', 'pizza', 'cola', 'icecream', 'water'] },
-  coffee: { name: 'Кофейня «Зерно»', items: ['coffee', 'tea', 'croissant', 'chocolate', 'juice'] },
-  pizza: { name: 'Пиццерия «Сыр»', items: ['pizza', 'cola', 'juice', 'icecream'] },
-  pharm: { name: 'Аптека 24', items: ['medkit', 'pills', 'vitamins', 'water'] },
+  food: { name: 'Вкусно Доставка', items: ['burger', 'shawarma', 'hotdog', 'sushi', 'pelmeni', 'pizza', 'donut', 'cola', 'lemonade', 'icecream', 'water'] },
+  coffee: { name: 'Кофейня «Зерно»', items: ['coffee', 'tea', 'croissant', 'donut', 'cake', 'chocolate', 'juice', 'smoothie'] },
+  pizza: { name: 'Пиццерия «Сыр»', items: ['pizza', 'hotdog', 'cola', 'kvass', 'juice', 'icecream'] },
+  pharm: { name: 'Аптека 24', items: ['medkit', 'pills', 'vitamins', 'bandage', 'antiseptic', 'sunscreen', 'water'] },
 };
 function Store({ g, go }: P) {
   const [busy, setBusy] = useState<{ id: string; p: number } | null>(null);
@@ -725,12 +727,56 @@ function AllServices({ g, go }: P) {
     { ico: '🪪', label: 'Профиль', color: '#0f766e', on: () => go('profile') },
   ];
   if (g.online) items.push({ ico: '👥', label: 'Игроки', color: '#06b6d4', on: () => go('players') });
+  else items.push({ ico: '☠️', label: 'Опасно', color: '#7f1d1d', on: () => go('danger') });
   items.push({ ico: '💬', label: 'Чат', color: '#334155', on: () => { g.closePanel(); g.chatFocus?.(); } });
   return (
     <div className="tb-app-screen">
       <p className="tb-note">Классическое меню: все разделы собраны здесь. Команды чата — /help</p>
       <div className="tb-grid">{items.map((a) => <App key={a.label} {...a} />)}</div>
       <div className="est-hero small"><small>Имущество</small><b>{g.getState().properties.length + g.getState().vehicles.length + g.getState().kiosks.length} объекта</b><span>единый экран управления</span><button className="ui-btn sm main" onClick={() => go('estate')}>Открыть</button></div>
+    </div>
+  );
+}
+
+/** ⚠️ «Опасно» — приложение только для офлайн-игры: полный сброс прогресса или удаление аккаунта */
+function Danger({ g }: P) {
+  const [arm, setArm] = useState<'reset' | 'account' | null>(null);
+  /** стирает все локальные сейвы соло-игры; онлайн-слоты (losgorod_save_online…) не трогаем */
+  const wipeOfflineSaves = () => {
+    try {
+      const drop: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('losgorod_save') && !k.startsWith('losgorod_save_online')) drop.push(k);
+      }
+      drop.forEach((k) => localStorage.removeItem(k));
+    } catch { /* приватный режим */ }
+  };
+  if (g.online) return (
+    <div className="tb-pad">
+      <div className="tb-card big dim">☠️ <div><b>Только офлайн</b><small>Это приложение доступно в одиночной игре. Онлайн-прогресс хранится на сервере и здесь не меняется.</small></div></div>
+    </div>
+  );
+  const acc = currentAccount();
+  return (
+    <div className="tb-pad">
+      <div className="tb-card big dim">☠️ <div><b>Опасная зона</b><small>Действия ниже необратимы. Онлайн-сохранения не затрагиваются никогда.</small></div></div>
+
+      <div className="tb-card col">
+        <div className="row">💾 <div className="grow"><b>Сбросить весь офлайн-прогресс</b><small>деньги, дома, машины, бизнес и инвентарь — игра начнётся заново</small></div></div>
+        {arm !== 'reset'
+          ? <button className="ui-btn danger" onClick={() => setArm('reset')}>Сбросить сохранения…</button>
+          : <div className="btns"><button className="ui-btn danger" onClick={() => { wipeOfflineSaves(); window.location.reload(); }}>Да, начать с нуля</button><button className="ui-btn ghost" onClick={() => setArm(null)}>Отмена</button></div>}
+      </div>
+
+      <div className="tb-card col">
+        <div className="row">🗑️ <div className="grow"><b>Удалить свой аккаунт</b><small>{acc ? `логин «${acc.login}» будет стёрт с этого устройства вместе со всем прогрессом` : 'локальный аккаунт не найден — прогресс и так гостевой'}</small></div></div>
+        {arm !== 'account'
+          ? <button className="ui-btn danger" disabled={!acc} onClick={() => setArm('account')}>Удалить аккаунт…</button>
+          : <div className="btns"><button className="ui-btn danger" onClick={() => { const a = currentAccount(); if (a) removeAccount(a.login); logout(); wipeOfflineSaves(); window.location.reload(); }}>Да, удалить навсегда</button><button className="ui-btn ghost" onClick={() => setArm(null)}>Отмена</button></div>}
+      </div>
+
+      <p className="tb-note">После подтверждения страница перезагрузится и начнётся новая игра. Онлайн-прогресс (серверный) останется нетронутым.</p>
     </div>
   );
 }
