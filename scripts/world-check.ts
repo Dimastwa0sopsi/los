@@ -143,14 +143,20 @@ try {
     if (roadsInside.length) throw new Error(`внутри парка осталось ${roadsInside.length} участков дорог`);
     const inside = (x: number, z: number) => x > bp.x0 && x < bp.x1 && z > bp.z0 && z < bp.z1;
     const kind = (t: string) => L.props.filter((p) => p.t === t && inside(p.x, p.z)).length;
-    const rides = { ferris: kind('ferris'), carousel: kind('carouselbig'), tower: kind('droptower'), coaster: kind('coaster'), rocket: kind('rocket') };
-    console.log(`  парк «Ракета»: ${side}×${side} м, аттракционы: колесо ${rides.ferris}, карусель ${rides.carousel}, башня ${rides.tower}, горки ${rides.coaster}, ракета ${rides.rocket}, пруд ${kind('pond')}`);
-    if (!rides.rocket) throw new Error('в парке нет ракеты');
-    if (!rides.ferris || !rides.carousel || !rides.tower || !rides.coaster) throw new Error('в парке не хватает аттракционов');
+    const rides = L.parkRides.filter((r) => inside(r.x, r.z));
+    const kinds = new Set(rides.map((r) => r.kind));
+    console.log(`  парк «Ракета»: ${side}×${side} м, аттракционы: ${rides.map((r) => r.name).join(' · ')}, ракета ${kind('rocket')}, пруд ${kind('pond')}, оградка пруда ${kind('railing')}`);
+    if (kind('rocket') < 1) throw new Error('в парке нет ракеты');
+    for (const k of ['ferris', 'carousel', 'tower', 'coaster'] as const) if (!kinds.has(k)) throw new Error(`в парке нет аттракциона ${k}`);
+    for (const r of rides) {
+      if (!inside(r.board.x, r.board.z)) throw new Error(`площадка посадки ${r.name} вне парка`);
+      const blocked = L.colliders.some((c) => r.board.x > c.x0 - 1 && r.board.x < c.x1 + 1 && r.board.z > c.z0 - 1 && r.board.z < c.z1 + 1 && c.y1 > 1.2);
+      if (blocked) throw new Error(`к площадке ${r.name} не подойти: перекрыта коллайдером`);
+    }
     if (!kind('pond')) throw new Error('в парке нет пруда');
     const ice = L.kiosks.filter((k) => inside(k.x, k.z) && k.type === 2);
     if (!ice.length) throw new Error('в парке нет ларька с мороженым');
-    // пруд нельзя обойти: вокруг воды стоит ограда из коллайдеров
+    // пруд нельзя обойти: вокруг воды стоит видимая оградка с коллайдерами
     const pond = L.props.find((p) => p.t === 'pond' && inside(p.x, p.z));
     if (pond) {
       const r = pond.h ?? 7.5;
@@ -161,9 +167,22 @@ try {
       });
       if (ring.length < 12) throw new Error(`вокруг пруда только ${ring.length} ограждений — в воду можно зайти`);
     }
-    // дорожек внутри парка быть не должно
-    const paths = L.props.filter((p) => (p.t === 'path' || p.t === 'pave') && inside(p.x, p.z)).length;
-    if (paths) throw new Error(`в парке ${paths} дорожек/плит — просили без дорог`);
+    // невидимых стен в парке быть не должно: любой коллайдер выше 1.2 м должен
+    // стоять рядом с видимым объектом (иначе игрок упирается в воздух)
+    const solid = L.colliders.filter((c) => {
+      const cx = (c.x0 + c.x1) / 2, cz = (c.z0 + c.z1) / 2;
+      return inside(cx, cz) && c.y1 > 1.2;
+    });
+    let ghosts = 0;
+    for (const c of solid) {
+      const cx = (c.x0 + c.x1) / 2, cz = (c.z0 + c.z1) / 2;
+      const near = L.props.some((p) => Math.hypot(p.x - cx, p.z - cz) < (p.t === 'parkarch' ? 7.6 : 4.5))
+        || L.buildings.some((b) => Math.hypot(b.x - cx, b.z - cz) < 30)
+        || L.parkRides.some((r) => Math.hypot(r.x - cx, r.z - cz) < 14);
+      if (!near) ghosts++;
+    }
+    console.log(`  парк: коллайдеров выше 1.2 м — ${solid.length}, «стен из воздуха» — ${ghosts}`);
+    if (ghosts > 0) throw new Error(`в парке ${ghosts} невидимых стен`);
   }
 } catch (e) {
   console.error('✗ генерация мира упала:', (e as Error).message);

@@ -18,6 +18,7 @@ import { Sound } from './audio';
 import { Input } from './input';
 import { K } from './keys';
 import { Weather } from './weather';
+import { ParkRides } from './rides';
 import { Radio } from './radio';
 import { allMaterials, disposeTextures, mat, GFX, getTex } from './textures';
 import { T, M } from './geom';
@@ -146,6 +147,9 @@ export class Game {
   /** сколько стоим на остановке (посадка пассажиров) */
   private busDwellT = 0;
   combat!: Combat; rideRemote: { id: number; seat: number } | null = null;
+  /** аттракционы парка: динамические модели + поездка игрока */
+  rides: ParkRides | null = null;
+  rideOn: { id: string; name: string; t: number; dur: number } | null = null;
   lying = false; carrying = false; autopilot = false; destination: { x: number; z: number } | null = null;
   job: Job | null = null; taxi: { v: Vehicle; stage: 'coming' | 'waiting' | 'riding' | 'arrived' | 'leaving'; dist: number; t: number } | null = null;
   service: { v: Vehicle; kind: 'police' | 'ambulance'; t: number } | null = null;
@@ -297,6 +301,8 @@ export class Game {
     // слабые телефоны сразу начинают с пониженного разрешения и без лишних эффектов
     if (this.mobile && ((navigator as Navigator & { hardwareConcurrency?: number }).hardwareConcurrency ?? 4) <= 4) this.qualityLevel = 1;
     this.W = await buildWorldMeshes(this.L, P);
+    this.rides = new ParkRides(this.L.parkRides);
+    this.scene.add(this.rides.group);
     if (this.disposed) return;
     this.scene.add(this.W.root);
     P(0.95, 'Жители и транспорт');
@@ -703,6 +709,8 @@ export class Game {
   }
   private updateWorldSystems(dt: number) {
     const inside = !!this.interior;
+    this.rides?.update(dt);
+    if (this.rideOn) this.updateRide(dt);
     // хмель выветривается, диско-свет переливается, если включён
     if (this.buzzT > 0) this.buzzT = Math.max(0, this.buzzT - dt);
     if (this.discoOn && this.interior && this.interiorKind === 'bar') this.pulseDisco();
@@ -941,6 +949,7 @@ export class Game {
     const ch = this.player;
     if (this.admFreeze) { ch.root.position.set(this.px, this.py, this.pz); ch.root.rotation.set(0, this.pa, 0); ch.pose('idle', performance.now() / 1000); return; }
     if (this.rideRemote) { this.updateRideRemote(); return; }
+    if (this.rideOn) { this.placeOnRide(); return; }
     if (this.camMode) {
       if (this.camMode.mode === 'selfie') this.pa = this.camYaw + Math.PI;
       ch.root.position.set(this.px, this.py, this.pz); ch.root.rotation.set(0, this.pa, 0);
@@ -2186,6 +2195,12 @@ export class Game {
         if (c && Math.hypot(c.x - px, c.z - pz) < 2.2) return { text: 'E — обслужить покупателя', keys: ['E'], act: () => this.serveCustomer() };
       }
       return best;
+    }
+    if (this.rideOn) return { text: `E — сойти (${this.rideOn.name})`, keys: ['E'], act: () => this.leaveRide() };
+    // аттракционы парка «Ракета»
+    {
+      const rd = this.nearestRide(3.6);
+      if (rd) return { text: `E — прокатиться: ${rd.name}${rd.price ? ` ($${rd.price})` : ''}`, keys: ['E'], act: () => this.boardRide(rd.id) };
     }
     // сюжет: дядя Вася
     const qv = this.questPeds.vasya;
@@ -4702,6 +4717,58 @@ export class Game {
     this.sound.door();
     this.toast(`Вы сели в машину к ${r.name}. E — выйти`);
   }
+  // ================= аттракционы парка «Ракета» =================
+  private nearestRide(r: number) {
+    if (!this.rideOn && (this.inVeh || this.interior)) return null;
+    let best: WorldLayout['parkRides'][number] | null = null, bd = r;
+    for (const rd of this.L.parkRides) {
+      const d = Math.hypot(rd.board.x - this.px, rd.board.z - this.pz);
+      if (d < bd) { bd = d; best = rd; }
+    }
+    return best;
+  }
+  boardRide(id: string) {
+    const rd = this.L.parkRides.find((q) => q.id === id);
+    if (!rd || this.rideOn) return;
+    if (rd.price > 0) {
+      if (this.state.money < rd.price) { this.toast('Не хватает денег на билет'); return; }
+      this.state.money -= rd.price;
+    }
+    const dur = this.rides?.start(id) || 14;
+    this.rideOn = { id, name: rd.name, t: 0, dur };
+    this.inVeh = null; this.crouch = false; this.exitCover();
+    this.sound.coin();
+    this.toast(`Поехали! ${rd.name}`);
+    this.placeOnRide();
+  }
+  leaveRide(silent = false) {
+    if (!this.rideOn) return;
+    const rd = this.L.parkRides.find((q) => q.id === this.rideOn!.id);
+    this.rides?.stop(this.rideOn.id);
+    this.rideOn = null;
+    if (rd) { this.px = rd.board.x; this.pz = rd.board.z; this.py = 0; }
+    this.pvy = 0;
+    if (!silent) this.toast('Прокатились!');
+  }
+  private placeOnRide() {
+    if (!this.rideOn) return;
+    const seat = this.rides?.seat(this.rideOn.id);
+    if (!seat) return;
+    this.px = seat.x; this.py = Math.max(0, seat.y); this.pz = seat.z;
+    this.pa = seat.yaw;
+    const ch = this.player;
+    ch.root.position.set(seat.x, seat.y, seat.z);
+    ch.root.rotation.set(0, seat.yaw, 0);
+    ch.pose('ride', performance.now() / 1000);
+  }
+  private updateRide(dt: number) {
+    const r = this.rideOn;
+    if (!r) return;
+    r.t += dt;
+    // поездка заканчивается у платформы посадки — не выкидываем в воздухе
+    if (r.t >= r.dur) this.leaveRide();
+  }
+
   private updateRideRemote() {
     const rr = this.rideRemote!; const r = this.remotes.get(rr.id);
     if (!r || !r.veh) { this.exitRemoteRide(true); this.toast('Водитель вышел из машины'); return; }
