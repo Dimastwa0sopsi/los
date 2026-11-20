@@ -112,12 +112,12 @@ export function GameView({ settings, newGame, gender, nick = '', mode = 'solo', 
       {game && hud && phase === 'play' && mobile && !panel && hud.camera && <div className="lg-touch"><div className="lg-look" style={{ left: 0 }} onPointerDown={(e) => { (e.target as HTMLElement).setPointerCapture(e.pointerId); (e.target as HTMLElement).dataset.x = String(e.clientX); (e.target as HTMLElement).dataset.y = String(e.clientY); }} onPointerMove={(e) => { const t = e.target as HTMLElement; if (!t.dataset.x) return; game.input.lookDX += e.clientX - +t.dataset.x; game.input.lookDY += e.clientY - +(t.dataset.y ?? 0); t.dataset.x = String(e.clientX); t.dataset.y = String(e.clientY); }} onPointerUp={(e) => { delete (e.target as HTMLElement).dataset.x; }} /></div>}
       {game && hud && phase === 'play' && !hud.editor && <ChatBox g={game} mobile={mobile} online={!!hud.online} />}
       <div className="lg-toasts">{toasts.map((t) => <div key={t.id} className="lg-toast">{t.text}</div>)}</div>
-      {game && panel && panel.type === 'settings' && <SettingsPanel value={settings} onChange={onSettings} onClose={close} inGame onExit={() => { game.save(); onExit(); }} onHelp={() => game.openPanel({ type: 'help' })} />}
+      {game && panel && panel.type === 'settings' && <SettingsPanel value={settings} onChange={onSettings} onClose={close} inGame onHelp={() => game.openPanel({ type: 'help' })} />}
       {game && panel && panel.type === 'map' && <BigMap g={game} mode={panel.mode} close={close} />}
       {game && panel && panel.type === 'onlineJoin' && (
         <OnlineJoin variant="panel" g={game} initial={{ nick: game.state.nick ?? nick, gender: game.state.look.gender }}
           onClose={close}
-          onMenu={() => { game.save(); onExit(); }}
+          onMenu={close}
           onLaunch={(l) => {
             close();
             if (l.mode === 'solo') { if (game.online) game.leaveOnline(); return; }
@@ -136,7 +136,7 @@ export function GameView({ settings, newGame, gender, nick = '', mode = 'solo', 
       {netErr !== null && (
         <ServerDownModal
           text={netErr || undefined}
-          onMenu={() => { try { game?.save(); } catch { /* */ } onExit(); }}
+          onMenu={() => { setNetErr(null); game?.fallbackOffline(); }}
           // повторный вход без перезагрузки страницы: сервер мог только что перехватить старую сессию
           onRetry={game?.net ? () => { setNetErr(null); if (game) { game.input.enabled = true; game.net?.retryLogin(); } } : undefined}
           // сервер недоступен — не выкидываем в меню, а продолжаем офлайн

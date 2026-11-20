@@ -1,9 +1,6 @@
-import { useEffect, useState } from 'react';
-import { discoverServer } from '../game/discovery';
+import { useState } from 'react';
 import menuBg from '../assets/menu.jpg';
 import type { Game } from '../game/game';
-import { ONLINE_URL, getServerUrl, hostOf, diagnoseServer, type ServerDiag } from '../game/net';
-import { ensureServer } from '../game/discovery';
 import { Modal } from './MenuScreens';
 
 /** текст, который показываем, если сервер не отвечает */
@@ -11,52 +8,19 @@ export const SERVER_DOWN_TEXT = 'Сервер отключен, заходите
 
 export type JoinLaunch = { mode: 'solo' | 'online'; nick: string; gender: 'm' | 'f' };
 
-/** модальное окно ошибки сети: само проверяет сервер и объясняет причину */
+/** Ошибка подключения без отдельной проверки сервера. */
 export function ServerDownModal({ text, onMenu, onRetry, onSolo }: { text?: string | null; onMenu: () => void; onRetry?: () => void; onSolo?: () => void }) {
-  const [diag, setDiag] = useState<ServerDiag | null>(null);
-  const [checking, setChecking] = useState(true);
-  const run = async () => {
-    setChecking(true);
-    try {
-      // заодно перечитываем live.json: адрес туннеля мог смениться
-      await discoverServer(true).catch(() => null);
-      setDiag(await diagnoseServer());
-    } catch { setDiag(null); } finally { setChecking(false); }
-  };
-  useEffect(() => { void run(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
-  const tone = diag?.reason === 'ok' ? 'ok' : diag ? 'bad' : 'wait';
-  const head = diag ? diag.text : (text && text.trim() ? text : SERVER_DOWN_TEXT);
-  return (
-    <div className="lg-modal-back" onPointerDown={(e) => e.stopPropagation()}>
-      <div className="lg-modal" style={{ width: 'min(460px, 100%)' }}>
-        <div className="lg-modal-head"><h2>⚠️ Нет связи к серверу!</h2></div>
-        <div className="lg-modal-body">
-          <p style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.45, textAlign: 'center', margin: '4px 0 10px' }}>{head}</p>
-          <div className={`srv-diag ${tone}`}>
-            <div className="srv-diag-row"><span>адрес</span><b>{hostOf(diag?.url || getServerUrl())}</b></div>
-            <div className="srv-diag-row"><span>проверка</span><b>{checking ? 'идёт…' : diag ? diag.detail : 'не удалось'}</b></div>
-            {diag?.build && <div className="srv-diag-row"><span>сборка сервера</span><b>{diag.build}</b></div>}
-            {diag?.online !== undefined && <div className="srv-diag-row"><span>игроков в сети</span><b>{diag.online}</b></div>}
-          </div>
-          <p className="srv-diag-hint">
-            {diag?.reason === 'dead' && 'Откройте Colab, выполните серверную ячейку и нажмите «📡 Постоянная ссылка».'}
-            {diag?.reason === 'notserver' && 'Сервер в Colab остановлен (или туннель смотрит не на тот порт). Перезапустите ячейку — адрес подхватится сам.'}
-            {diag?.reason === 'ok' && 'Сервер жив: попробуйте войти ещё раз — вход мог просто не успеть.'}
-            {(diag?.reason === 'blocked' || diag?.reason === 'nohttp') && 'Сеть блокирует WebSocket: проверьте VPN/расширения браузера.'}
-          </p>
-          <button className="lg-btn w-full mt-2" style={{ width: '100%', marginTop: 10 }} disabled={checking}
-            onClick={() => { void run(); if (onRetry) onRetry(); }}>
-            {checking ? 'Проверяю…' : '🔍 Проверить снова'}
-          </button>
-          {onRetry && (
-            <button className="lg-btn lg-btn-main w-full mt-2" style={{ width: '100%', marginTop: 8 }} onClick={onRetry}>🔄 Повторить вход</button>
-          )}
-          {onSolo && <button className="lg-btn lg-btn-main w-full mt-2" style={{ width: '100%', marginTop: 8 }} onClick={onSolo}>🎮 Продолжить офлайн</button>}
-          <button className="lg-btn w-full" style={{ width: '100%', marginTop: 8 }} onClick={onMenu}>В меню</button>
-        </div>
+  return <div className="lg-modal-back" onPointerDown={(e) => e.stopPropagation()}>
+    <div className="lg-modal" style={{ width: 'min(460px, 100%)' }}>
+      <div className="lg-modal-head"><h2>⚠️ Нет связи с сервером</h2></div>
+      <div className="lg-modal-body">
+        <p>{text?.trim() || SERVER_DOWN_TEXT}</p>
+        {onRetry && <button className="lg-btn lg-btn-main w-full mt-2" onClick={onRetry}>🔄 Повторить вход</button>}
+        {onSolo && <button className="lg-btn w-full mt-2" onClick={onSolo}>🎮 Продолжить офлайн</button>}
+        <button className="lg-btn w-full mt-2" onClick={onMenu}>← Назад</button>
       </div>
     </div>
-  );
+  </div>;
 }
 
 /** не открываем экранную клавиатуру на телефоне сразу при запуске */
@@ -98,39 +62,15 @@ export function OnlineJoin({ variant = 'start', g, initial, onLaunch, onClose, o
   const startGender = initial?.gender ?? info?.gender ?? 'm';
   const [nick, setNick] = useState(startNick);
   const [gender, setGender] = useState<'m' | 'f'>(startGender);
-  const [busy, setBusy] = useState(false);
+  const [busy] = useState(false);
   const [down, setDown] = useState<string | null>(null);
-  // живой статус сервера прямо в панели «Онлайн»: чтобы не гадать, почему не пускает
-  const [diag, setDiag] = useState<ServerDiag | null>(null);
-  const [diagT, setDiagT] = useState(true);
-  const check = async () => {
-    setDiagT(true);
-    try {
-      await discoverServer(true).catch(() => null);
-      setDiag(await diagnoseServer());
-    } catch { setDiag(null); } finally { setDiagT(false); }
-  };
-  useEffect(() => { if (variant === 'panel') void check(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [variant]);
   // те же правила, что и в Game.enterOnline: буквы/цифры/пробел/_-. , 2–16 символов
   const valid = /^[\p{L}\p{N} _\-.]{2,16}$/u.test(nick.trim());
   const clean = () => nick.trim().slice(0, 16);
   const alreadyOnline = !!g?.online;
 
-  // «Онлайн»: адрес сервера игрок не вводит — клиент сам находит живой туннель
-  // (game/discovery.ts: опубликованный live.json → сохранённый → встроенный),
-  // проверяет его подключением и только потом грузит общий мир.
-  const goOnline = async () => {
+  const goOnline = () => {
     if (busy || !valid) return;
-    setBusy(true);
-    try {
-      await ensureServer();   // сам находит живой адрес и проверяет его подключением
-    } catch {
-      setBusy(false);
-      const d = await diagnoseServer().catch(() => null);
-      setDown(d ? d.text : '');
-      return;
-    }
-    setBusy(false);
     onLaunch({ mode: 'online', nick: clean(), gender });
   };
   const goSolo = () => onLaunch({ mode: 'solo', nick: clean(), gender });
@@ -139,13 +79,6 @@ export function OnlineJoin({ variant = 'start', g, initial, onLaunch, onClose, o
     return (
       <>
         <Modal title="🌐 Онлайн" onClose={onClose ?? (() => {})}>
-          <div className={`srv-diag ${diag?.reason === 'ok' ? 'ok' : diag ? 'bad' : 'wait'}`} style={{ marginBottom: 12 }}>
-            <div className="srv-diag-row"><span>сервер</span><b>{diagT ? 'проверяю…' : diag ? (diag.reason === 'ok' ? 'на связи' : 'недоступен') : 'неизвестно'}</b></div>
-            <div className="srv-diag-row"><span>адрес</span><b>{hostOf(diag?.url || getServerUrl())}</b></div>
-            <div className="srv-diag-row"><span>проверка</span><b>{diagT ? 'идёт…' : diag ? diag.detail : 'нет данных'}</b></div>
-            {diag?.online !== undefined && <div className="srv-diag-row"><span>игроков</span><b>{diag.online}</b></div>}
-            <button className="lg-btn sm" style={{ marginTop: 8 }} disabled={diagT} onClick={() => void check()}>🔍 Проверить</button>
-          </div>
           {info?.exists && (
             <div className="lg-card mb-3">
               <b>Онлайн-сохранение</b>

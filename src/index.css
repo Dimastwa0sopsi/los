@@ -1175,3 +1175,14 @@ button.tb-card:hover { background: rgba(255,255,255,.09); } button.tb-card:activ
 .lg-about { display: flex; flex-direction: column; gap: 2px; margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); }
 .lg-about b { font-size: 13px; }
 .lg-about span { font-size: 11.5px; color: var(--mut); }
+
+/* Панель администратора в игровом планшете */
+.adm-panel { display: flex; flex-direction: column; gap: 10px; }
+.adm-panel small { overflow-wrap: anywhere; }
+.adm-label { display: flex; flex-direction: column; gap: 4px; }
+.adm-panel .lg-input { width: 100%; box-sizing: border-box; }
+.adm-tabs, .adm-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.adm-tabs { position: sticky; top: 0; z-index: 2; padding: 8px 0; background: #101b2b; }
+.adm-panel details { padding: 8px; border: 1px solid #475569; border-radius: 8px; }
+.adm-panel details .adm-label { margin-top: 8px; }
+.adm-message { padding: 10px; background: #1e3a4a; border-radius: 8px; overflow-wrap: anywhere; }

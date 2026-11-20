@@ -123,7 +123,7 @@ export function HowTo({ onClose }: { onClose: () => void }) {
   );
 }
 
-export function SettingsPanel({ value, onChange, onClose, inGame, onExit, onResetSave, onHelp }: { value: Settings; onChange: (s: Settings) => void; onClose: () => void; inGame?: boolean; onExit?: () => void; onResetSave?: () => void; onHelp?: () => void }) {
+export function SettingsPanel({ value, onChange, onClose, inGame, onResetSave, onHelp }: { value: Settings; onChange: (s: Settings) => void; onClose: () => void; inGame?: boolean; onExit?: () => void; onResetSave?: () => void; onHelp?: () => void }) {
   const [s, setS] = useState(value);
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => { const n = { ...s, [k]: v }; setS(n); onChange(n); };
   const Seg = <K extends keyof Settings>({ k, opts }: { k: K; opts: [Settings[K], string][] }) => (
@@ -209,7 +209,7 @@ export function SettingsPanel({ value, onChange, onClose, inGame, onExit, onRese
       <div className="flex flex-wrap gap-2 mt-4">
         <button className="lg-btn" onClick={() => { const d = defaultSettings(); setS(d); onChange(d); }}>Сбросить настройки</button>
         {inGame && <button className="lg-btn lg-btn-main" onClick={onClose}>▶ Продолжить</button>}
-        {inGame && onExit && <button className="lg-btn" onClick={onExit}>⏏ В главное меню</button>}
+        {inGame && <button className="lg-btn" onClick={onClose}>← Назад</button>}
         {!inGame && onResetSave && <button className="lg-btn lg-danger" onClick={onResetSave}>Удалить сохранение</button>}
       </div>
       <p className="text-xs opacity-60 mt-2">Изменения качества, плотности трафика и пешеходов частично применяются при следующем запуске мира.</p>

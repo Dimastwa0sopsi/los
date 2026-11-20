@@ -6,13 +6,19 @@ import { generateLayout } from '../src/game/worldgen';
 import { ParkRides } from '../src/game/rides';
 
 const L = generateLayout();
-if (!L.parkRides.length) { console.error('✗ в лейауте нет аттракционов'); process.exit(1); }
-
-const rides = new ParkRides(L.parkRides);
+if (L.parkRides.length) throw new Error('Парк должен быть без аттракционов');
+// Движок аттракционов тестируем на отдельном фиктивном наборе, не размещая их в мире.
+const definitions: typeof L.parkRides = [
+  { id: 'ferris', kind: 'ferris', name: 'Колесо', x: 0, z: 0, w: 3.4, h: 12, board: { x: 0, z: 11 }, price: 6 },
+  { id: 'carousel', kind: 'carousel', name: 'Карусель', x: 100, z: 0, w: 9, h: 8, board: { x: 100, z: 10 }, price: 4 },
+  { id: 'tower', kind: 'tower', name: 'Башня', x: 200, z: 0, w: 1.8, h: 22, board: { x: 206, z: 0 }, price: 7 },
+  { id: 'coaster', kind: 'coaster', name: 'Горки', x: 300, z: 0, w: 52, h: 9, board: { x: 300, z: -8 }, price: 9 },
+];
+const rides = new ParkRides(definitions);
 let fail = 0;
 const bad = (msg: string) => { console.log(`  ✗ ${msg}`); fail++; };
 
-for (const def of L.parkRides) {
+for (const def of definitions) {
   rides.start(def.id);
   const xs: number[] = [], ys: number[] = [], zs: number[] = [];
   const steps = def.kind === 'ferris' ? 4000 : 1200;
@@ -60,7 +66,7 @@ for (const def of L.parkRides) {
   rides.stop(def.id);
 }
 // остановленный аттракцион не «дёргается» и не теряет сиденье
-const first = L.parkRides[0];
+const first = definitions[0];
 rides.stop(first.id);
 const a = rides.seat(first.id)!, b = (rides.update(0.016), rides.seat(first.id)!);
 if (Math.hypot(a.x - b.x, a.z - b.z, a.y - b.y) > 1) bad('остановленный аттракцион прыгает');

@@ -26,7 +26,11 @@ try {
   console.log(`  дома: ${houses.length}, с забором ${fenced}, подъездов к улице ${driveways}, заборов ${fences}`);
   if (fish < 2 || toilets < 3) throw new Error('пляж собран не полностью');
   if (sosnFarm < 3 || sosn.length < 8) throw new Error('деревня с фермой собрана не полностью');
-  if (L.villages.length !== 3) throw new Error('деревень должно быть ровно три');
+  if (L.villages.length !== 4) throw new Error('должно быть четыре поселения');
+  const eg = L.buildings.filter(b => b.village === 'Егоровка');
+  if (eg.filter(b => b.kind === 'vhouse' && b.price === 250000 && b.forSale).length !== 16) throw new Error('неверные дома Егоровки');
+  for (const kind of ['supermarket', 'pharmacy', 'gunshop', 'bank']) if (!eg.some(b => b.kind === kind && b.enter)) throw new Error('в Егоровке нет сервиса ' + kind);
+  if (L.parkRides.length) throw new Error('в парке остались аттракционы');
   for (const gone of ['Берёзово', 'Тихая Гавань', 'Лесной Край', 'Дубрава']) if (L.villages.some((v) => v.name === gone)) throw new Error('деревня ' + gone + ' не удалена');
   if (L.newCity || L.bridges.length) throw new Error('соседний город и мост должны быть убраны');
   if (fenced < houses.length) throw new Error('не у каждого дома есть забор');
@@ -161,15 +165,8 @@ try {
     const inside = (x: number, z: number) => x > bp.x0 && x < bp.x1 && z > bp.z0 && z < bp.z1;
     const kind = (t: string) => L.props.filter((p) => p.t === t && inside(p.x, p.z)).length;
     const rides = L.parkRides.filter((r) => inside(r.x, r.z));
-    const kinds = new Set(rides.map((r) => r.kind));
-    console.log(`  парк «Ракета»: ${side}×${side} м, аттракционы: ${rides.map((r) => r.name).join(' · ')}, ракета ${kind('rocket')}, пруд ${kind('pond')}, оградка пруда ${kind('railing')}`);
+    if (rides.length) throw new Error('в парке остались аттракционы');
     if (kind('rocket') < 1) throw new Error('в парке нет ракеты');
-    for (const k of ['ferris', 'carousel', 'tower', 'coaster'] as const) if (!kinds.has(k)) throw new Error(`в парке нет аттракциона ${k}`);
-    for (const r of rides) {
-      if (!inside(r.board.x, r.board.z)) throw new Error(`площадка посадки ${r.name} вне парка`);
-      const blocked = L.colliders.some((c) => r.board.x > c.x0 - 1 && r.board.x < c.x1 + 1 && r.board.z > c.z0 - 1 && r.board.z < c.z1 + 1 && c.y1 > 1.2);
-      if (blocked) throw new Error(`к площадке ${r.name} не подойти: перекрыта коллайдером`);
-    }
     if (!kind('pond')) throw new Error('в парке нет пруда');
     const ice = L.kiosks.filter((k) => inside(k.x, k.z) && k.type === 2);
     if (!ice.length) throw new Error('в парке нет ларька с мороженым');

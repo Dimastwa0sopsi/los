@@ -1,13 +1,12 @@
 // Стартовая заставка: статичный фон города и ОДНА кнопка — «▶ Играть».
 //
 // Никаких подсказок, шагов «выберите режим», логинов и полей с адресом сервера.
-// По нажатию клиент сам находит живой сервер (см. game/discovery.ts): если он
-// доступен — сразу общий мир, если нет — одиночная игра. Игрок не вводит ничего.
-import { useEffect, useState } from 'react';
+// По нажатию игра запускается без предварительной проверки сервера;
+// ошибка реального соединения позволяет продолжить офлайн.
+import { useState } from 'react';
 import menuBg from '../assets/menu.jpg';
 import { type JoinLaunch } from './OnlineJoin';
 import { activateAccountSave, currentAccount, updateAccount } from '../game/accounts';
-import { warmServer, ensureServer } from '../game/discovery';
 import { APP_BUILD, APP_VERSION, versionShort } from '../version';
 
 const NICK_KEY = 'losgorod_nick';
@@ -28,9 +27,6 @@ function pickNick(): string {
 export function AuthScreen({ onLaunch }: { onLaunch: (l: JoinLaunch) => void }) {
   const [busy, setBusy] = useState(false);
 
-  // прогрев: пока игрок смотрит на заставку, клиент уже ищет актуальный сервер
-  useEffect(() => { warmServer(); }, []);
-
   const play = async () => {
     if (busy) return;
     setBusy(true);
@@ -43,10 +39,8 @@ export function AuthScreen({ onLaunch }: { onLaunch: (l: JoinLaunch) => void }) 
       updateAccount(acc.login, { gender });
     }
     const nick = pickNick();
-    let online = false;
-    try { await ensureServer(); online = true; } catch { online = false; }
     try { localStorage.setItem(GENDER_KEY, gender); } catch { /* приватный режим */ }
-    onLaunch({ mode: online ? 'online' : 'solo', nick, gender });
+    onLaunch({ mode: 'online', nick, gender });
   };
 
   return (
