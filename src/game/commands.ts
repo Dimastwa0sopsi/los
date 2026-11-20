@@ -1,7 +1,7 @@
 // 50 команд чата: имущество, транспорт, бизнес, деньги и навигация.
 // Каждая команда делает что-то настоящее — без «заглушек ради галочки».
 import type { Game } from './game';
-import { KIOSK_TYPES, VEHICLES, ITEMS, SHOP_ITEMS } from './data';
+import { KIOSK_TYPES, VEHICLES, ITEMS, SHOP_ITEMS, EMOTES } from './data';
 import { carValue, repairCost } from './state';
 
 export type CmdCat = 'prop' | 'car' | 'biz' | 'money' | 'world';
@@ -248,6 +248,21 @@ export const COMMANDS: Cmd[] = [
   } },
 
   // ---------- мир ----------
+  { name: 'e', aliases: ['emo', 'emote'], args: 'номер', cat: 'world', desc: 'анимация по номеру из панели F', run: (g, arg) => {
+    const n = parseInt(arg, 10);
+    if (!Number.isFinite(n) || n < 1 || n > EMOTES.length) {
+      say(g, `Номер 1…${EMOTES.length}: ${EMOTES.map((e, i) => `${i + 1}) ${e.icon}${e.name}`).join(' · ')}`); return;
+    }
+    g.playEmote(EMOTES[n - 1].id);
+  } },
+  { name: 'd', aliases: ['dance', 'танцы'], args: 'номер', cat: 'world', desc: 'танец по номеру (клавиша / — панель танцев)', run: (g, arg) => {
+    const list = EMOTES.filter((e) => e.dance);
+    const n = parseInt(arg, 10);
+    if (!Number.isFinite(n) || n < 1 || n > list.length) {
+      say(g, `Танец 1…${list.length}: ${list.map((e, i) => `${i + 1}) ${e.icon}${e.name}`).join(' · ')} · панель — клавиша /`); return;
+    }
+    g.playEmote(list[n - 1].id);
+  } },
   { name: 'help', cat: 'world', desc: 'список команд по категориям', run: (g) => { for (const c of Object.keys(CAT_NAMES) as CmdCat[]) g.sysMsg(`${CAT_NAMES[c]}: ${COMMANDS.filter((x) => x.cat === c).map((x) => '/' + x.name).join(' ')}`); } },
   { name: 'cmds', args: '[категория]', cat: 'world', desc: 'подробная справка по командам', run: (g, a) => {
     const cat = (Object.keys(CAT_NAMES) as CmdCat[]).find((c) => c === a || CAT_NAMES[c].toLowerCase().includes(a.toLowerCase()));
