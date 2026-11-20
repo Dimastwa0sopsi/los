@@ -62,12 +62,12 @@ function Speedo({ kmh, rpm, gear, heli, alt, fuel, name, lights, auto, cruise, d
 }
 
 /** плашка версии внизу экрана: номер, дата сборки, по клику — список обновлений */
-function VersionChip({ mobile, onOpen }: { mobile: boolean; onOpen: () => void }) {
+function VersionChip({ onOpen }: { onOpen: () => void }) {
   return (
-    <button className={`hx-ver ${mobile ? 'mob' : ''}`} onClick={onOpen} title={`Лос-Город ${APP_VERSION} · сборка ${APP_BUILD} (${APP_BUILD_ID})`}>
+    <button className="hx-ver" onClick={onOpen} title={`Лос-Город ${APP_VERSION} · сборка ${APP_BUILD} (${APP_BUILD_ID})`}>
       <i />
       <b>{versionShort()}</b>
-      {!mobile && <small>сборка {APP_BUILD}</small>}
+      <small>сборка {APP_BUILD}</small>
     </button>
   );
 }
@@ -187,7 +187,8 @@ export function Hud({ g, hud, mobile }: { g: Game; hud: HudState; mobile: boolea
       {hud.prompt && g.settings.hints !== 'off' && <Prompt text={hud.prompt} short={g.settings.hints === 'short'} />}
 
       {/* версия внизу экрана: каждая сборка помечена номером и датой */}
-      <VersionChip mobile={mobile} onOpen={() => { setVerOpen(true); }} />
+      {/* версия внизу экрана — требование для ПК; на телефоне она есть в меню и настройках */}
+      {!mobile && <VersionChip onOpen={() => { setVerOpen(true); }} />}
       {verOpen && <ChangelogModal onClose={() => setVerOpen(false)} />}
     </div>
   );

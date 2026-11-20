@@ -1130,8 +1130,9 @@ button.tb-card:hover { background: rgba(255,255,255,.09); } button.tb-card:activ
 .lg-pad-grid .lg-chip span { margin-right: 4px; }
 
 /* ---- плашка версии внизу экрана ---- */
+.hx:not(.mob) .hx-map { bottom: calc(46px + var(--safe-b)); }
 .hx-ver {
-  position: absolute; left: calc(10px + var(--safe-l)); bottom: calc(8px + var(--safe-b)); z-index: 30;
+  position: absolute; left: calc(14px + var(--safe-l)); bottom: calc(10px + var(--safe-b)); z-index: 30;
   display: flex; align-items: center; gap: 7px; padding: 5px 10px 5px 8px;
   background: rgba(10, 13, 20, .62); border: 1px solid rgba(255,255,255,.12); border-radius: 999px;
   color: var(--mut); font: inherit; cursor: pointer; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
