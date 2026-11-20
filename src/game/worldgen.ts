@@ -1235,7 +1235,8 @@ export function generateLayout(): WorldLayout {
         // огород за домом, поленница, куры во дворе
         const gx = hx + side * 8;
         for (let k = 0; k < 3; k++) addProp({ t: 'bed', x: gx, z: hz - 6 + k * 3.2, w: 2.2, d: 2.6 });
-        for (let k = 0; k < 4; k++) addProp({ t: 'chicken', x: hx + side * 3.5 + (k % 2) * 1.6, z: hz + 5 + Math.floor(k / 2) * 1.8, r: k * 1.2 });
+        // куры гуляют во дворе, а не в стене дома (раньше стояли ровно на южной стене)
+        for (let k = 0; k < 4; k++) addProp({ t: 'chicken', x: hx + side * 2.4 + (k % 2) * 1.6, z: hz + 6.6 + Math.floor(k / 2) * 1.5, r: k * 1.2 });
         addProp({ t: 'hay', x: hx + side * 6.4, z: hz + 7.4 }, { w: 1.6, d: 1.6, h: 1.2 });
         addProp({ t: 'tree', x: hx + side * 9, z: hz - 9, h: 1.1 }, { w: 0.5, d: 0.5, h: 3.4 });
       }
@@ -1326,7 +1327,7 @@ export function generateLayout(): WorldLayout {
         plotFence(hb, 2.6, 1.2, rng.pick(['#8b6b4a', '#a8a29e', '#e5e5e5']));
         driveway(hb.door, { z: 1560 + side * 4 }, 3.6, '#8b8b8b');
         for (let g = 0; g < 3; g++) addProp({ t: 'bed', x: hx + 6.5, z: hz - 3 + g * 3, w: 1.6, d: 2.4 });
-        for (let c = 0; c < 4; c++) addProp({ t: 'chicken', x: hx - 5 + (c % 2) * 1.6, z: hz + side * 6 + Math.floor(c / 2) * 1.6, r: c });
+        for (let c = 0; c < 4; c++) addProp({ t: 'chicken', x: hx - 3.1 + (c % 2) * 1.6, z: hz + side * 7.6 + Math.floor(c / 2) * 1.5, r: c });
       }
     }
     // общественная зона: пруд с лавочками и детская площадка

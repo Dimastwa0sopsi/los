@@ -54,7 +54,7 @@ export type SvcKind = 'wash' | 'tire' | 'food' | 'park' | 'slot' | 'pawn' | 'fis
 interface Prompt { text: string; keys: string[]; act: () => void; r?: () => void; l?: () => void }
 interface Debris { obj: THREE.Object3D; vx: number; vy: number; vz: number; wx: number; wz: number; rest: boolean }
 type TruckOrder = { name: string; x: number; z: number; cargo: string; pay: number; dist: number };
-type Job = { type: 'bus'; line: number; next: number; riders: number; earned: number; bus: Vehicle; stage: 'toBus' | 'drive' } | { type: 'farm'; stage: 'pickup' | 'feed' | 'eggs' | 'crate'; trough: number; cycles: number } | { type: 'truck'; stage: 'toTruck' | 'drive' | 'return'; order: TruckOrder; drop: { x: number; z: number }; truck: Vehicle } | { type: 'factory'; stage: 'pickup' | 'load'; truck: number; trips: number } | { type: 'courier'; stage: 'pickup' | 'drop'; from: Building; to: Building; pay: number } | { type: 'combine'; earned: number; strips: boolean[] } | { type: 'shift'; b: number; served: number; cust: Ped | null; stage: 'enter' | 'wait' | 'leave'; t: number }
+type Job = { type: 'bus'; line: number; next: number; riders: number; earned: number; bus: Vehicle; stage: 'toBus' | 'drive' } | { type: 'farm'; stage: 'pickup' | 'feed' | 'eggs' | 'crate'; trough: number; fed: boolean[]; cycles: number } | { type: 'truck'; stage: 'toTruck' | 'drive' | 'return'; order: TruckOrder; drop: { x: number; z: number }; truck: Vehicle } | { type: 'factory'; stage: 'pickup' | 'load'; truck: number; trips: number } | { type: 'courier'; stage: 'pickup' | 'drop'; from: Building; to: Building; pay: number } | { type: 'combine'; earned: number; strips: boolean[] } | { type: 'shift'; b: number; served: number; cust: Ped | null; stage: 'enter' | 'wait' | 'leave'; t: number }
   | { type: 'doctor'; served: number; phase: 'idle' | 'pick' | 'treat'; need: number; timer: number; cust: Ped | null; t: number };
 
 export interface GameCallbacks {
@@ -720,7 +720,8 @@ export class Game {
     const vehs = this.vehicles.filter((v) => Math.abs(v.speed) > 4 && Math.abs(v.x - this.px) + Math.abs(v.z - this.pz) < 150).map((v) => ({ x: v.x, z: v.z, speed: v.speed, r: v.spec.len / 2, mine: v === this.inVeh && !this.passenger }));
     this.peds.update(dt, performance.now() / 1000, {
       px: this.px, pz: this.pz, py: this.py, playerVisible: !this.inVeh && !this.rideRemote && this.state.health > 0, inside, viewDist: this.drawDist(),
-      suppress: (x, z) => this.suppressed(x, z), lightState: (n, ew) => this.lightState(n, ew), hitPlayer: (d, fx, fz, heavy) => this.combat.takeHit(d, fx, fz, { heavy }),
+      suppress: (x, z) => this.suppressed(x, z), lightState: (n, ew) => this.lightState(n, ew),
+      hitPlayer: (d, fx, fz, heavy) => { this.trafficPanic(fx, fz, 45); return this.combat.takeHit(d, fx, fz, { heavy }); },
       foePos: (id) => { const r = this.remotes.get(id); return r && r.visible && r.hp > 0 && !r.inVeh ? { x: r.x, z: r.z } : null; },
       hitFoe: (id, d, fx, fz, heavy) => this.net?.sendEvent({ e: 'hit', t: id, d: Math.round(d), k: 'fist', hx: r2(fx), hz: r2(fz), heavy }),
       obstacles: (x, z) => this.activeCol.query(x, z, 0.3).some((b) => b.y1 > 0.5), vehicles: vehs,
@@ -2198,9 +2199,19 @@ export class Game {
     // работа: ферма «Зорька»
     if (this.job?.type === 'farm') {
       const j = this.job, F = this.L.livestock;
-      if (j.stage === 'pickup' && Math.hypot(F.feed.x - px, F.feed.z - pz) < 3) return { text: 'E — взять мешок корма', keys: ['E'], act: () => { j.stage = 'feed'; this.carrying = true; this.toast(`Насыпьте корм в кормушку №${j.trough + 1}`); } };
-      if (j.stage === 'feed') { const t = F.troughs[j.trough]; if (Math.hypot(t.x - px, t.z - pz) < 2.4) return { text: `E — насыпать корм (кормушка №${j.trough + 1})`, keys: ['E'], act: () => this.farmStep() }; }
-      if (j.stage === 'eggs' && Math.hypot(F.coop.x - px, F.coop.z - pz) < 2.8) return { text: 'E — собрать яйца в курятнике', keys: ['E'], act: () => { j.stage = 'crate'; this.carrying = true; this.toast('Отнесите лоток с яйцами к ящику у конторы'); } };
+      if (j.stage === 'pickup' && Math.hypot(F.feed.x - px, F.feed.z - pz) < 3) {
+        const next = j.fed.findIndex((f) => !f);
+        return { text: 'E — взять мешок корма', keys: ['E'], act: () => { j.stage = 'feed'; j.trough = next < 0 ? 0 : next; this.carrying = true; this.toast(`Насыпьте корм в кормушку №${j.trough + 1}`); } };
+      }
+      if (j.stage === 'feed') {
+        // ближайшая пустая кормушка
+        let best = -1, bd = 2.9;
+        // кормушка — это поилка с коллайдером: считаем расстояние до её центра,
+        // а не до точки у стены, иначе подойти «с юга» было невозможно
+        F.troughs.forEach((t, i) => { if (j.fed[i]) return; const d = Math.hypot(t.x - px, t.z + 1.4 - pz); if (d < bd) { bd = d; best = i; } });
+        if (best >= 0) return { text: `E — насыпать корм (кормушка №${best + 1})`, keys: ['E'], act: () => this.farmStep(best) };
+      }
+      if (j.stage === 'eggs' && Math.hypot(F.coop.x - px, F.coop.z - pz) < 3.6) return { text: 'E — собрать яйца в курятнике', keys: ['E'], act: () => { j.stage = 'crate'; this.carrying = true; this.toast('Отнесите лоток с яйцами к ящику у конторы'); } };
       if (j.stage === 'crate' && Math.hypot(F.crate.x - px, F.crate.z - pz) < 2.6) return { text: 'E — сдать яйца', keys: ['E'], act: () => this.farmStep() };
     }
     // работа
@@ -2242,7 +2253,12 @@ export class Game {
         const ok = this.state.money >= 50000;
         return { text: ok ? `E — ${b.name}: добро пожаловать 🕴` : `🕴 Фейсконтроль: вход при $${(50000).toLocaleString('ru')} на руках`, keys: ['E'], act: () => { if (!ok) { this.sound.error(); this.toast('🕴 Охранник скрещивает руки: «Дресс-код простой — пятьдесят тысяч в кармане»'); } else this.enterBuilding(b); } };
       }
-      if (b.kind === 'livestock') return { text: 'E — Ферма «Зорька»: работа на ферме', keys: ['E'], act: () => this.openPanel({ type: 'livestock' }) };
+      if (b.kind === 'livestock') {
+        const zorka = b.name.includes('Зорька');
+        return zorka
+          ? { text: 'E — Ферма «Зорька»: работа на ферме', keys: ['E'], act: () => this.openPanel({ type: 'livestock' }) }
+          : { text: `E — ${b.name}: сюда привозят корм`, keys: ['E'], act: () => this.toast('🪧 Это коровник деревни. Работа на ферме «Зорька» — у конторы на юго-востоке города') };
+      }
       if (b.kind === 'farm') return { text: 'E — Агрохолдинг: работа на комбайне', keys: ['E'], act: () => this.openPanel({ type: 'farm' }) };
       if (b.enter) {
         if (b.kind === 'house' || b.kind === 'vhouse') {
@@ -2642,6 +2658,19 @@ export class Game {
     j.served++; j.stage = 'leave'; this.state.money += 35; this.sound.coin();
     if (j.served >= 5) { this.state.money += 80; this.toast('Смена завершена! $35×5 + бонус $80'); if (j.cust) { const c = j.cust; setTimeout(() => this.peds.peds.includes(c) && this.peds.removePed(c), 3000); } this.job = null; }
     else this.toast(`Покупатель обслужен: +$35 (${j.served}/5)`);
+  }
+  /** Перестрелка рядом: НПС за рулём жмёт газ до 100 км/ч, уходит от опасности
+   *  и не смотрит на светофоры. Когда уехал далеко или время вышло — снова обычная езда. */
+  trafficPanic(x: number, z: number, r = 50) {
+    let n = 0;
+    for (const v of this.vehicles) {
+      if (!v.ai || v === this.inVeh || v.role !== 'traffic') continue;
+      if (Math.hypot(v.x - x, v.z - z) > r) continue;
+      v.ai.panic(x, z, 6 + Math.random() * 4);
+      if (v.dummy) v.model.setHazard(true);
+      n++;
+    }
+    return n;
   }
   /** пед под перекрестием (лучим из камеры) */
   private aimPed(maxD = 40): import('./npc').Ped | null {
@@ -3177,7 +3206,12 @@ export class Game {
   /** цель маршрута GPS */
   gpsTarget(): { x: number; z: number; job: boolean } | null {
     const qt = !this.job && !this.destination ? this.questTarget() : null; if (qt) return { ...qt, job: true };
-    if (this.job?.type === 'farm') { const j = this.job, F = this.L.livestock; const p = j.stage === 'pickup' ? F.feed : j.stage === 'feed' ? F.troughs[j.trough] : j.stage === 'eggs' ? F.coop : F.crate; return { ...p, job: true }; }
+    if (this.job?.type === 'farm') {
+      const j = this.job, F = this.L.livestock;
+      const next = j.fed.findIndex((f) => !f);
+      const p = j.stage === 'pickup' ? F.feed : j.stage === 'feed' ? F.troughs[next < 0 ? 0 : next] : j.stage === 'eggs' ? F.coop : F.crate;
+      return { ...p, job: true };
+    }
     if (this.job?.type === 'truck') { const j = this.job; const p = j.stage === 'toTruck' ? { x: j.truck.x, z: j.truck.z } : j.stage === 'drive' ? j.drop : { x: 1220, z: 488 }; return { ...p, job: true }; }
     if (this.job?.type === 'factory') { const p = this.job.stage === 'pickup' ? this.L.industrial.pickup : { x: this.L.industrial.trucks[this.job.truck].x, z: 570.5 }; return { ...p, job: true }; }
     if (this.job?.type === 'courier') { const b = this.job.stage === 'pickup' ? this.job.from : this.job.to; return { x: b.door.x, z: b.door.z, job: true }; }
@@ -3944,18 +3978,25 @@ export class Game {
   }
   startFarmJob() {
     if (this.job) { this.toast('Сначала завершите текущую работу'); return; }
-    this.job = { type: 'farm', stage: 'pickup', trough: 0, cycles: 0 }; this.closePanel();
+    this.job = { type: 'farm', stage: 'pickup', trough: 0, fed: [false, false, false], cycles: 0 }; this.closePanel();
     this.toast('🐄 Работа на ферме: возьмите мешок корма у стогов сена (метка)');
   }
-  private farmStep() {
+  private farmStep(trough = -1) {
     const j = this.job; if (!j || j.type !== 'farm') return;
     this.carrying = false;
     if (j.stage === 'feed') {
-      this.state.money += 40; this.sound.coin();
-      if (j.trough < 2) { j.trough++; j.stage = 'pickup'; this.toast(`+$40. Следующий мешок — в кормушку №${j.trough + 1}`); }
-      else { j.stage = 'eggs'; this.toast('+$40. Коровы накормлены! Теперь соберите яйца в курятнике'); }
+      // кормить можно любую ещё пустую кормушку: раньше игра требовала строго «следующую»
+      // по счёту, и если игрок путал порядок — подсказка просто исчезала
+      const free = trough >= 0 && !j.fed[trough] ? trough : j.fed.findIndex((f) => !f);
+      if (free < 0) { j.stage = 'eggs'; return; }
+      j.fed[free] = true;
+      this.state.money += 40; this.sound.coin(); this.save();
+      const left = j.fed.filter((f) => !f).length;
+      if (left > 0) { j.stage = 'pickup'; j.trough = j.fed.findIndex((f) => !f); this.toast(`+$40. Осталось кормушек: ${left}. Возьмите следующий мешок у стогов`); }
+      else { j.stage = 'eggs'; j.trough = 0; this.toast('+$40. Коровы накормлены! Теперь соберите яйца в курятнике'); }
     } else if (j.stage === 'crate') {
-      j.cycles++; this.state.money += 70 + 150; this.sound.coin(); j.trough = 0; j.stage = 'pickup';
+      j.cycles++; this.state.money += 70 + 150; this.sound.coin(); this.save();
+      j.trough = 0; j.fed = [false, false, false]; j.stage = 'pickup';
       this.toast(`🥚 Яйца сданы: +$70 и бонус за цикл $150 (циклов: ${j.cycles}). Продолжайте или завершите работу в планшете`);
     }
   }
