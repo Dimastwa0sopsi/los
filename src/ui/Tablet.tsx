@@ -10,8 +10,8 @@ import { type Settings, defaultSettings } from '../game/config';
 import { currentAccount, removeAccount, logout } from '../game/accounts';
 
 const $ = (n: number) => '$' + Math.round(n).toLocaleString('ru');
-type Scr = 'store' | 'tg' | 'gallery' | 'vzhuh' | 'food' | 'coffee' | 'pizza' | 'pharm' | 'limited' | 'quest' | 'home' | 'map' | 'taxi' | 'sos' | 'homes' | 'cars' | 'bazaar' | 'jobs' | 'biz' | 'bank' | 'inv' | 'players' | 'support' | 'promo' | 'settings' | 'profile' | 'estate' | 'all' | 'tasks' | 'ach' | 'danger';
-const TITLES: Record<Scr, string> = { store: 'LosSt — магазин приложений', tg: 'Телеграм', gallery: 'Галерея', vzhuh: 'Вжух Самокаты', food: 'Вкусно Доставка', coffee: 'Кофейня «Зерно»', pizza: 'Пиццерия «Сыр»', pharm: 'Аптека 24', limited: 'LIMITED Drop', quest: 'Сюжет', home: '', map: 'Карта и GPS', taxi: 'Такси', sos: 'Экстренные службы', homes: 'Недвижимость', cars: 'Мой транспорт', bazaar: 'Автобазар', jobs: 'Работа', biz: 'Бизнес', bank: 'Банк', inv: 'Инвентарь', players: 'Игроки онлайн', support: 'Поддержка', promo: 'Промокод', settings: 'Настройки', profile: 'Профиль', estate: 'Имущество', all: 'Все сервисы', tasks: 'Задания дня', ach: 'Достижения', danger: '⚠️ Опасная зона' };
+type Scr = 'store' | 'tg' | 'gallery' | 'vzhuh' | 'food' | 'coffee' | 'pizza' | 'pharm' | 'limited' | 'quest' | 'home' | 'map' | 'taxi' | 'homes' | 'cars' | 'bazaar' | 'jobs' | 'biz' | 'bank' | 'inv' | 'players' | 'support' | 'promo' | 'settings' | 'profile' | 'estate' | 'all' | 'tasks' | 'ach' | 'danger';
+const TITLES: Record<Scr, string> = { store: 'LosSt — магазин приложений', tg: 'Телеграм', gallery: 'Галерея', vzhuh: 'Вжух Самокаты', food: 'Вкусно Доставка', coffee: 'Кофейня «Зерно»', pizza: 'Пиццерия «Сыр»', pharm: 'Аптека 24', limited: 'LIMITED Drop', quest: 'Сюжет', home: '', map: 'Карта и GPS', taxi: 'Такси', homes: 'Недвижимость', cars: 'Мой транспорт', bazaar: 'Автобазар', jobs: 'Работа', biz: 'Бизнес', bank: 'Банк', inv: 'Инвентарь', players: 'Игроки онлайн', support: 'Поддержка', promo: 'Промокод', settings: 'Настройки', profile: 'Профиль', estate: 'Имущество', all: 'Все сервисы', tasks: 'Задания дня', ach: 'Достижения', danger: '⚠️ Опасная зона' };
 interface P { g: Game; go: (s: Scr) => void; close: () => void }
 
 export function Tablet({ g, close, initial }: { g: Game; close: () => void; initial?: string }) {
@@ -34,7 +34,6 @@ export function Tablet({ g, close, initial }: { g: Game; close: () => void; init
           {scr === 'home' && <Home g={g} go={go} close={close} />}
           {scr === 'map' && <MapCanvas g={g} mode="waypoint" height="min(52vh, 420px)" />}
           {scr === 'taxi' && <Taxi g={g} go={go} close={close} />}
-          {scr === 'sos' && <Sos g={g} go={go} close={close} />}
           {scr === 'homes' && <Homes g={g} go={go} close={close} />}
           {scr === 'cars' && <Cars g={g} go={go} close={close} />}
           {scr === 'bazaar' && <Bazaar g={g} go={go} close={close} />}
@@ -149,7 +148,6 @@ function Home({ g, go }: P) {
     },
     {
       name: 'Город', ico: '🏙️', items: [
-        { ico: '🆘', label: 'Службы', color: '#ef4444', on: () => go('sos') },
         { ico: '📜', label: 'Сюжет', color: '#a16207', on: () => go('quest'), badge: s.quest && !s.quest.done ? '!' : undefined },
         { ico: '💃', label: 'Анимации', color: '#c026d3', on: () => g.openPanel({ type: 'emotes' }) },
         { ico: '📷', label: 'Камера', color: '#0f172a', on: () => g.startCamera('rear') },
@@ -329,16 +327,6 @@ function Taxi({ g, close }: P) {
       {!t && <button className="ui-btn main" onClick={() => { g.callTaxi(); close(); }}>Вызвать такси</button>}
       {t && <button className="ui-btn danger" onClick={() => g.cancelTaxi()}>Отменить заказ</button>}
       {g.online && <p className="tb-note">В онлайне можно сесть в такси к другому игроку (F у его машины) — оплата водителю списывается при выходе. Такси можно купить в автосалоне.</p>}
-    </div>
-  );
-}
-
-function Sos({ g, close }: P) {
-  return (
-    <div className="tb-list">
-      <button className="tb-card" onClick={() => { g.callService('police'); close(); }}>👮 <div><b>Полиция</b><small>патруль приедет к вам</small></div></button>
-      <button className="tb-card" onClick={() => { g.callService('ambulance'); close(); }}>🚑 <div><b>Скорая помощь</b><small>восстановит здоровье · $250</small></div></button>
-      <button className="tb-card" onClick={() => g.toast('Пожарная служба: вызов принят. Возгораний не обнаружено')}>🚒 <div><b>Пожарная служба</b><small>случайные пожары отключены</small></div></button>
     </div>
   );
 }
@@ -576,28 +564,53 @@ function Store({ g, go }: P) {
     </div>
   );
 }
-const NPC_CONTACTS: Record<string, { name: string; icon: string }> = { vasya: { name: 'Дядя Вася', icon: '🧔' }, mama: { name: 'Мама', icon: '👩' }, support: { name: 'LosSt Поддержка', icon: '🛟' } };
+const NPC_CONTACTS: Record<string, { name: string; icon: string; num: string }> = {
+  vasya: { name: 'Дядя Вася', icon: '🧔', num: '+0955341772' },
+  mama: { name: 'Мама', icon: '👩', num: '+0933712468' },
+  support: { name: 'LosSt Поддержка', icon: '🛟', num: '+0800555353' },
+};
 function Telegram({ g }: P) {
   const s = g.getState();
+  const [, tick] = useState(0);
   const [peer, setPeer] = useState<string | null>(null);
   const [text, setText] = useState('');
+  const [q, setQ] = useState('');
   const list = useRef<HTMLDivElement>(null);
   const online = g.net ? [...g.net.players.values()].filter((p) => p.id !== g.net!.id).map((p) => p.nick ?? p.name) : [];
-  const keys = [...new Set([...Object.keys(NPC_CONTACTS), ...online, ...Object.keys(s.dms ?? {})])];
+  const custNames = s.contacts ?? {};
+  const nameOf = (k: string) => NPC_CONTACTS[k]?.name ?? custNames[k] ?? k;
+  const numOf = (k: string) => NPC_CONTACTS[k]?.num ?? '';
+  const keys = [...new Set([...Object.keys(NPC_CONTACTS), ...online, ...Object.keys(custNames), ...Object.keys(s.dms ?? {})])];
+  const qq = q.trim().toLowerCase().replace(/[\s\-()]/g, '');
+  const found = qq ? keys.filter((k) => (nameOf(k).toLowerCase().includes(qq) || numOf(k).replace(/[\s\-()]/g, '').includes(qq) || k.toLowerCase().includes(qq))) : keys;
+  const exactHit = qq && (found.length > 0 || /^\+?\d{4,}$/.test(qq));
   const msgs = peer ? s.dms?.[peer] ?? [] : [];
   useEffect(() => { if (peer && s.unread) delete s.unread[peer]; list.current?.scrollTo(0, 1e6); });
-  const send = () => { if (peer && text.trim()) { g.sendDm(peer, text); setText(''); } };
+  const send = () => { if (peer && text.trim()) { g.sendDm(peer, text); setText(''); tick((x) => x + 1); } };
+  const startByNumber = () => {
+    const hit = found.find((k) => numOf(k).replace(/\D/g, '') === qq.replace(/\D/g, '')) ?? found[0] as string | undefined;
+    if (hit) { setPeer(hit); return; }
+    const key = qq.startsWith('+') ? qq : '+' + qq;   // новый контакт по номеру
+    if (!custNames[key]) g.addContact(key, `Абонент ${key}`);
+    setPeer(key); tick((x) => x + 1);
+  };
   if (!peer) return (
     <div className="tb-list">
+      {s.phoneNum
+        ? <div className="tb-card big">📱 <div><small>Ваш номер</small><b>{g.formatPhone(s.phoneNum)}</b></div></div>
+        : <button className="tb-card big" onClick={() => { g.buyPhone(); tick((x) => x + 1); }}>📶 <div className="grow"><b>Купить SIM-карту с номером</b><small>случайный номер +09… · $99 · нужен для СМС</small></div></button>}
+      <input className="ui-input" value={q} placeholder="🔎 Поиск по имени или номеру (+09…)" onChange={(e) => setQ(e.target.value)} />
       <div className="tg-head">✈️ Чаты</div>
-      {keys.map((k) => { const c = NPC_CONTACTS[k]; const last = s.dms?.[k]?.at(-1); const un = s.unread?.[k] ?? 0; const on = online.includes(k); return (
-        <button className="tb-card" key={k} onClick={() => setPeer(k)}><span className="tg-ava">{c?.icon ?? k.slice(0, 1).toUpperCase()}</span><div className="grow"><b>{c?.name ?? k}{on ? ' 🟢' : ''}</b><small>{last ? (last.me ? 'Вы: ' : '') + last.text : on ? 'в сети' : 'нет сообщений'}</small></div>{un > 0 && <em className="tg-un">{un}</em>}</button>); })}
-      <p className="tb-note">Игроки онлайн появляются в списке автоматически.</p>
+      {exactHit && qq && !found.some((k) => numOf(k).replace(/\D/g, '') === qq.replace(/\D/g, '')) &&
+        <button className="tb-card main" onClick={startByNumber}>➕ <div className="grow"><b>Написать на {qq.startsWith('+') ? qq : '+' + qq}</b><small>новый чат по номеру</small></div></button>}
+      {found.map((k) => { const c = NPC_CONTACTS[k]; const last = s.dms?.[k]?.at(-1); const un = s.unread?.[k] ?? 0; const on = online.includes(k); return (
+        <button className="tb-card" key={k} onClick={() => setPeer(k)}><span className="tg-ava">{c?.icon ?? (on ? '🧑' : '👤')}</span><div className="grow"><b>{nameOf(k)}{on ? ' 🟢' : ''}</b><small>{numOf(k) ? g.formatPhone(numOf(k)) + ' · ' : ''}{last ? (last.me ? 'Вы: ' : '') + last.text : on ? 'в сети' : 'нет сообщений'}</small></div>{un > 0 && <em className="tg-un">{un}</em>}</button>); })}
+      <p className="tb-note">СМС — $5 за сообщение, списывается со счёта. Игроки онлайн попадают в список сами; узнали чей-то номер — найдёте его поиском.</p>
     </div>
   );
   return (
     <div className="tg">
-      <div className="tg-top"><button onClick={() => setPeer(null)}>‹</button><b>{NPC_CONTACTS[peer]?.name ?? peer}</b></div>
+      <div className="tg-top"><button onClick={() => setPeer(null)}>‹</button><b>{nameOf(peer)}{numOf(peer) ? <small style={{ opacity: 0.7 }}> · {g.formatPhone(numOf(peer))}</small> : null}</b></div>
       <div className="tg-list" ref={list}>{msgs.map((m, i) => <div key={i} className={`tg-msg ${m.me ? 'me' : ''}`}>{m.text}<small>{new Date(m.t).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}</small></div>)}{!msgs.length && <p className="tb-empty">Напишите первое сообщение</p>}</div>
       <div className="tg-in"><input className="ui-input" value={text} maxLength={300} placeholder="Сообщение" onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') send(); }} /><button className="ui-btn main" onClick={send}>➤</button></div>
     </div>
@@ -714,7 +727,6 @@ function AllServices({ g, go }: P) {
     { ico: '🏦', label: 'Банк', color: '#b45309', on: () => go('bank') },
     { ico: '💼', label: 'Работа', color: '#8b5cf6', on: () => go('jobs') },
     { ico: '🚕', label: 'Такси', color: '#eab308', on: () => go('taxi') },
-    { ico: '🆘', label: 'Службы', color: '#ef4444', on: () => go('sos') },
     { ico: '📜', label: 'Сюжет', color: '#a16207', on: () => go('quest') },
     { ico: '🛍️', label: 'Магазин', color: '#7c5cff', on: () => go('store') },
     { ico: '💎', label: 'LIMITED', color: '#a855f7', on: () => go('limited') },
