@@ -18,7 +18,7 @@ export interface Interior {
   dispose: () => void;
 }
 export type InteriorKind = 'shop24' | 'supermarket' | 'cafe' | 'pharmacy' | 'gunshop' | 'clothes' | 'barber' | 'police' | 'hospital' | 'cityhall' | 'bank' | 'fishshop' |
-  'dealer' | 'service' | 'mall' | 'hall' | 'apt_eco' | 'apt_mid' | 'apt_lux' | 'house_city' | 'house_village' | 'vshop' | 'vpharmacy' | 'vguntruck' | 'vadmin' | 'checkpoint' | 'fire' | 'gas' | 'mallfood' | 'basement' | 'truckoffice' | 'office' | 'scootershop' | 'greenhouse' | 'bar' | 'ozgim' | 'mine';
+  'dealer' | 'service' | 'mall' | 'hall' | 'apt_eco' | 'apt_mid' | 'apt_lux' | 'house_city' | 'house_village' | 'vshop' | 'vpharmacy' | 'vguntruck' | 'vadmin' | 'checkpoint' | 'fire' | 'gas' | 'mallfood' | 'basement' | 'truckoffice' | 'office' | 'scootershop' | 'greenhouse' | 'bar' | 'ozgim' | 'mine' | 'casino';
 
 const WALLS = {
   white: 'c:#f1efe9', beige: 'c:#e8dcc4', mint: 'c:#d1e7dd', grey: 'c:#d4d4d8', blue: 'c:#c7d2fe', wood: 'c:#b08060', dark: 'c:#3f3f46',
@@ -1332,6 +1332,37 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
       ib.light(-W / 2 + 2.4, 2.4, -6, 0.5, 0x9fd8ff, 8); ib.light(-W / 2 + 2.4, 2.4, 10, 0.5, 0x9fd8ff, 8);
       break;
     }
+    // ---------------- КАЗИНО «ЖАР-ПТИЦА»: золото, бархат, стол «Бомба» и фейсконтроль ----------------
+    case 'casino': {
+      S(26, 22, 4.8); ib.room(W, D, H, 'tex:carpet_red', WALLS.night, 'Выйти из казино');
+      // золотые колонны и карниз по периметру зала
+      for (const [px, pz] of [[-W / 2 + 2, -D / 2 + 2], [W / 2 - 2, -D / 2 + 2], [-W / 2 + 2, D / 2 - 2], [W / 2 - 2, D / 2 - 2]] as const) {
+        ib.cyl('c:#b45309', px, 0, pz, 0.5, H - 0.5, true); ib.cyl('c:#fbbf24', px, H - 0.6, pz, 0.62, 0.2);
+      }
+      ib.f('c:#fbbf24', 0, H - 0.35, 0, W - 0.6, 0.12, D - 0.6, false);
+      // главный стол «Бомба»: зелёное сукно, фишки, дилер напротив
+      ib.cyl('tex:felt', 0, 0, -1.6, 2.5, 0.95, true);
+      ib.cyl('c:#3b2412', 0, 0, -1.6, 2.7, 0.12, false);
+      ib.cyl('c:#fbbf24', 0, 0.95, -1.6, 2.6, 0.04, false);
+      for (let i = 0; i < 6; i++) ib.cyl('c:' + ['#dc2626', '#1d4ed8', '#111827'][i % 3], -0.9 + (i % 3) * 0.9, 0.95, -1.6 + (i < 3 ? -0.5 : 0.5), 0.16, 0.1 + (i % 3) * 0.05);
+      ib.act(0, 1.2, 2.4, '💣 Игра «Бомба» — ставки от $30 000 до $1 000 000', 'gamble');
+      // стойки игровых автоматов вдоль стен
+      for (const sx of [-W / 2 + 1.6, W / 2 - 1.6]) for (let z = -D / 2 + 3; z <= D / 2 - 5; z += 3.2) {
+        const west = sx < 0;
+        ib.f('c:#1f2937', sx, 0, z, 1.1, 2.0, 0.8, true);
+        ib.f('glow:' + ['#facc15', '#f472b6', '#22d3ee', '#a855f7'][Math.abs(Math.round(z)) % 4], sx + (west ? -0.3 : 0.3), 1.3, z, 0.1, 0.9, 0.6, false);
+      }
+      // касса обмена фишек и барная стойка у юго-западного угла
+      ib.counter(-7.4, D / 2 - 2.6, 4.6, 'Касса: обменяйте выигрыш на наличные', 'counter');
+      // вывеска и неон над входом
+      ib.plane('sign:КАЗИНО «ЖАР-ПТИЦА» · ×5 ДЖЕКПОТ|#f59e0b', 0, H - 1.2, -D / 2 + 0.2, 8.4, 0.9, 0);
+      ib.f('glow:#f59e0b', 0, H - 0.7, -D / 2 + 0.16, 9.0, 0.16, 0.06, false);
+      // охрана у входа и дилер за столом
+      ib.npc(-3.2, D / 2 - 1.6, Math.PI, 'security'); ib.npc(3.2, D / 2 - 1.6, Math.PI, 'security');
+      ib.npc(0, -3.6, 0, 'dealer');
+      ib.light(0, H - 0.6, -1.6, 1.8, 0xffe3a8, 16); ib.light(-W / 2 + 4, H - 0.6, 4, 1.0, 0xf59e0b, 12); ib.light(W / 2 - 4, H - 0.6, 4, 1.0, 0xa855f7, 12);
+      break;
+    }
   }
   const spawnZ = D / 2 - 1.6;
   return ib.finish({ x: 0, z: spawnZ, a: Math.PI }, { x0: -W / 2, x1: W / 2, z0: -D / 2, z1: D / 2, h: H });
@@ -1343,7 +1374,7 @@ export function interiorForBuilding(kind: string, cls?: string): InteriorKind | 
     police: 'police', hospital: 'hospital', cityhall: 'cityhall', bank: 'bank', dealer: 'dealer', service: 'service', mall: 'mall', apartment: 'hall',
     house: 'house_city', vhouse: 'house_village', vshop: 'vshop', vpharmacy: 'vpharmacy', vguntruck: 'vguntruck', vadmin: 'vadmin',
     checkpoint: 'checkpoint', fire: 'fire', gas: 'gas', depot: 'truckoffice', office: 'office', scootershop: 'scootershop', fishshop: 'fishshop',
-    greenhouse: 'greenhouse', bar: 'bar', ozgim: 'ozgim', mine: 'mine',
+    greenhouse: 'greenhouse', bar: 'bar', ozgim: 'ozgim', mine: 'mine', casino: 'casino',
   };
   void cls;
   return m[kind] ?? null;

@@ -4,10 +4,7 @@ import type { Game, HudState } from '../game/game';
 /** вибро-отклик на касание (если телефон поддерживает) */
 const buzz = (ms = 8) => { try { navigator.vibrate?.(ms); } catch { /* нет поддержки — молча */ } };
 
-/**
- * Кнопка мобильного управления: круглый «стеклянный» кружок с иконкой.
- * hold — палец держит (стик/газ/тормоз), иначе одиночное нажатие.
- */
+/** круглая «стеклянная» кнопка: hold — держать (газ/огонь), иначе тап */
 function Btn({ g, name, ico, sub, hold = true, cls = '', onTap, active }: {
   g: Game; name?: string; ico: string; sub?: string; hold?: boolean; cls?: string; onTap?: () => void; active?: boolean;
 }) {
@@ -30,7 +27,7 @@ function Btn({ g, name, ico, sub, hold = true, cls = '', onTap, active }: {
   );
 }
 
-/** крестовина-кнопки вместо джойстика: диагонали работают при двух зажатых стрелках */
+/** крестовина вместо джойстика: диагонали — двумя зажатыми стрелками */
 function Dpad({ g }: { g: Game }) {
   const dirs = useRef(new Set<string>());
   const [, force] = useState(0);
@@ -48,10 +45,7 @@ function Dpad({ g }: { g: Game }) {
       if (!g.input.enabled) return;
       try { el.setPointerCapture(e.pointerId); } catch { /* */ }
       buzz(5); dirs.current.add(d);
-    } else {
-      dirs.current.delete(d);
-      try { el.releasePointerCapture(e.pointerId); } catch { /* */ }
-    }
+    } else { dirs.current.delete(d); try { el.releasePointerCapture(e.pointerId); } catch { /* */ } }
     apply();
   };
   const Key = ({ d, ico }: { d: string; ico: string }) => (
@@ -69,6 +63,9 @@ function Dpad({ g }: { g: Game }) {
     </div>
   );
 }
+
+type Tile = { ico: string; label: string; on: () => void };
+type Group = { title: string; tiles: Tile[] };
 
 export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
   const stickRef = useRef<HTMLDivElement>(null);
@@ -91,46 +88,47 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
     const l = Math.hypot(dx, dy); if (l > 1) { dx /= l; dy /= l; }
     const dz = (x: number) => (Math.abs(x) < 0.16 ? 0 : x);
     g.input.joy.x = dz(dx); g.input.joy.y = dz(-dy);
-    setKnob({ x: dx * 40, y: dy * 40 });
+    setKnob({ x: dx * 46, y: dy * 46 });
   };
   const stickEnd = (e: React.PointerEvent) => { if (stickId.current !== e.pointerId) return; resetStick(); };
 
-  const quick: { ico: string; label: string; on: () => void }[] = [
-    { ico: '🎒', label: 'Инвентарь', on: () => g.openPanel({ type: 'inventory' }) },
-    { ico: '🗺️', label: 'Карта', on: () => g.openPanel({ type: 'map', mode: 'waypoint' }) },
-    { ico: '💃', label: 'Эмоции', on: () => g.openPanel({ type: 'emotes' }) },
-    { ico: '💬', label: 'Чат', on: () => g.chatFocus?.() },
-    { ico: '⚙️', label: 'Настройки', on: () => g.openPanel({ type: 'settings' }) },
-    { ico: '🪪', label: 'Профиль', on: () => g.openPanel({ type: 'passport' }) },
-    { ico: '📜', label: 'Сюжет', on: () => g.openPanel({ type: 'quest' }) },
-    { ico: '🎟️', label: 'Промокод', on: () => g.openPanel({ type: 'promo' }) },
-    { ico: hud.firstPerson ? '👁️' : '🎥', label: 'Камера', on: () => g.toggleFirstPerson() },
-    ...(v && !v.passenger && !v.heli ? [
-      { ico: '🏁', label: hud.race ? 'Стоп гонку' : 'Гонка', on: () => g.startRace() },
-      { ico: '📣', label: 'Сигнал', on: () => g.input.tapV('horn') },
-      { ico: '⚠️', label: 'Аварийка', on: () => g.input.tapV('hazard') },
-      { ico: '💡', label: 'Фары', on: () => g.input.tapV('lights') },
-    ] : []),
-    ...(v && !v.passenger && v.canHydro ? [
-      { ico: '🛠', label: 'Подвеска вверх', on: () => g.hydroUp() },
-      { ico: '🔧', label: 'Подвеска вниз', on: () => g.hydroDown() },
-      { ico: '⏫', label: 'Прыжок', on: () => g.hydroJump() },
-    ] : []),
-    ...(v && !v.passenger ? [
+  // ---------- меню-шторка: сгруппированные плитки ----------
+  const groups: Group[] = [{
+    title: 'Игра', tiles: [
+      { ico: '🎒', label: 'Инвентарь', on: () => g.openPanel({ type: 'inventory' }) },
+      { ico: '🗺️', label: 'Карта · GPS', on: () => g.openPanel({ type: 'map', mode: 'waypoint' }) },
+      { ico: '🪪', label: 'Паспорт', on: () => g.openPanel({ type: 'passport' }) },
+      { ico: '📜', label: 'Сюжет', on: () => g.openPanel({ type: 'quest' }) },
+      { ico: '🎟️', label: 'Промокод', on: () => g.openPanel({ type: 'promo' }) },
+      { ico: '⚙️', label: 'Настройки', on: () => g.openPanel({ type: 'settings' }) },
+    ],
+  }, {
+    title: 'Общение и камера', tiles: [
+      { ico: '💬', label: 'Чат', on: () => g.chatFocus?.() },
+      { ico: '💃', label: 'Эмоции', on: () => g.openPanel({ type: 'emotes' }) },
+      { ico: hud.firstPerson ? '👁️' : '🎥', label: hud.firstPerson ? 'От 3-го лица' : 'От 1-го лица', on: () => g.toggleFirstPerson() },
+    ],
+  }];
+  if (v && !v.passenger) groups.push({
+    title: `Машина · ${v.name}`, tiles: [
+      { ico: '🏁', label: hud.race ? 'Стоп гонку' : 'Уличная гонка', on: () => g.startRace() },
       { ico: '📻', label: 'Радио', on: () => g.openPanel({ type: 'radio' }) },
-      { ico: '↯', label: hud.driftAssist ? 'Дрифт вкл' : 'Дрифт', on: () => g.toggleDrift() },
-    ] : []),
-    ...(v && !v.passenger ? [{
-      ico: '🛞', label: v.cruise > 0 ? `Круиз ${Math.round(v.cruise * 3.6)}` : 'Круиз',
-      on: () => { g.cruise = g.cruise > 0 ? 0 : Math.max(4.5, Math.abs(v.kmh / 3.6)); g.toast(g.cruise > 0 ? `Круиз-контроль: ${Math.round(g.cruise * 3.6)} км/ч` : 'Круиз-контроль выключен'); },
-    }] : []),
-  ];
+      { ico: '↯', label: hud.driftAssist ? 'Дрифт: вкл' : 'Дрифт-помощник', on: () => g.toggleDrift() },
+      { ico: '🛞', label: v.cruise > 0 ? `Круиз ${Math.round(v.cruise * 3.6)} км/ч` : 'Круиз-контроль', on: () => { g.cruise = g.cruise > 0 ? 0 : Math.max(4.5, Math.abs(v.kmh / 3.6)); g.toast(g.cruise > 0 ? `Круиз-контроль: ${Math.round(g.cruise * 3.6)} км/ч` : 'Круиз-контроль выключен'); } },
+      ...(v.canHydro ? [
+        { ico: '🛠', label: 'Подвеска вверх', on: () => g.hydroUp() },
+        { ico: '🔧', label: 'Подвеска вниз', on: () => g.hydroDown() },
+        { ico: '⏫', label: 'Гидро-прыжок', on: () => g.hydroJump() },
+      ] : []),
+    ],
+  });
 
-  const openQuick = (on: boolean) => { setMenu(on); buzz(10); };
+  /** подсказка действия для большой кнопки E: обрезаем служебный префикс */
+  const actLabel = hud.prompt ? hud.prompt.replace(/^(E|F|R|L)\s*—\s*/, '').replace(/[·•].*$/, '').trim().slice(0, 26) : 'действие';
 
   return (
     <div className="mui">
-      {/* ---------- обзор: свайп правой частью экрана, два пальца — зум ---------- */}
+      {/* обзор: свайп по правой части, щипок двумя пальцами — зум */}
       <div className="mui-look"
         onPointerDown={(e) => { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); look.current.set(e.pointerId, { x: e.clientX, y: e.clientY }); }}
         onPointerMove={(e) => {
@@ -144,63 +142,73 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
         }}
         onPointerUp={(e) => look.current.delete(e.pointerId)} onPointerCancel={(e) => look.current.delete(e.pointerId)} />
 
-      {/* ---------- верх: быстрые кнопки ---------- */}
+      {/* верх справа: системные кнопки (слева — мини-карта HUD) */}
       <div className="mui-top">
         <Btn g={g} ico="📱" hold={false} onTap={() => { buzz(); g.openPanel({ type: 'phone' }); }} cls="glass" />
-        <Btn g={g} ico={menu ? '✕' : '☰'} hold={false} onTap={() => openQuick(!menu)} cls={`glass ${menu ? 'on' : ''}`} />
+        <Btn g={g} ico="💬" hold={false} onTap={() => { buzz(); g.chatFocus?.(); }} cls="glass" />
+        <Btn g={g} ico={menu ? '✕' : '☰'} hold={false} onTap={() => { setMenu(!menu); buzz(10); }} cls={`glass ${menu ? 'on' : ''}`} />
       </div>
 
-      {/* ---------- шторка быстрых действий ---------- */}
+      {/* шторка: группы плиток */}
       {menu && (
         <>
           <div className="mui-sheet-back" onPointerDown={() => setMenu(false)} />
           <div className="mui-sheet">
-            {quick.map((q) => (
-              <button key={q.label} className="mui-tile" onPointerDown={(e) => { e.preventDefault(); buzz(6); setMenu(false); q.on(); }}>
-                <span>{q.ico}</span><small>{q.label}</small>
-              </button>
+            <div className="mui-sheet-head"><b>Быстрое меню</b><button className="mui-x" onPointerDown={() => setMenu(false)}>✕</button></div>
+            {groups.map((gr) => (
+              <div key={gr.title} className="mui-group">
+                <h5>{gr.title}</h5>
+                <div className="mui-grid">
+                  {gr.tiles.map((q) => (
+                    <button key={q.label} className="mui-tile" onPointerDown={(e) => { e.preventDefault(); buzz(6); setMenu(false); q.on(); }}>
+                      <span>{q.ico}</span><small>{q.label}</small>
+                    </button>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         </>
       )}
 
-      {/* ---------- лево: джойстик ИЛИ крестовина (настройки → «Движение на телефоне») ---------- */}
+      {/* лево низ: движение — джойстик или крестовина (настройки → «Движение на телефоне») */}
       {g.settings.moveStyle === 'pad' ? (
-        <div className="mui-stick-wrap padwrap">
+        <div className="mui-move padwrap">
           <Dpad g={g} />
-          {!v && (
-            <Btn g={g} ico={run ? '🏃' : '🚶'} hold={false} onTap={() => { const n = !run; setRun(n); buzz(8); g.input.setV('run', n); }} cls="mini" active={run} />
-          )}
         </div>
       ) : (
-        <div className="mui-stick-wrap">
+        <div className="mui-move">
           <div className={`mui-stick ${knob.x || knob.y ? 'active' : ''}`} ref={stickRef}
             onPointerDown={(e) => {
               e.preventDefault(); e.stopPropagation();
               if (!g.input.enabled) return;
               stickId.current = e.pointerId;
               (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-              buzz(8);
-              stickMove(e);
+              buzz(8); stickMove(e);
             }}
             onPointerMove={stickMove} onPointerUp={stickEnd} onPointerCancel={stickEnd} onLostPointerCapture={stickEnd}>
             <span className="ring" />
             <span className="knob" style={{ transform: `translate(${knob.x}px, ${knob.y}px)` }} />
           </div>
-          {!v && (
-            <Btn g={g} ico={run ? '🏃' : '🚶'} hold={false} onTap={() => { const n = !run; setRun(n); buzz(8); g.input.setV('run', n); }} cls="mini" active={run} />
-          )}
+        </div>
+      )}
+      {!v && (
+        <div className="mui-run">
+          <Btn g={g} ico={run ? '🏃 бег' : '🚶 шаг'} hold={false} onTap={() => { const n = !run; setRun(n); buzz(8); g.input.setV('run', n); }} cls={`pill ${run ? 'on' : ''}`} active={run} />
         </div>
       )}
 
-      {/* ---------- низ центр: взаимодействие ---------- */}
+      {/* центр низ: большое контекстное действие E (+ R/L по ситуации) */}
       <div className="mui-ctx">
         {hud.promptKeys.includes('R') && <Btn g={g} name="work" ico="💼" sub="R" hold={false} cls="mini" />}
-        <Btn g={g} name="interact" ico="✋" sub="действие" hold={false} cls="ctx" />
+        <div className="mui-main-wrap">
+          <Btn g={g} name="interact" ico="✋" hold={false} cls="ctx-big" />
+          <span className="mui-ctx-label">{actLabel}</span>
+        </div>
         {hud.promptKeys.includes('L') && <Btn g={g} name="rob" ico="💰" sub="L" hold={false} cls="mini red" />}
       </div>
 
-      {/* ---------- право: действия ---------- */}
+      {/* право низ: боевые/дорожные действия */}
       {v ? (
         <div className="mui-right drive">
           {v.passenger ? (
@@ -211,41 +219,40 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
             </>
           ) : (
             <>
-              <div className="mui-pedals">
-                <Btn g={g} name={v.heli ? 'up' : 'gas'} ico={v.heli ? '⬆' : 'ГАЗ'} sub={v.heli ? 'вверх' : undefined} cls="pedal green" />
-                <Btn g={g} name={v.heli ? 'down' : 'brake'} ico={v.heli ? '⬇' : 'ТОРМ'} cls="pedal red" />
-              </div>
-              {hud.gun && <Btn g={g} name="fire" ico="🔫" cls="main red" />}
-              <div className="mui-arc">
-                <Btn g={g} ico="↯" sub={hud.driftAssist ? 'дрифт вкл' : 'дрифт'} hold={false}
-                  onTap={() => g.toggleDrift()} cls="mid blue" active={hud.driftAssist} />
-                {v.canHydro && <Btn g={g} ico="🛠" sub={v.hydro > 0 ? `${v.hydro}%` : 'гидро'} hold={false}
-                  onTap={() => g.hydroJump()} cls="mini pink" active={v.hydro > 0} />}
+              <div className="mui-arc col">
+                {hud.gun && <Btn g={g} name="fire" ico="🔫" cls="main red" />}
                 {hud.gun && <Btn g={g} name="aim" ico="🎯" hold={false} cls="mini" active={hud.gun.aiming} />}
+                <Btn g={g} ico="↯" sub="дрифт" hold={false} onTap={() => g.toggleDrift()} cls="mini blue" active={hud.driftAssist} />
+                {v.canHydro && <Btn g={g} ico="⏫" sub="гидро" hold={false} onTap={() => g.hydroJump()} cls="mini pink" />}
                 {!v.heli && <Btn g={g} name="lights" ico="💡" hold={false} cls="mini" />}
+                {!v.heli && <Btn g={g} name="horn" ico="📣" hold={false} cls="mini" />}
                 {!v.heli && <Btn g={g} name="gearUp" ico="＋" hold={false} cls="mini" />}
                 {!v.heli && <Btn g={g} name="gearDown" ico="－" hold={false} cls="mini" />}
                 {v.canAuto && <Btn g={g} name="autopilot" ico="🤖" hold={false} cls="mini" />}
-                {(v.moto || hud.gun) && <Btn g={g} name={v.moto ? 'wheelie' : 'reload'} ico={v.moto ? '🛞' : '⟳'} hold={false} cls="mini" />}
-                <Btn g={g} name="enter" ico="🚪" hold={false} cls="mini grey" />
+                <Btn g={g} name="enter" ico="🚪" sub="выйти" hold={false} cls="mini grey" />
+              </div>
+              <div className="mui-pedals">
+                <Btn g={g} name={v.heli ? 'up' : 'gas'} ico={v.heli ? '⬆' : 'ГАЗ'} sub={v.heli ? 'вверх' : undefined} cls="pedal green" />
+                <Btn g={g} name={v.heli ? 'down' : 'brake'} ico={v.heli ? '⬇' : 'ТОРМ'} cls="pedal red" />
               </div>
             </>
           )}
         </div>
       ) : (
         <div className="mui-right">
+          <div className="mui-arc col top">
+            {hud.gun
+              ? <><Btn g={g} name="aim" ico="🎯" hold={false} cls="mid" active={hud.gun.aiming} /><Btn g={g} name="reload" ico="⟳" hold={false} cls="mini" /></>
+              : <><Btn g={g} name="jump" ico="⤒" hold={false} cls="mid blue" /><Btn g={g} name="block" ico="🛡" hold={true} cls="mini grey" /></>}
+            <Btn g={g} name="crouch" ico={hud.crouch ? '🧍' : '🧎'} hold={false} cls="mini" active={hud.crouch} />
+            <Btn g={g} name="weapon" ico="⇄" sub={hud.weapon === 'none' ? undefined : ''} hold={false} cls="mini" />
+            <Btn g={g} name="qmod" ico={hud.cover ? '🚪' : '🧱'} hold={false} cls="mini" active={hud.cover} />
+          </div>
           <div className="mui-main-wrap">
             {hud.gun
               ? <Btn g={g} name="fire" ico="🔫" cls="main red" />
               : <Btn g={g} name="attack" ico="👊" cls="main red" />}
             <span className="mui-main-hint">{hud.gun ? 'огонь' : 'удар'}</span>
-          </div>
-          <div className="mui-arc">
-            {hud.gun ? <><Btn g={g} name="aim" ico="🎯" hold={false} cls="mid" active={hud.gun.aiming} /><Btn g={g} name="reload" ico="⟳" hold={false} cls="mini" /></>
-              : <><Btn g={g} name="block" ico="🛡" cls="mid grey" /><Btn g={g} name="jump" ico="⤒" hold={false} cls="mini blue" /></>}
-            <Btn g={g} name="crouch" ico={hud.crouch ? '🧍' : '🧎'} hold={false} cls="mini" active={hud.crouch} />
-            <Btn g={g} name="qmod" ico={hud.cover ? '🚪' : '🧱'} hold={false} cls="mini" active={hud.cover} />
-            <Btn g={g} name="weapon" ico="⇄" hold={false} cls="mini" />
           </div>
         </div>
       )}

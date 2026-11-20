@@ -11,6 +11,58 @@ import { repairCost, sellPrice, demand, carValue, type MarketOffer } from '../ga
 
 const $ = (n: number) => '$' + Math.round(n).toLocaleString('ru');
 
+/** Казино «Жар-Птица»: дуэльная игра «Бомба» 3×3 — дилер прячет 3 бомбы, игрок открывает клетки */
+function CasinoPanel({ g, close }: { g: Game; close: () => void }) {
+  const [, tick] = useState(0); const r = () => tick((x) => x + 1);
+  const [bet, setBet] = useState(30000);
+  const [phase, setPhase] = useState<'idle' | 'play' | 'boom' | 'cash'>('idle');
+  const [bombs, setBombs] = useState<number[]>([]);
+  const [open, setOpen] = useState<number[]>([]);
+  const safeCnt = open.length;
+  const mult = +(1 + safeCnt * 0.45).toFixed(2);
+  const start = () => { if (!g.casinoStart(bet)) { r(); return; } const b: number[] = []; while (b.length < 3) { const n = Math.floor(Math.random() * 9); if (!b.includes(n)) b.push(n); } setBombs(b); setOpen([]); setPhase('play'); };
+  const pick = (i: number) => {
+    if (phase !== 'play' || open.includes(i)) return;
+    if (bombs.includes(i)) { setPhase('boom'); g.casinoPayout(0, `💥 Бомба под клеткой ${i + 1}! Ставка $${bet.toLocaleString('ru')} сгорела`); r(); return; }
+    const nx = [...open, i]; setOpen(nx);
+    if (nx.length >= 6) { setPhase('cash'); g.casinoPayout(Math.floor(bet * 5), '👑 ДЖЕКПОТ ×5 — все безопасные клетки ваши!'); r(); }
+    else r();
+  };
+  const cashout = () => { if (phase !== 'play') return; setPhase('cash'); g.casinoPayout(Math.floor(bet * mult), `🪙 Забрали ×${mult}`); r(); };
+  const presets = [30000, 100000, 250000, 500000, 1000000];
+  return (
+    <Modal title="Казино «Жар-Птица» · 💣 Бомба" onClose={close}>
+      <p className="text-sm opacity-80">Баланс: <b>{$(g.getState().money)}</b></p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 74px)', gap: 8, justifyContent: 'center', margin: '14px 0' }}>
+        {Array.from({ length: 9 }, (_, i) => {
+          const revealed = open.includes(i); const boomShow = phase === 'boom' && bombs.includes(i);
+          const bg = boomShow ? '#7f1d1d' : revealed ? '#166534' : '#1f2937';
+          return (
+            <button key={i} disabled={phase !== 'play' || revealed} onClick={() => pick(i)}
+              style={{ width: 74, height: 74, borderRadius: 14, background: bg, border: '2px solid #fbbf24', color: '#fff', fontSize: 30, cursor: phase === 'play' && !revealed ? 'pointer' : 'default', opacity: phase === 'idle' ? 0.5 : 1 }}>
+              {boomShow ? '💣' : revealed ? '💎' : ''}
+            </button>
+          );
+        })}
+      </div>
+      {phase === 'idle' && (<>
+        <div className="btns" style={{ flexWrap: 'wrap', justifyContent: 'center' }}>
+          {presets.map((p) => <button key={p} className={`ui-btn sm ${bet === p ? 'main' : ''}`} onClick={() => setBet(p)}>{$(p)}</button>)}
+        </div>
+        <div className="btns mt-2">
+          <button className="ui-btn sm" onClick={() => setBet(Math.max(30000, bet - 10000))}>−10k</button>
+          <b style={{ alignSelf: 'center' }}>Ставка: {$(bet)}</b>
+          <button className="ui-btn sm" onClick={() => setBet(Math.min(1000000, bet + 10000))}>+10k</button>
+        </div>
+        <button className="lg-btn lg-btn-main mt-3" onClick={start}>Начать игру</button>
+        <p className="tb-note mt-2">Дилер прячет 3 бомбы среди 9 клеток. Каждая 💎 даёт +0.45× к ставке; забрали — получили своё ×множитель. Все 6 алмазов — джекпот ×5!</p>
+      </>)}
+      {phase === 'play' && (<div className="text-center"><b style={{ fontSize: 22 }}>×{mult}</b><button className="lg-btn lg-btn-main mt-2" onClick={cashout}>Забрать {$(Math.floor(bet * mult))}</button></div>)}
+      {(phase === 'boom' || phase === 'cash') && <button className="lg-btn lg-btn-main mt-2" onClick={() => { setPhase('idle'); r(); }}>Сыграть ещё</button>}
+    </Modal>
+  );
+}
+
 export function GamePanel({ g, panel, close }: { g: Game; panel: Panel; close: () => void }) {
   const [, force] = useState(0);
   const r = () => force((x) => x + 1);
@@ -93,6 +145,7 @@ export function GamePanel({ g, panel, close }: { g: Game; panel: Panel; close: (
     case 'inventory': return <Modal title="🎒 Инвентарь" onClose={close} wide><InventoryGrid g={g} /></Modal>;
     case 'bar': return <BarMenu g={g} close={close} />;
     case 'ozgim': return <Ozgim g={g} close={close} />;
+    case 'casino': return <CasinoPanel g={g} close={close} />;
     case 'promo': return <Promo g={g} close={close} />;
     case 'svc': return <SvcPanel g={g} kind={panel.kind} close={close} />;
     default: return null;

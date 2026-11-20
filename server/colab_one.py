@@ -95,6 +95,7 @@ except Exception as e:
         say('ℹ️', 'и принадлежать тому же аккаунту, что и authtoken.')
     raise SystemExit(1)
 url_ws = str(t.public_url).replace('https://', 'wss://').replace('http://', 'ws://')
+json.dump({'NGROK_AUTHTOKEN': token, 'STATIC_DOMAIN': dom, 'LAST_URL': url_ws.replace('wss://', 'https://')}, open(CFG_F, 'w'))  # адрес для админ-панели
 
 # ── старт сервера: база на Drive ⇒ прогресс вечен ───────────────────────────
 env = dict(os.environ, PORT=str(PORT), ADMIN_TOKEN='losgorod-admin',
