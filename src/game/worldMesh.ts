@@ -777,10 +777,11 @@ function buildBuilding(b: Batcher, bd: Building) {
   const tints = FACADE_TINTS[bd.facade];
   const facadeKey = 'facade:' + bd.facade + (tints ? ':' + tints[bd.id % tints.length] : '');
   if (bd.roof === 'gable') {
-    b.box(facadeKey, x, 0, z, w, h * 0.62, d, 0, [10, 12]);
+    b.box(bd.kind === 'banya' ? 'tex:woodpanel' : facadeKey, x, 0, z, w, h * 0.62, d, 0, [10, 12]);
     b.box('c:#5a554f', x, 0, z, w + 0.2, 0.5, d + 0.2); // фундамент
     const alongX = w >= d;
     b.add('c:' + (bd.color ?? '#7f1d1d'), T.prism, M(x, h * 0.62, z, alongX ? 0 : Math.PI / 2, (alongX ? w : d) + 0.6, h * 0.38, (alongX ? d : w) + 0.8));
+    if (bd.kind === 'banya') b.box('c:#44403c', x + w * 0.25, h * 0.65, z, 0.25, 0.9, 0.25);
     if (bd.kind === 'vhouse' || bd.kind === 'house') b.box('c:#57534e', x + (alongX ? w * 0.25 : 0), h * 0.7, z + (alongX ? 0 : d * 0.25), 0.6, h * 0.45, 0.6);
   } else {
     b.box(facadeKey, x, 0, z, w, h, d, 0, [FACADE_TILE.w, FACADE_TILE.h]);

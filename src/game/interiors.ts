@@ -187,6 +187,8 @@ export class IB {
     this.wall(w / 2, -d / 2, w / 2, d / 2, h, wallMk);
     this.wall(-w / 2, d / 2, w / 2, d / 2, h, wallMk, [[0, 2.3]]);
     this.entrance(w, d, h, style);
+    // Дверь — переход по E, а не проход за границы сцены.
+    this.col(-1.15, d / 2 - 0.1, 1.15, d / 2 + 0.1, 0, h);
     this.act(0, d / 2 - 0.9, 1.5, exitLabel, 'exit');
     // плинтус по периметру + потолочный карниз
     const bb = (x: number, z: number, w2: number, d2: number) => this.f('c:#d6d3d1', x, 0, z, w2, 0.11, d2, false);
@@ -378,7 +380,7 @@ export class IB {
       bounds: { x0: this.ox + bounds.x0, x1: this.ox + bounds.x1, z0: this.oz + bounds.z0, z1: this.oz + bounds.z1, h: bounds.h },
       bed: this.bed, doorSpots: this.doorSpots, pots: this.pots.map((p) => ({ x: this.ox + p.x, z: this.oz + p.z })), lights: this.lights, carts: this.carts,
       stats: { meshes: g.children.length, signs: this.signs, fixtures: this.fixtures, doors: this.doors, windows: this.windows },
-      dispose: () => { g.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) m.geometry.dispose(); }); g.parent?.remove(g); },
+      dispose: () => { g.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) { m.geometry.dispose(); if (o.userData.steam) (m.material as THREE.Material).dispose(); } }); g.parent?.remove(g); },
     };
   }
 }
@@ -1118,25 +1120,35 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
         const z = -1.4 + (k % 3) * 0.9, y = 0.25 + Math.floor(k / 3) * 0.75;
         ib.f('c:#b08968', 3.45, y, z, 0.45, 0.45, 0.65, false);
       }
+      for (let k = 0; k < 6; k++) {
+        const x = -2.7 + (k % 3) * 2.1, z = -2.1 + Math.floor(k / 3) * 1.8;
+        ib.cyl('c:#553b2b', x, 0, z, 0.32, 0.5, true);
+        ib.act(x, z + 0.65, 1.0, `Горшок ${k + 1}`, 'pot:' + k);
+        ib.pots.push({ x, z });
+      }
       ib.light(0, H - 0.3, 0, 0.8, 0xfff1d6, 9);
       break;
     }
     case 'banya': {
-      S(10, 12, 3); ib.room(W, D, H, 'tex:woodfloor', WALLS.panel, 'Выйти из бани', 'wood');
-      // Вход с юга: диван слева, проход в парную справа.
-      ib.wall(-5, 1, 5, 1, H, WALLS.panel, [[-2.5, 1.7]]);
-      ib.sofa(3, 3.8, 2.4, 0, '#735342');
-      // Справа от входа в парную печь, слева два крана, дальше лавки.
-      ib.f('c:#44403c', -4, 0, -0.3, 1.1, 1.1, 1.1);
-      ib.f('c:#78716c', -4, 1.1, -0.3, 0.9, 0.25, 0.9, false);
-      for (const x of [3.7, 2.8]) {
-        ib.f('chrome', x, 1.1, 0.82, 0.18, 0.12, 0.35, false);
-        ib.f('c:#94a3b8', x, 0.65, 0.55, 0.55, 0.18, 0.5, false);
+      S(8, 9, 2.8); ib.room(W, D, H, 'tex:parquet', WALLS.panel, 'Выйти из бани', 'wood');
+      ib.wall(-4, 0.5, 4, 0.5, H, WALLS.panel, [[-2, 1.5]]);
+      ib.f('c:#865c37', -2, 0, 0.48, 1.3, 2.1, 0.07, false);
+      ib.sofa(2.5, 2.9, 1.8, 0, '#735342');
+      ib.act(2.7, 1.5, 0.95, 'Замок бани', 'bath_lock');
+      ib.f('c:#44403c', -3.2, 0, -0.6, 0.9, 1.0, 0.9);
+      ib.f('c:#78716c', -3.2, 1.0, -0.6, 0.75, 0.25, 0.75, false);
+      for (const x of [2.5, 3.3]) {
+        ib.f('chrome', x, 1.0, 0.32, 0.14, 0.12, 0.3, false);
+        ib.f('c:#94a3b8', x, 0.6, 0.1, 0.45, 0.16, 0.4, false);
       }
-      for (const x of [-3.8, 3.8]) ib.f('c:#b88958', x, 0.45, -3.7, 1.1, 0.14, 3.0, true);
-      ib.light(0, H - 0.3, 3, 0.8, 0xffdba8, 8);
-      ib.light(0, H - 0.3, -3, 0.8, 0xffc88a, 8);
-      ib.lamp(-3, H - 0.3, -3, false);
+      for (const x of [-3.1, 3.1]) ib.f('c:#b88958', x, 0.45, -2.7, 0.9, 0.14, 2.2, true);
+      // Лёгкий пар только в парной: прозрачные облака без столкновений.
+      for (const [x, z, size] of [[-2.8, -1.5, 0.55], [-1.9, -2.1, 0.65], [-0.6, -2.6, 0.7], [1.1, -3, 0.55]] as const) {
+        const cloud = new THREE.Mesh(new THREE.SphereGeometry(size, 8, 6), new THREE.MeshBasicMaterial({ color: 0xf5f3ed, transparent: true, opacity: 0.10, depthWrite: false }));
+        cloud.position.set(ib.ox + x, 2.0, ib.oz + z); cloud.scale.y = 0.45; cloud.userData.steam = true; ib.group.add(cloud);
+      }
+      ib.light(0, H - 0.3, 2.5, 0.8, 0xffdba8, 7);
+      ib.light(0, H - 0.3, -2.5, 0.8, 0xffc88a, 7);
       break;
     }
     // ---------------- ОФИС «ЛОС-ТЕХ» ----------------

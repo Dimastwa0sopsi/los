@@ -178,7 +178,7 @@ export function Hud({ g, hud, mobile }: { g: Game; hud: HudState; mobile: boolea
         <div className={`hx-cross ${hud.gun.aiming ? 'aim' : ''} ${hud.hitMarker ? 'hit' : ''}`} style={{ ['--gap' as string]: `${Math.round(4 + hud.gun.spread * 260)}px` }}>
           <i className="t" /><i className="b" /><i className="l" /><i className="r" /><em />
           {hud.gun.reloading && <span>перезарядка…</span>}
-          {!hud.gun.reloading && hud.gun.mag === 0 && <span>{hud.gun.reserve ? 'R — перезарядить' : 'нет патронов'}</span>}
+          {!hud.gun.reloading && hud.gun.mag === 0 && <span>{hud.gun.reserve ? 'G — перезарядить' : 'нет патронов'}</span>}
         </div>
       )}
       {!hud.gun && hud.hitMarker && <div className="hx-cross hit fist"><em /></div>}

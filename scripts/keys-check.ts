@@ -38,6 +38,8 @@ console.log(`клавиш в карте: ${n}`);
 for (const b of BINDINGS) console.log(`  ${b.ctx.padEnd(4)} ${keyLabel(b.code).padEnd(6)} ${b.what}`);
 
 let bad = 0;
+if (K.enterVehicle !== 'KeyF' || K.interact !== 'KeyE') { bad++; console.error('✗ посадка должна быть на F, действие — на E'); }
+else console.log('✓ F — посадка в транспорт, E — действие');
 if (dup.length) { bad++; console.error('\n✗ повтор клавиши в одном контексте:'); for (const d of dup) console.error('   ' + d); }
 else console.log('\n✓ повторов нет: каждая клавиша занята одним действием');
 
