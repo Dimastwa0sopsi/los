@@ -129,6 +129,42 @@ try {
   console.log(`  бары: ${bars.length}, названий ${barNames.size}: ${[...barNames].join(' · ')}`);
   if (bars.length < 4) throw new Error(`баров ${bars.length}, нужно 4`);
   if (barNames.size < 4) throw new Error('у баров одинаковые названия');
+  // парк «Ракета»: 2×2 квартала, без внутренних дорог, с аттракционами, мороженым и прудом
+  {
+    const bp = L.bigParks.find((q) => q.name === 'Ракета');
+    if (!bp) throw new Error('нет парка «Ракета»');
+    const side = bp.x1 - bp.x0;
+    if (Math.abs(side - (2 * 60 - 12)) > 0.01) throw new Error(`парк не 2×2 квартала: сторона ${side}`);
+    const roadsInside = L.edges.filter((e) => {
+      const A = L.nodes[e.a], B = L.nodes[e.b];
+      const inside = (p: { x: number; z: number }) => p.x > bp.x0 + 1 && p.x < bp.x1 - 1 && p.z > bp.z0 + 1 && p.z < bp.z1 - 1;
+      return inside(A) || inside(B);
+    });
+    if (roadsInside.length) throw new Error(`внутри парка осталось ${roadsInside.length} участков дорог`);
+    const inside = (x: number, z: number) => x > bp.x0 && x < bp.x1 && z > bp.z0 && z < bp.z1;
+    const kind = (t: string) => L.props.filter((p) => p.t === t && inside(p.x, p.z)).length;
+    const rides = { ferris: kind('ferris'), carousel: kind('carouselbig'), tower: kind('droptower'), coaster: kind('coaster'), rocket: kind('rocket') };
+    console.log(`  парк «Ракета»: ${side}×${side} м, аттракционы: колесо ${rides.ferris}, карусель ${rides.carousel}, башня ${rides.tower}, горки ${rides.coaster}, ракета ${rides.rocket}, пруд ${kind('pond')}`);
+    if (!rides.rocket) throw new Error('в парке нет ракеты');
+    if (!rides.ferris || !rides.carousel || !rides.tower || !rides.coaster) throw new Error('в парке не хватает аттракционов');
+    if (!kind('pond')) throw new Error('в парке нет пруда');
+    const ice = L.kiosks.filter((k) => inside(k.x, k.z) && k.type === 2);
+    if (!ice.length) throw new Error('в парке нет ларька с мороженым');
+    // пруд нельзя обойти: вокруг воды стоит ограда из коллайдеров
+    const pond = L.props.find((p) => p.t === 'pond' && inside(p.x, p.z));
+    if (pond) {
+      const r = pond.h ?? 7.5;
+      const ring = L.colliders.filter((c) => {
+        const cx = (c.x0 + c.x1) / 2, cz = (c.z0 + c.z1) / 2;
+        const d = Math.hypot(cx - pond.x, cz - pond.z);
+        return d > r * 0.8 && d < r + 2.6 && c.y1 <= 1.2;
+      });
+      if (ring.length < 12) throw new Error(`вокруг пруда только ${ring.length} ограждений — в воду можно зайти`);
+    }
+    // дорожек внутри парка быть не должно
+    const paths = L.props.filter((p) => (p.t === 'path' || p.t === 'pave') && inside(p.x, p.z)).length;
+    if (paths) throw new Error(`в парке ${paths} дорожек/плит — просили без дорог`);
+  }
 } catch (e) {
   console.error('✗ генерация мира упала:', (e as Error).message);
   process.exit(1);

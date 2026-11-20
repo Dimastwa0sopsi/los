@@ -48,15 +48,19 @@ async function main() {
 
   type Case = { label: string; x: number; z: number; want: (k: string) => boolean; why: string };
   const isGrass = (k: string) => k === 'tex:grass';
+  // внутри городского квартала допустим асфальт, газон, земля и тротуар — но не «плита вместо газона»
+  const isCitySurface = (k: string) => k === 'tex:asphalt' || k === 'tex:grass' || k === 'tex:soil' || k === 'tex:sidewalk' || k === 'tex:patch';
   const cases: Case[] = [
-    { label: 'жилой квартал', x: 330, z: 330, want: isGrass, why: 'внутри жилого квартала должен быть газон' },
-    { label: 'деловой квартал', x: 870, z: 640, want: isGrass, why: 'внутри делового квартала должен быть газон' },
+    { label: 'жилой квартал', x: 330, z: 330, want: isCitySurface, why: 'внутри жилого квартала должна быть твёрдая поверхность (асфальт/газон)' },
+    { label: 'деловой квартал', x: 870, z: 640, want: isCitySurface, why: 'внутри делового квартала должна быть поверхность' },
     { label: 'частный двор', x: 150, z: 810, want: isGrass, why: 'во дворе усадьбы должен быть газон' },
     { label: 'поле за городом', x: 900, z: 1500, want: isGrass, why: 'за городом должна быть трава' },
     { label: 'луг у реки', x: -500, z: 500, want: isGrass, why: 'у реки должна быть трава' },
     { label: 'двор деревни', x: 601, z: 1730, want: (k) => isGrass(k) || k.startsWith('road:'), why: 'в деревне должна быть трава или дорога' },
     { label: 'деревня: у улицы', x: 610, z: 1735, want: (k) => isGrass(k) || k.startsWith('road:'), why: 'у деревенской улицы должна быть трава' },
     { label: 'деревня: палисадник', x: 592, z: 1690, want: (k) => isGrass(k) || k.startsWith('road:') || k.startsWith('c:'), why: 'у дома должна быть трава' },
+    { label: 'парк «Ракета»', x: 470, z: 770, want: isGrass, why: 'в парке должен быть газон (без дорожек)' },
+    { label: 'парк: пруд', x: 514, z: 821, want: (k) => k === 'water' || k === 'tex:grass', why: 'в пруду должна быть вода' },
     { label: 'дорога-шоссе', x: 30, z: 540, want: (k) => k.startsWith('road:'), why: 'на шоссе должно быть полотно' },
     { label: 'дорога-город', x: 330, z: 540, want: (k) => k.startsWith('road:'), why: 'на городской улице должно быть полотно' },
   ];
