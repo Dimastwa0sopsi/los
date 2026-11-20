@@ -222,9 +222,19 @@ export async function diagnoseServer(url = getServerUrl(), timeout = 4500): Prom
   if (typeof fetch !== 'function') return { ...base, reason: 'nohttp', detail: 'в этом браузере нет fetch' };
   const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
   const timer = ctrl ? setTimeout(() => ctrl.abort(), timeout) : 0;
+  // бесплатный ngrok показывает браузеру страницу-заглушку вместо ответа сервера;
+  // заголовок её отключает. Шлём его только если первый ответ — не наш JSON.
+  const get = (hdr?: Record<string, string>) =>
+    fetch(`${http}/version?t=${Date.now()}`, { cache: 'no-store', signal: ctrl?.signal, headers: hdr });
   try {
-    const r = await fetch(`${http}/version?t=${Date.now()}`, { cache: 'no-store', signal: ctrl?.signal });
-    const type = r.headers.get('content-type') || '';
+    let r = await get();
+    let type = r.headers.get('content-type') || '';
+    if (!(r.ok && type.includes('json'))) {
+      try {
+        const r2 = await get({ 'ngrok-skip-browser-warning': '1' });
+        if (r2.ok && (r2.headers.get('content-type') || '').includes('json')) { r = r2; type = r2.headers.get('content-type') || ''; }
+      } catch { /* заглушка ngrok не главная причина — остаётся первый ответ */ }
+    }
     if (r.ok && type.includes('json')) {
       const j = (await r.json()) as { ok?: boolean; server?: string; build?: string; version?: string; online?: number; uptime?: number };
       if (j && j.server === 'los-gorod') {

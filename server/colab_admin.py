@@ -46,8 +46,10 @@ def api(path, body=None, timeout=20):
         return {'ok': False, 'error': f'Сервер недоступен: {e}'}
 
 def http_text(url, timeout=8):
+    # заголовок снимает страницу-заглушку бесплатного ngrok
+    req = urllib.request.Request(url, headers={'ngrok-skip-browser-warning': '1'})
     try:
-        with urllib.request.urlopen(url, timeout=timeout) as r:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
             return r.status, r.read().decode('utf-8', 'replace')
     except urllib.error.HTTPError as e:
         return e.code, ''
@@ -67,6 +69,7 @@ def explain_down(err):
         say('👉', f'Туннель отвечает HTTP {code}, но игрового сервера за ним нет (обычно ngrok 404).')
         say('👉', 'Перезапустите серверную ячейку, затем «📡 Постоянная ссылка», и вставьте новый адрес сюда.')
     say('🔗', 'Проверка вручную: откройте в браузере', BASE + '/version')
+    say('👉', 'Порядок запуска: сначала серверная ячейка (colab_one.py), потом эта панель.')
 
 chk = api('/admin/state')
 if not chk.get('ok'):

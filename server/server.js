@@ -143,7 +143,7 @@ const json = (res, code, obj) => {
   res.writeHead(code, {
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'content-type, x-admin-token',
+    'Access-Control-Allow-Headers': 'content-type, x-admin-token, ngrok-skip-browser-warning',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     // ответы служебных ручек не кэшируем: диагностика должна быть свежей
     'Cache-Control': 'no-store',
