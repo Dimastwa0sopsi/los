@@ -2,6 +2,7 @@
  * над землёй, столбы доходят до рамы, чанки собираются.  npm run check:mesh
  */
 import './domstub';
+import * as THREE from 'three';
 import { generateLayout } from '../src/game/worldgen';
 import { buildWorldMeshes } from '../src/game/worldMesh';
 
@@ -31,6 +32,17 @@ t('светофоры в парке не строятся', W.lights.every((l) =
   const bp = L.bigParks[0];
   return !(l.x > bp.x0 - 1 && l.x < bp.x1 + 1 && l.z > bp.z0 - 1 && l.z < bp.z1 + 1);
 }), `${W.lights.length} перекрёстков со светофором`);
+
+W.root.updateMatrixWorld(true);
+const ground: THREE.Object3D[] = [];
+W.root.traverse(o => { if (o.userData.matKey === 'tex:grass' || o.userData.matKey === 'tex:asphalt') ground.push(o); });
+const ray = new THREE.Raycaster();
+let covered = 0;
+for (const pool of L.pools) {
+  ray.set(new THREE.Vector3(pool.x, 2, pool.z), new THREE.Vector3(0, -1, 0));
+  if (ray.intersectObjects(ground, false).some(hit => hit.point.y > -0.1)) covered++;
+}
+t('земля не перекрывает городские бассейны', covered === 0, `закрыто ${covered} из ${L.pools.length}`);
 
 console.log(fail ? `✗ провалов: ${fail}` : '✓ геометрия мира в порядке');
 process.exit(fail ? 1 : 0);

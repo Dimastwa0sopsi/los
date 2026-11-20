@@ -351,6 +351,11 @@ export class AIDriver {
   panicT = 0; panicSpeed = 0; panicFrom = { x: 0, z: 0 };
   chaseTarget: (() => { x: number; z: number }) | null = null;
   private replan = 0; arrived = false;
+  /** Нарушения включены только для обычного трафика, не для автопилота. */
+  trafficViolations = false;
+  private speedTimer = 20; private speeding = 0;
+  private lightDecisionNode = -1; private ignoreThisLight = false;
+  private passingT = 0; private passingOffset = 0;
   setRoute(L: WorldLayout, from: number, to: number, final: { x: number; z: number } | null): boolean {
     const p = astar(L, from, to);
     if (!p) return false;
@@ -379,6 +384,14 @@ export class AIDriver {
       if (Math.hypot(v.x - this.panicFrom.x, v.z - this.panicFrom.z) > 160) this.panicT = 0;
     }
     const panic = this.panicT > 0;
+    if (this.trafficViolations && this.mode === 'wander') {
+      this.speeding = Math.max(0, this.speeding - dt);
+      this.speedTimer -= dt;
+      if (this.speedTimer <= 0) {
+        this.speedTimer = 35 + ctx.rand() * 65;
+        if (ctx.rand() < 0.18) this.speeding = 4 + ctx.rand() * 4;
+      }
+    }
     if (this.mode === 'idle') return this.apply(v, dt, v.heading, 0);
     if (this.mode === 'chase' && this.chaseTarget) {
       const t = this.chaseTarget();
@@ -428,9 +441,36 @@ export class AIDriver {
     let tx = A2.x + (B.x - A2.x) * tt, tz = A2.z + (B.z - A2.z) * tt;
     if (tt >= 1 && this.k + 2 < this.route.length) { const N2 = this.lanePt(L, b, this.route[this.k + 2], false); tx = (tx + N2.x) / 2; tz = (tz + N2.z) / 2; }
     if (this.mode === 'route' && this.final && this.k === this.route.length - 2 && tt >= 1) { tx = this.final.x; tz = this.final.z; }
+    // Обгон только на широкой прямой и при свободной встречной полосе.
+    const ux = (B.x - A2.x) / sl, uz = (B.z - A2.z) / sl;
+    this.passingT = Math.max(0, this.passingT - dt);
+    if (!this.passingT && this.mode === 'wander' && (kind === 'city' || kind === 'avenue' || kind === 'highway') && remain > 38) {
+      const ahead = ctx.vehicles.some(o => {
+        if (o === v || !o.model.group.visible) return false;
+        const dx = o.x - v.x, dz = o.z - v.z, f = dx * ux + dz * uz, side = dx * -uz + dz * ux;
+        return f > 8 && f < 24 && Math.abs(side) < 2 && o.speed < v.speed - 1 && Math.cos(angleDiff(o.heading, v.heading)) > 0.7;
+      });
+      const clear = !ctx.vehicles.some(o => {
+        if (o === v || !o.model.group.visible) return false;
+        const dx = o.x - v.x, dz = o.z - v.z, f = dx * ux + dz * uz, side = dx * -uz + dz * ux;
+        return f > -18 && f < 65 && side < -1 && side > -8;
+      });
+      const clearWall = !ctx.col || !ctx.col.solidAt(v.x + uz * 4, 1, v.z - ux * 4);
+      if (ahead && clear && clearWall) this.passingT = 4;
+    }
+    // Если встречная машина появилась уже во время манёвра, тормозим;
+    // смещение сохраняется, пока возвращение не станет безопасным.
+    const passHazard = (this.passingT > 0 || this.passingOffset < -0.5) && ctx.vehicles.some(o => {
+      if (o === v || !o.model.group.visible) return false;
+      const dx = o.x - v.x, dz = o.z - v.z, f = dx * ux + dz * uz, side = dx * -uz + dz * ux;
+      return f > 0 && f < 35 && side < -1 && side > -8 && Math.cos(angleDiff(o.heading, v.heading)) < -0.3;
+    });
+    const wantOffset = this.passingT > 0 ? -4.5 : 0;
+    this.passingOffset += clamp(wantOffset - this.passingOffset, -dt * 1.8, dt * 1.8);
+    tx += -uz * this.passingOffset; tz += ux * this.passingOffset;
     const desired = Math.atan2(tx - v.x, tz - v.z);
     // скорость
-    let target = cruiseFor(kind) * this.speedMul;
+    let target = passHazard ? 0 : cruiseFor(kind) * this.speedMul * (this.speeding > 0 ? 1.35 : 1);
     if (this.mode === 'chase') target = v.spec.maxSpeed * 0.7;
     if (panic) target = Math.max(target, Math.min(this.panicSpeed, v.spec.maxSpeed));
     target = Math.min(target, v.spec.maxSpeed);
@@ -446,8 +486,12 @@ export class AIDriver {
       const An = L.nodes[a];
       const ew = Math.abs(bn.x - An.x) > Math.abs(bn.z - An.z);
       const st = ctx.lightState(b, ew);
+      if (this.lightDecisionNode !== b) {
+        this.lightDecisionNode = b;
+        this.ignoreThisLight = this.trafficViolations && this.mode === 'wander' && ctx.rand() < 0.03;
+      }
       const dn = Math.hypot(bn.x - v.x, bn.z - v.z) - 10.5;
-      if ((st === 'red' || (st === 'yellow' && dn > 4)) && dn > -1.5) target = Math.min(target, Math.sqrt(2 * 5 * Math.max(0, dn)) * 0.9);
+      if (!this.ignoreThisLight && (st === 'red' || (st === 'yellow' && dn > 4)) && dn > -1.5) target = Math.min(target, Math.sqrt(2 * 5 * Math.max(0, dn)) * 0.9);
       if (st === 'flash' && dn < 12) target = Math.min(target, 7);
     }
     return this.apply(v, dt, desired, target, ctx);

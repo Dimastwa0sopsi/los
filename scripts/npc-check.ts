@@ -82,5 +82,36 @@ if (after > 15) bad++;
   }
 }
 
+// Обгон: впереди медленная машина, а встречная полоса должна быть свободной.
+{
+  const a = L.nodes.find(n => n.gi === 2 && n.gj === 2)!;
+  const b = L.nodes.find(n => n.gi === 3 && n.gj === 2)!;
+  const c = L.nodes.find(n => n.gi === 4 && n.gj === 2)!;
+  const runCase = (oncoming: boolean) => {
+    const car = fakeV(a.x + 5, a.z + 3); car.heading = Math.PI / 2; car.speed = 10;
+    const slow = fakeV(a.x + 20, a.z + 3); slow.heading = Math.PI / 2; slow.speed = 2;
+    const other = fakeV(a.x + 40, a.z - 3); other.heading = -Math.PI / 2; other.speed = 10;
+    const driver = new AIDriver(); driver.route = [a.id, b.id, c.id];
+    return driver.step(car, 0.5, { ...ctx, lightState: () => 'green', vehicles: oncoming ? [car, slow, other] : [car, slow] });
+  };
+  const free = runCase(false), blocked = runCase(true);
+  const ok = free.desired > blocked.desired + 0.05;
+  console.log(`  ${ok ? '✓' : '✗'} объезд медленной машины только при свободной встречной полосе`);
+  if (!ok) bad++;
+}
+// Решение нарушить красный выбирается один раз на перекрёсток, а не каждый кадр.
+{
+  const light = L.nodes.find(n => n.gi === 3 && n.gj === 6)!;
+  const before = L.adj[light.id][0].n, after = L.adj[light.id].find(e => e.n !== before)!.n;
+  const a = L.nodes[before], dx = light.x - a.x, dz = light.z - a.z, len = Math.hypot(dx, dz);
+  const car = fakeV(light.x - dx / len * 12 - dz / len * 3, light.z - dz / len * 12 + dx / len * 3);
+  car.heading = Math.atan2(dx, dz);
+  const driver = new AIDriver(); driver.route = [before, light.id, after]; driver.trafficViolations = true;
+  const result = driver.step(car, 0.1, { ...ctx, rand: () => 0 });
+  const ok = result.target > 6;
+  console.log(`  ${ok ? '✓' : '✗'} редкое нарушение красного у обычного трафика`);
+  if (!ok) bad++;
+}
+
 console.log(bad ? '✗ поведение водителей не то' : '  ✓ водители уходят от опасности и возвращаются к спокойной езде');
 process.exit(bad ? 1 : 0);

@@ -82,6 +82,44 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
     for (const i of order) { pos.push(pts[i][0], y, pts[i][1]); uv2.push(pts[i][0] / s, pts[i][1] / s); }
     b.raw(key, pos, uv2);
   };
+  // Вырезаем прямоугольные чаши из земли, чтобы плитка и дно не скрывались травой.
+  type P2 = [number, number];
+  const cutPools = (polygon: P2[]): P2[][] => {
+    let pieces = [polygon];
+    const clip = (poly: P2[], axis: 0 | 1, bound: number, less: boolean): P2[] => {
+      const out: P2[] = [];
+      for (let i = 0; i < poly.length; i++) {
+        const a = poly[i], b = poly[(i + 1) % poly.length];
+        const ia = less ? a[axis] <= bound : a[axis] >= bound;
+        const ib = less ? b[axis] <= bound : b[axis] >= bound;
+        if (ia) out.push(a);
+        if (ia !== ib) { const t = (bound - a[axis]) / (b[axis] - a[axis]); out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]); }
+      }
+      return out;
+    };
+    for (const p of L.pools) {
+      const x0 = p.x - p.w / 2, x1 = p.x + p.w / 2, z0 = p.z - p.d / 2, z1 = p.z + p.d / 2;
+      const next: P2[][] = [];
+      for (const poly of pieces) {
+        if (Math.max(...poly.map(v => v[0])) <= x0 || Math.min(...poly.map(v => v[0])) >= x1 || Math.max(...poly.map(v => v[1])) <= z0 || Math.min(...poly.map(v => v[1])) >= z1) { next.push(poly); continue; }
+        let inside = poly;
+        for (const [axis, bound, less] of [[0, x0, false], [0, x1, true], [1, z0, false], [1, z1, true]] as const) {
+          const outside = clip(inside, axis, bound, !less); if (outside.length >= 3) next.push(outside);
+          inside = clip(inside, axis, bound, less); if (inside.length < 3) break;
+        }
+      }
+      pieces = next;
+    }
+    return pieces;
+  };
+  const groundPoly = (b: Batcher, key: string, pts: P2[], y: number, scale = 12.5) => {
+    for (const poly of cutPools(pts)) for (let i = 1; i + 1 < poly.length; i++) {
+      const tri = [poly[0], poly[i], poly[i + 1]];
+      const ny = (tri[2][1] - tri[0][1]) * (tri[1][0] - tri[0][0]) - (tri[2][0] - tri[0][0]) * (tri[1][1] - tri[0][1]);
+      if (ny > 0) [tri[1], tri[2]] = [tri[2], tri[1]];
+      b.raw(key, tri.flatMap(v => [v[0], y, v[1]]), tri.flatMap(v => [v[0] / scale, v[1] / scale]));
+    }
+  };
   const gb = new Batcher();                            // суша двумя берегами (без воды посередине)
   const wShallow = new Batcher(), wMid = new Batcher(), wDeep = new Batcher();
   const bedPos: number[] = [], bedUv: number[] = [], bedCol: number[] = [];
@@ -111,8 +149,8 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
     const l0 = c0 - bankHalf, l1 = c1 - bankHalf;
     const r0 = c0 + bankHalf, r1 = c1 + bankHalf;
     // суша: левый и правый берег, кромка точно по линии воды
-    flat4(gb, 'tex:grass', [[GX0, z], [GX0, z1], [l1, z1], [l0, z]], 0);
-    flat4(gb, 'tex:grass', [[r0, z], [r1, z1], [GX1, z1], [GX1, z]], 0);
+    groundPoly(gb, 'tex:grass', [[GX0, z], [GX0, z1], [l1, z1], [l0, z]], 0);
+    groundPoly(gb, 'tex:grass', [[r0, z], [r1, z1], [GX1, z1], [GX1, z]], 0);
     // дно: поперёк русла 14 сегментов, глубина по профилю
     const px: number[][] = [], py: number[][] = [];
     for (const zz of [z, z1]) {
@@ -283,7 +321,7 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
     const b = B(cx, cz);
     const green = GREEN_BLOCKS.includes(bl.type);
     // основание квартала: асфальт в городе, газон в парках и частном секторе
-    b.box(green ? 'tex:grass' : 'tex:asphalt', cx, 0, cz, s, 0.15, s, 0, green ? 4 : 6);
+    groundPoly(b, green ? 'tex:grass' : 'tex:asphalt', [[x0, z0], [x0, z0 + s], [x0 + s, z0 + s], [x0 + s, z0]], 0.075, green ? 4 : 6);
     const cc = 'c:#c9c6bf';
     b.box(cc, cx, 0, z0 + 0.12, s, 0.18, 0.24); b.box(cc, cx, 0, z0 + s - 0.12, s, 0.18, 0.24);
     b.box(cc, x0 + 0.12, 0, cz, 0.24, 0.18, s); b.box(cc, x0 + s - 0.12, 0, cz, 0.24, 0.18, s);

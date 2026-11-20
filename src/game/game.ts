@@ -514,7 +514,7 @@ export class Game {
       const type = this.pickTrafficType();
       const v = new Vehicle(type, type === 'police' ? 'police' : 'traffic');
       v.place(sx, sz, Math.atan2(dx, dz));
-      v.ai = new AIDriver(); v.ai.route = [n.id, nb.n]; v.ai.speedMul = 0.85 + this.rng.next() * 0.3;
+      v.ai = new AIDriver(); v.ai.trafficViolations = true; v.ai.route = [n.id, nb.n]; v.ai.speedMul = 0.85 + this.rng.next() * 0.3;
       v.speed = 6; v.hasDriver = true; v.addDummyDriver();
       return this.addVehicle(v);
     }
