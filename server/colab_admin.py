@@ -45,9 +45,36 @@ def api(path, body=None, timeout=20):
     except Exception as e:                      # noqa: BLE001
         return {'ok': False, 'error': f'Сервер недоступен: {e}'}
 
+def http_text(url, timeout=8):
+    # заголовок снимает страницу-заглушку бесплатного ngrok
+    req = urllib.request.Request(url, headers={'ngrok-skip-browser-warning': '1'})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return r.status, r.read().decode('utf-8', 'replace')
+    except urllib.error.HTTPError as e:
+        return e.code, ''
+    except Exception:                                  # noqa: BLE001
+        return 0, ''
+
+def explain_down(err):
+    """Объясняет причину вместо голого «HTTP 404»: жив ли туннель и жив ли сервер."""
+    say('❌', 'Админ-панель не подключилась:', err)
+    code, body = http_text(f'{BASE}/version')
+    if code == 200 and 'build' in body:
+        say('ℹ️', 'Сервер жив (', body.strip()[:120], '), но /admin/state ответил', err)
+        say('👉', 'Похоже, на порту старый server.js: перезапустите серверную ячейку.')
+    elif code == 0:
+        say('👉', 'Туннель не отвечает. Запустите серверную ячейку (colab_one.py) и дождитесь ngrok.')
+    else:
+        say('👉', f'Туннель отвечает HTTP {code}, но игрового сервера за ним нет (обычно ngrok 404).')
+        say('👉', 'Перезапустите серверную ячейку, затем «📡 Постоянная ссылка», и вставьте новый адрес сюда.')
+    say('🔗', 'Проверка вручную: откройте в браузере', BASE + '/version')
+    say('👉', 'Порядок запуска: сначала серверная ячейка (colab_one.py), потом эта панель.')
+
 chk = api('/admin/state')
 if not chk.get('ok'):
-    say('❌', 'Нет связи с сервером:', chk.get('error')); raise SystemExit(1)
+    explain_down(chk.get('error'))
+    raise SystemExit(1)
 say('🔌', 'Админ-панель →', BASE)
 
 # --- ipywidgets (в Colab иногда слетает) ------------------------------------

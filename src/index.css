@@ -1128,3 +1128,50 @@ button.tb-card:hover { background: rgba(255,255,255,.09); } button.tb-card:activ
 .mui-tray-cell small { font-size: 9px; color: var(--mut); text-align: center; line-height: 1.15; }
 .lg-pad-grid { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
 .lg-pad-grid .lg-chip span { margin-right: 4px; }
+
+/* ---- плашка версии внизу экрана ---- */
+.hx:not(.mob) .hx-map { bottom: calc(46px + var(--safe-b)); }
+.hx-ver {
+  position: absolute; left: calc(14px + var(--safe-l)); bottom: calc(10px + var(--safe-b)); z-index: 30;
+  display: flex; align-items: center; gap: 7px; padding: 5px 10px 5px 8px;
+  background: rgba(10, 13, 20, .62); border: 1px solid rgba(255,255,255,.12); border-radius: 999px;
+  color: var(--mut); font: inherit; cursor: pointer; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  transition: background .15s, border-color .15s, transform .15s;
+}
+.hx-ver:hover { background: rgba(20, 26, 38, .8); border-color: rgba(255,255,255,.24); transform: translateY(-1px); }
+.hx-ver:active { transform: translateY(0) scale(.98); }
+.hx-ver i { width: 7px; height: 7px; border-radius: 50%; background: #3ddc84; box-shadow: 0 0 8px #3ddc84; flex: 0 0 auto; }
+.hx-ver b { font-size: 12px; font-weight: 800; color: #e6ebf5; letter-spacing: .2px; }
+.hx-ver small { font-size: 10.5px; color: var(--mut); }
+.hx-ver.mob { left: calc(8px + var(--safe-l)); bottom: calc(6px + var(--safe-b)); padding: 4px 8px; }
+.hx-ver.mob b { font-size: 11px; }
+
+/* окно «Что нового» */
+.hx-ver-note { font-size: 12px; color: var(--mut); margin-bottom: 10px; }
+.hx-ver-note code { font-size: 11px; opacity: .8; }
+.hx-ver-list { max-height: min(56vh, 460px); overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-right: 4px; }
+.hx-ver-list section { border: 1px solid rgba(255,255,255,.09); border-radius: 14px; padding: 10px 12px; background: rgba(255,255,255,.03); }
+.hx-ver-list section.on { border-color: rgba(124,92,255,.55); background: rgba(124,92,255,.10); }
+.hx-ver-list h3 { display: flex; align-items: center; gap: 8px; font-size: 14px; margin-bottom: 6px; }
+.hx-ver-list h3 b { font-weight: 900; }
+.hx-ver-list h3 span { font-size: 11px; color: var(--mut); }
+.hx-ver-list h3 em { font-style: normal; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; padding: 2px 7px; border-radius: 999px; background: var(--acc); color: #fff; }
+.hx-ver-list ul { display: flex; flex-direction: column; gap: 4px; padding-left: 16px; list-style: disc; }
+.hx-ver-list li { font-size: 13px; line-height: 1.35; color: #cfd5e3; }
+
+/* ---- диагностика сервера в окне «Нет связи» ---- */
+.srv-diag { border: 1px solid rgba(255,255,255,.10); border-radius: 14px; padding: 9px 12px; background: rgba(255,255,255,.04); display: flex; flex-direction: column; gap: 5px; }
+.srv-diag.ok { border-color: rgba(61,220,132,.45); background: rgba(61,220,132,.08); }
+.srv-diag.bad { border-color: rgba(255,77,94,.45); background: rgba(255,77,94,.07); }
+.srv-diag-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font-size: 12.5px; }
+.srv-diag-row span { color: var(--mut); text-transform: lowercase; }
+.srv-diag-row b { font-weight: 700; text-align: right; word-break: break-word; }
+.srv-diag-hint { font-size: 12px; color: var(--mut); line-height: 1.4; margin-top: 8px; }
+
+/* ---- версия в меню и настройках ---- */
+.auth-ver { position: absolute; left: calc(14px + var(--safe-l)); bottom: calc(10px + var(--safe-b)); display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 800; color: #dfe6f2; padding: 5px 11px; border-radius: 999px; background: rgba(8,11,18,.55); border: 1px solid rgba(255,255,255,.12); backdrop-filter: blur(8px); }
+.auth-ver i { width: 7px; height: 7px; border-radius: 50%; background: #3ddc84; box-shadow: 0 0 8px #3ddc84; }
+.auth-ver span { font-weight: 500; color: var(--mut); font-size: 11px; }
+.lg-about { display: flex; flex-direction: column; gap: 2px; margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); }
+.lg-about b { font-size: 13px; }
+.lg-about span { font-size: 11.5px; color: var(--mut); }

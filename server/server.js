@@ -26,6 +26,8 @@ const BUILD = (() => {
   try { return crypto.createHash('sha1').update(fs.readFileSync(__filename)).digest('hex').slice(0, 12); }
   catch { return 'dev'; }
 })();
+/** версия протокола сервера: клиент показывает её в диагностике */
+const SERVER_VERSION = '0.4.0';
 const db = new Database(process.env.DB_FILE || 'game.db');
 db.pragma('journal_mode = WAL');
 
@@ -138,7 +140,14 @@ const onlineByName = (name) => [...active.values()].find(({ row }) => row.name.t
 
 /* ================= HTTP: health + админ-панель для Colab ================= */
 const json = (res, code, obj) => {
-  res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' });
+  res.writeHead(code, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'content-type, x-admin-token, ngrok-skip-browser-warning',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    // ответы служебных ручек не кэшируем: диагностика должна быть свежей
+    'Cache-Control': 'no-store',
+  });
   res.end(JSON.stringify(obj));
 };
 const readBody = (req) => new Promise((resolve) => {
@@ -988,12 +997,26 @@ async function publishLive() {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || '/', 'http://localhost');
   if (url.pathname === '/') { res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Los-Gorod server OK'); return; }
+  // служебные ручки для игры и панели: по ним клиент понимает, что именно не работает
+  if (req.method === 'OPTIONS') { json(res, 204, {}); return; }
   if (url.pathname === '/health') {
     json(res, 200, { ok: true, online: active.size, uptime: Math.round(process.uptime()), maintenance: MAINTENANCE, build: BUILD, caps: { state: 1, adm: 1 } });
     return;
   }
-  if (url.pathname === '/version') { json(res, 200, { ok: true, build: BUILD }); return; }
-  if (!url.pathname.startsWith('/admin')) { json(res, 404, { ok: false, error: 'not found' }); return; }
+  if (url.pathname === '/version' || url.pathname === '/diag') {
+    // один запрос — весь диагноз: жив ли сервер, какая сборка, сколько игроков,
+    // принимает ли он админ-токен. Игра показывает это в окне «Нет связи».
+    json(res, 200, {
+      ok: true, server: 'los-gorod', build: BUILD, version: SERVER_VERSION,
+      uptime: Math.round(process.uptime()), online: active.size, maintenance: MAINTENANCE,
+      admin: true, ws: true, time: Date.now(),
+    });
+    return;
+  }
+  if (!url.pathname.startsWith('/admin')) {
+    json(res, 404, { ok: false, error: 'not found', hint: 'Это не игровой сервер: проверьте адрес туннеля' });
+    return;
+  }
   const token = url.searchParams.get('token') || req.headers['x-admin-token'];
   if (token !== ADMIN_TOKEN) { json(res, 403, { ok: false, error: 'Неверный токен админ-панели' }); return; }
   if (req.method === 'GET' && url.pathname === '/admin/tunnel') {
