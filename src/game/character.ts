@@ -66,7 +66,7 @@ function mergeChildren(g: THREE.Object3D, keep: THREE.Object3D[]) {
   g.add(mesh);
 }
 const clampN = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
-export type Pose = 'idle' | 'walk' | 'run' | 'drive' | 'ride' | 'passenger' | 'punch' | 'lie' | 'carry' | 'smoke' | 'shoot' | 'swim' | 'sitbench' | 'sitpc' | 'dead' | 'fall'
+export type Pose = 'idle' | 'walk' | 'run' | 'drive' | 'ride' | 'passenger' | 'punch' | 'lie' | 'carry' | 'smoke' | 'shoot' | 'swim' | 'sitbench' | 'sitpc' | 'handshake' | 'dead' | 'fall'
   | 'dance1' | 'dance2' | 'dance3' | 'dance4' | 'dance5' | 'wave' | 'clap' | 'sit' | 'liedown' | 'pushup' | 'scoot' | 'ridepass' | 'tread' | 'selfie'
   | 'handsup' | 'guard' | 'jab' | 'cross' | 'hook' | 'block' | 'flinch' | 'aim' | 'knock' | 'crouch' | 'crouchwalk' | 'crouchaim'
   | 'cover' | 'coverwalk' | 'coveraim' | 'bow' | 'salute' | 'point' | 'think' | 'stretch' | 'cheer'
@@ -167,6 +167,7 @@ export class Character {
     // ресницы-объём для «драматичного» макияжа и серьги
     if (L.lashes === 'dramatic') for (const sx of [1, -1]) { bx(this.head, '#141414', 0.002, 0.03, 0.008, sx * 0.108, 0.135, 0.108); bx(this.head, '#141414', 0.002, 0.026, 0.008, sx * 0.09, 0.133, 0.112); }
     if (f && (L.marks === 'beauty' || L.marks === 'mole')) { const g0 = new THREE.Mesh(new THREE.SphereGeometry(0.006, 6, 5), mat('c:#151515')); g0.position.set(0.03, 0.155, 0.117); this.head.add(g0); }
+    if (L.mask) { bx(this.head, '#20242a', 0.235, 0.105, 0.04, 0, 0.075, 0.145); for (const side of [-1, 1]) bx(this.head, '#20242a', 0.025, 0.055, 0.16, side * 0.11, 0.075, 0.04); }
     this.buildHair();
     // руки
     for (const [sh, el, sg] of [[this.shL, this.elL, 1], [this.shR, this.elR, -1]] as const) {
@@ -360,6 +361,7 @@ export class Character {
         }
         break;
       }
+      case 'handshake': { const k = Math.sin(t * 5) * 0.1; this.shR.rotation.x = -1.25 + k; this.shR.rotation.z = 0.15; this.elR.rotation.x = -0.85; this.torso.rotation.x = 0.07; break; }
       case 'bow': { const k = (Math.sin(t * 1.6) + 1) / 2; this.torso.rotation.x = 0.15 + k * 0.8; this.head.rotation.x = -0.1 + k * 0.2; this.shL.rotation.z = 0.25; this.shR.rotation.z = -0.25; this.hipL.rotation.x = -0.1; break; }
       case 'salute': this.shR.rotation.x = -1.85; this.shR.rotation.z = 0.95; this.elR.rotation.x = -2.05; this.torso.rotation.x = -0.04; this.head.rotation.x = -0.06; this.hipL.rotation.x = 0; break;
       case 'point': { const k = Math.sin(t * 1.4) * 0.1; this.shR.rotation.x = -1.55 + k; this.elR.rotation.x = -0.05; this.shR.rotation.z = 0.05; this.torso.rotation.y = 0.12; this.head.rotation.y = 0.15; break; }

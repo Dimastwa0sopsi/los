@@ -112,6 +112,30 @@ export const COMMANDS: Cmd[] = [
     say(g, `${VEHICLES[o.type]?.name}: рынок ${$(carValue(o.type, o.year, o.mileage, o.condition))} · государству ${$(Math.round(carValue(o.type, o.year, o.mileage, o.condition) * 0.6))}`);
   } },
   { name: 'lockcar', aliases: ['lk'], cat: 'car', desc: 'запереть/открыть ближайшую машину', run: (g) => g.toggleCarLock() },
+  { name: 'pts', args: '[номер]', cat: 'car', desc: 'игровой ПТС вашей машины', run: (g, a) => {
+    const o = myCar(g, a); if (!o) return;
+    const doc = g.vehicleDocument(o.uid); if (doc) g.openPanel({ type: 'info', title: '📄 ПТС', text: doc });
+  } },
+  { name: 'carlock', args: '[номер]', cat: 'car', desc: 'закрыть свою машину поблизости', run: (g, a) => {
+    const o = myCar(g, a); if (!o) return; const v = g.ownedVehicleNear(o.uid), p = near(g);
+    if (!v || (v !== g.inVeh && Math.hypot(v.x-p.x, v.z-p.z) > 25)) { say(g, 'Подойдите к машине'); return; }
+    if (o.locked) { say(g, 'Машина уже закрыта'); return; } o.locked = true; g.saveGame(); say(g, '🔒 Машина закрыта');
+  } },
+  { name: 'carunlock', args: '[номер]', cat: 'car', desc: 'открыть свою машину поблизости', run: (g, a) => {
+    const o = myCar(g, a); if (!o) return; const v = g.ownedVehicleNear(o.uid), p = near(g);
+    if (!v || (v !== g.inVeh && Math.hypot(v.x-p.x, v.z-p.z) > 25)) { say(g, 'Подойдите к машине'); return; }
+    if (!o.locked) { say(g, 'Машина уже открыта'); return; } o.locked = false; g.saveGame(); say(g, '🔓 Машина открыта');
+  } },
+  { name: 'carwhere', args: '[номер]', cat: 'car', desc: 'маршрут к своей машине', run: (g, a) => {
+    const o = myCar(g, a); if (!o) return; const v = g.ownedVehicleNear(o.uid);
+    if (!v) { say(g, 'Машина не вызвана'); return; } g.destination = { x: v.x, z: v.z }; say(g, 'Маршрут к машине проложен');
+  } },
+  { name: 'carplates', args: '[номер]', cat: 'car', desc: 'номер и состояние табличек', run: (g, a) => {
+    const o = myCar(g, a); if (!o) return; say(g, `Номер ${o.tuning.plate || 'отсутствует'} · передний ${o.tuning.plateFront === false ? 'снят' : 'на месте'} · задний ${o.tuning.plateBack === false ? 'снят' : 'на месте'}`);
+  } },
+  { name: 'carfuel', args: '[номер]', cat: 'car', desc: 'запас топлива', run: (g, a) => { const o = myCar(g, a); if (o) say(g, `Топливо: ${Math.round(o.fuel)}%`); } },
+  { name: 'carmileage', args: '[номер]', cat: 'car', desc: 'пробег машины', run: (g, a) => { const o = myCar(g, a); if (o) say(g, `Пробег: ${Math.round(o.mileage / 1000)} км`); } },
+  { name: 'carcondition', args: '[номер]', cat: 'car', desc: 'состояние машины', run: (g, a) => { const o = myCar(g, a); if (o) say(g, `Состояние: ${Math.round(o.condition * 100)}%`); } },
   { name: 'repair', args: '[номер]', cat: 'car', desc: 'отремонтировать машину (нужно быть рядом)', run: (g, a) => {
     const o = myCar(g, a); if (!o) return;
     const v = g.vehicles.find((x) => x.owned?.uid === o.uid);
@@ -217,6 +241,9 @@ export const COMMANDS: Cmd[] = [
   } },
 
   // ---------- деньги и розыск ----------
+  { name: 'handshake', args: '<ник>', cat: 'world', desc: 'предложить игроку рядом рукопожатие', run: (g, a) => { if (!a) { say(g, 'Использование: /handshake ник'); return; } g.requestHandshake(a); } },
+  { name: 'handaccept', cat: 'world', desc: 'принять предложение рукопожатия', run: (g) => g.acceptHandshake() },
+  { name: 'handdecline', cat: 'world', desc: 'отклонить предложение рукопожатия', run: (g) => g.declineHandshake() },
   { name: 'pay', args: '<ник> <сумма>', cat: 'money', desc: 'перевести деньги игроку', run: (g, a) => {
     const [nick, sum] = a.trim().split(/\s+/);
     const amt = Math.round(Number(sum) || 0);
@@ -232,6 +259,7 @@ export const COMMANDS: Cmd[] = [
     const s = g.getState();
     say(g, `💵 Баланс ${$(s.money)} · розыск ★${s.wanted || 0}`);
   } },
+  { name: 'mask', cat: 'world', desc: 'надеть или снять маску', run: (g) => g.toggleMask() },
   { name: 'wanted', aliases: ['search'], cat: 'money', desc: 'уровень розыска и как его сбросить', run: (g) => {
     const s = g.getState();
     say(g, (s.wanted || 0) > 0 ? `В розыске: ${'★'.repeat(s.wanted)} — уходите от погони или /charity` : 'Вы не в розыске 👍');

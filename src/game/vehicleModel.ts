@@ -121,7 +121,9 @@ export class VehicleModel {
   private glassGroup = new THREE.Group();
   /** номерной знак X000XX 00 (CanvasTexture на заднем бампере) */
   plate: THREE.Mesh | null = null;
+  frontPlate: THREE.Mesh | null = null;
   plateKey = '';
+  private plateTexture: THREE.Texture | null = null;
   headGlow: string[] = [];
   spec: VSpec; color: string; tuning: Tuning;
   private cur!: Part;
@@ -1057,32 +1059,31 @@ export class VehicleModel {
     for (const t of this.tailMeshes) t.material = m;
   }
   sirens(t: number) { for (const m of this.sirenMeshes) m.visible = (Math.floor(t * 4) + (m.userData.matKey.includes('ef4444') ? 0 : 1)) % 2 === 0; }
-  /** задний номерной знак: CanvasTexture, обновляется при смене номера */
+  /** Оба знака независимы: состояние хранится в настройках автомобиля. */
   updatePlate() {
     const num = (this.tuning.plate ?? '').trim();
-    const key = num || '';
-    if (key === this.plateKey && (this.plate || !num)) return;
+    const front = this.tuning.plateFront !== false, back = this.tuning.plateBack !== false;
+    const key = `${num}|${front}|${back}`;
+    if (key === this.plateKey) return;
     this.plateKey = key;
-    if (this.plate) { this.group.remove(this.plate); (this.plate.material as THREE.MeshBasicMaterial).map?.dispose(); this.plate = null; }
-    if (!num || this.spec.body === 'heli' || this.spec.body === 'moto' || this.spec.body === 'scooter' || this.spec.body === 'combine') return;
-    const c = document.createElement('canvas');
-    c.width = 256; c.height = 64;
-    const g = c.getContext('2d');
-    if (!g) return;
+    for (const m of [this.plate, this.frontPlate]) if (m) { this.group.remove(m); m.geometry.dispose(); (m.material as THREE.Material).dispose(); }
+    this.plate = null; this.frontPlate = null; this.plateTexture?.dispose(); this.plateTexture = null;
+    if (!num || (!front && !back) || ['heli', 'moto', 'scooter', 'combine', 'quad'].includes(this.spec.body)) return;
+    const c = document.createElement('canvas'); c.width = 256; c.height = 64;
+    const g = c.getContext('2d'); if (!g) return;
     g.fillStyle = '#f8fafc'; g.fillRect(0, 0, 256, 64);
     g.strokeStyle = '#1f2937'; g.lineWidth = 4; g.strokeRect(2, 2, 252, 60);
-    g.fillStyle = '#0b0d13'; g.font = 'bold 38px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillText(num, 128, 34);
+    g.fillStyle = '#0b0d13'; g.font = 'bold 38px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(num, 128, 34);
     g.fillStyle = '#1d4ed8'; g.fillRect(200, 0, 56, 22);
     g.fillStyle = '#fff'; g.font = 'bold 15px system-ui, sans-serif'; g.fillText('RUS', 228, 11);
-    const tex = new THREE.CanvasTexture(c);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    const w = Math.min(0.62, this.spec.wid * 0.32), h = w * 0.25;
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex, transparent: false }));
-    m.position.set(0, this.spec.hei * 0.3, -this.spec.len / 2 - 0.02);
-    m.rotation.y = Math.PI;
-    this.plate = m;
-    this.group.add(m);
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; this.plateTexture = tex;
+    const w = Math.min(0.72, this.spec.wid * 0.4), h = w * 0.25;
+    const make = (isFront: boolean) => {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex }));
+      m.position.set(0, this.spec.hei * 0.3, (isFront ? 1 : -1) * (this.spec.len / 2 + 0.03));
+      m.rotation.y = isFront ? 0 : Math.PI; this.group.add(m); return m;
+    };
+    if (front) this.frontPlate = make(true); if (back) this.plate = make(false);
   }
   /** перелив радужных фар (вызывается каждый кадр) */
   updateRainbow(t: number) {
@@ -1184,5 +1185,5 @@ export class VehicleModel {
     for (const w of this.frontWheels) w.rotation.y = -steer * 0.5;
     if (this.steerHandle) this.steerHandle.rotation.z = -steer;
   }
-  dispose() { for (const m of this.meshes) m.geometry.dispose(); this.group.parent?.remove(this.group); }
+  dispose() { for (const m of this.meshes) m.geometry.dispose(); for (const p of [this.plate, this.frontPlate]) if (p) { p.geometry.dispose(); (p.material as THREE.Material).dispose(); } this.plateTexture?.dispose(); this.group.parent?.remove(this.group); }
 }

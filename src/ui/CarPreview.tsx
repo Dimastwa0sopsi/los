@@ -10,13 +10,16 @@ import { VEHICLES, type Tuning } from '../game/data';
 export function CarPreview({ type, color, tuning, height = 220 }: { type: string; color: string; tuning: Tuning; height?: number }) {
   const host = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
+  const [failed, setFailed] = useState(false);
   const state = useRef<{ renderer: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.PerspectiveCamera; model: VehicleModel } | null>(null);
   const spin = useRef({ yaw: 0.7, auto: true });
 
   useEffect(() => {
     const el = host.current;
     if (!el) return;
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    let renderer: THREE.WebGLRenderer;
+    try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); setFailed(false); }
+    catch { setFailed(true); return; }
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     renderer.setSize(el.clientWidth || 320, height);
     renderer.domElement.style.display = 'block';
@@ -85,7 +88,7 @@ export function CarPreview({ type, color, tuning, height = 220 }: { type: string
 
   return (
     <div className="car-preview">
-      <div ref={host} style={{ height }} />
+      <div ref={host} style={{ height: failed ? undefined : height }}>{failed && <p className="car-preview-hint">3D-предпросмотр недоступен, настройки можно менять без него.</p>}</div>
       <div className="car-preview-hint">🖱 Крутите модель · радужные фары и неон видны сразу</div>
     </div>
   );

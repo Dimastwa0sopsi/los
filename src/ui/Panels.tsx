@@ -394,12 +394,19 @@ function TuningPanel({ g, uid, close }: { g: Game; uid: string; close: () => voi
   const rc = v ? repairCost({ ...o, missing: v.model.missingParts() }) + v.model.missingWheels() * 150 : 0;
   const Row = ({ label, children }: { label: string; children: React.ReactNode }) => <div className="lg-tune-row"><span>{label}</span><div className="flex flex-wrap gap-1">{children}</div></div>;
   const Opt = ({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) => <button className={`lg-chip ${on ? 'on' : ''}`} onClick={onClick}>{children}</button>;
-  const items = TUNE_CATALOG.filter((it) => it.cat === cat);
+  const seenPatches = new Set<string>();
+  const items = TUNE_CATALOG.filter(it => {
+    if (it.cat !== cat || Object.keys(it.patch).length === 0 || it.patch.kit) return false;
+    const key = JSON.stringify(it.patch); if (seenPatches.has(key)) return false; seenPatches.add(key); return true;
+  });
+  const unavailable = !v;
+  const repairPrice = Math.round(rc * (Date.now() < (g.getState().insuredUntil ?? 0) ? 0.5 : 1));
   return (<Modal title={`🔧 Автосервис · ${VEHICLES[o.type].name}`} onClose={() => { g.revertTuning(uid); close(); }} wide>
+    <p className="tune-intro">Выберите детали для предпросмотра, затем подтвердите установку. Баланс: <b>{$(g.getState().money)}</b>{unavailable && <b> · вызовите машину, чтобы установить детали</b>}</p>
     <div className="tune-grid">
       <div className="tune-left">
         <CarPreview type={o.type} color={t.paint ?? o.color} tuning={t} />
-        <div className="lg-card mt-2"><b>Ремонт</b> — состояние {Math.round(o.condition * 100)}%, деталей нет: {v ? v.model.missingParts().length + v.model.missingWheels() : 0}. <button className="lg-btn sm ml-2" onClick={() => { g.repairVehicle(uid); f((x) => x + 1); }}>Починить {$(rc)}</button></div>
+        <div className="lg-card mt-2"><b>Ремонт</b> — состояние {Math.round(o.condition * 100)}%, деталей нет: {v ? v.model.missingParts().length + v.model.missingWheels() : 0}. <button className="lg-btn sm ml-2" disabled={unavailable} onClick={() => { g.repairVehicle(uid); f((x) => x + 1); }}>Починить {$(repairPrice)}</button></div>
         <div className="lg-card mt-2">
           <b>🔢 Номерной знак</b>
           <p className="text-sm opacity-80">Формат: X000XX 00 (например, А123ВС 77)</p>
@@ -416,25 +423,30 @@ function TuningPanel({ g, uid, close }: { g: Game; uid: string; close: () => voi
         {msg && <p className="text-xs mt-1" style={{ color: '#a5b4fc' }}>{msg}</p>}
       </div>
       <div className="tune-right">
+        <div className="lg-card mb-2"><b>Быстрые настройки</b><div className="flex flex-wrap gap-1 mt-1">
+          <button className="lg-chip" onClick={() => { setT(p => ({ ...p, rims: 3, spoiler: true, clearance: -1 })); setMsg('Спортивный вид — предпросмотр'); }}>🏁 Спорт</button>
+          <button className="lg-chip" onClick={() => { setT(p => ({ ...p, chrome: true, rims: 0, tint: 1 })); setMsg('Классический вид — предпросмотр'); }}>✨ Классика</button>
+          <button className="lg-chip" onClick={() => { setT(p => ({ ...p, rims: 1, clearance: 2, neon: null })); setMsg('Для бездорожья — предпросмотр'); }}>🌲 Бездорожье</button>
+        </div></div>
         <div className="tune-tabs">{TUNE_CATS.map((c) => <button key={c.id} className={`lg-chip ${cat === c.id ? 'on' : ''}`} onClick={() => setCat(c.id)}>{c.icon} {c.name}</button>)}</div>
         <div className="tune-items">
           {items.map((it) => (
-            <button key={it.id} className={`tune-item ${t.kit === it.patch.kit && it.patch.kit ? 'on' : ''}`}
-              onClick={() => { setT((prev) => ({ ...prev, ...it.patch })); setMsg(`${it.name} — предпросмотр`); }}>
+            <button key={it.id} disabled={(it.patch.turbo !== undefined && it.patch.turbo < o.tuning.turbo) || (it.patch.engine !== undefined && it.patch.engine < o.tuning.engine)} className={`tune-item ${Object.entries(it.patch).every(([k, val]) => t[k as keyof Tuning] === val) ? 'on' : ''}`}
+              onClick={() => { setT((prev) => ({ ...prev, ...it.patch, turbo: Math.max(o.tuning.turbo, it.patch.turbo ?? prev.turbo), engine: Math.max(o.tuning.engine, it.patch.engine ?? prev.engine) })); setMsg(`${it.name} — предпросмотр`); }}>
               <span className="ti-ico">{it.icon}</span>
               <span className="ti-name">{it.name}</span>
-              <span className="ti-price">{it.price ? $(it.price) : 'бесплатно'}</span>
+              <span className="ti-price">{g.tuningCost(o.tuning, { ...t, ...it.patch }) ? `Итого ${$(g.tuningCost(o.tuning, { ...t, ...it.patch }))}` : 'Без доплаты'}</span>
             </button>
           ))}
         </div>
-        <Row label={`Покраска (${$(TUNE_PRICES.paint)})`}>{PAINT_COLORS.map((c) => <button key={c} className={`lg-swatch ${t.paint === c ? 'on' : ''}`} style={{ background: c }} onClick={() => setT({ ...t, paint: c })} />)}</Row>
+        <Row label={`Покраска (${$(TUNE_PRICES.paint)})`}>{PAINT_COLORS.map((c) => <button key={c} className={`lg-swatch ${t.paint === c ? 'on' : ''}`} style={{ background: c }} title={`Краска ${c}`} aria-label={`Краска ${c}`} onClick={() => setT({ ...t, paint: c })} />)}</Row>
         <Row label={`Тонировка (${$(TUNE_PRICES.tint)})`}>{[0, 1, 2, 3].map((n) => <Opt key={n} on={t.tint === n} onClick={() => setT({ ...t, tint: n })}>{['Нет', '30%', '60%', '90%'][n]}</Opt>)}</Row>
         <Row label={`Турбина (${$(TUNE_PRICES.turbo)}/ст.)`}>{[0, 1, 2, 3].map((n) => <Opt key={n} on={t.turbo === n} onClick={() => setT({ ...t, turbo: Math.max(o.tuning.turbo, n) })}>{n ? 'Ст.' + n : 'Сток'}</Opt>)}</Row>
         <Row label={`Двигатель (${$(TUNE_PRICES.engine)}/ст.)`}>{[0, 1, 2, 3].map((n) => <Opt key={n} on={t.engine === n} onClick={() => setT({ ...t, engine: Math.max(o.tuning.engine, n) })}>{n ? 'Ст.' + n : 'Сток'}</Opt>)}</Row>
         <Row label={`Клиренс (${$(TUNE_PRICES.clearance)})`}>{[-2, -1, 0, 1, 2].map((n) => <Opt key={n} on={t.clearance === n} onClick={() => setT({ ...t, clearance: n })}>{n > 0 ? '+' + n : n}</Opt>)}</Row>
-        <Row label={`Неон (${$(TUNE_PRICES.neon)})`}><Opt on={!t.neon} onClick={() => setT({ ...t, neon: null })}>Нет</Opt>{NEON_COLORS.map((c) => <button key={c} className={`lg-swatch ${t.neon === c ? 'on' : ''}`} style={{ background: c }} onClick={() => setT({ ...t, neon: c })} />)}</Row>
-        <Row label={`Фары (${$(TUNE_PRICES.lights)})`}>{LIGHT_COLORS.map((c) => <button key={c} className={`lg-swatch ${!t.rainbow && t.lights === c ? 'on' : ''}`} style={{ background: c }} onClick={() => setT({ ...t, lights: c, rainbow: false })} />)}<Opt on={!!t.rainbow} onClick={() => setT({ ...t, rainbow: !t.rainbow })}>🌈 радужные ($12 000)</Opt></Row>
-        <div className="flex gap-2 mt-3 items-center flex-wrap"><b className="flex-1">Итого: {$(cost)}</b><button className="lg-btn" onClick={() => setT({ ...o.tuning })}>Сброс</button><button className="lg-btn lg-btn-main" onClick={() => { g.applyTuning(uid, t, cost); setMsg('Установлено'); f((x) => x + 1); }}>Установить</button></div>
+        <Row label={`Неон (${$(TUNE_PRICES.neon)})`}><Opt on={!t.neon} onClick={() => setT({ ...t, neon: null })}>Нет</Opt>{NEON_COLORS.map((c) => <button key={c} className={`lg-swatch ${t.neon === c ? 'on' : ''}`} style={{ background: c }} title={`Неон ${c}`} aria-label={`Неон ${c}`} onClick={() => setT({ ...t, neon: c })} />)}</Row>
+        <Row label={`Фары (${$(TUNE_PRICES.lights)})`}>{LIGHT_COLORS.map((c) => <button key={c} className={`lg-swatch ${!t.rainbow && t.lights === c ? 'on' : ''}`} style={{ background: c }} title={`Фары ${c}`} aria-label={`Фары ${c}`} onClick={() => setT({ ...t, lights: c, rainbow: false })} />)}<Opt on={!!t.rainbow} onClick={() => setT({ ...t, rainbow: !t.rainbow })}>🌈 радужные ($12 000)</Opt></Row>
+        <div className="flex gap-2 mt-3 items-center flex-wrap"><b className="flex-1">Итого: {$(cost)}</b><button className="lg-btn" onClick={() => setT({ ...o.tuning })}>Сброс</button><button className="lg-btn lg-btn-main" disabled={unavailable} onClick={() => { const ok = g.applyTuning(uid, t); setMsg(ok ? 'Установлено и сохранено' : 'Не удалось установить: проверьте баланс и машину'); f((x) => x + 1); }}>Установить</button></div>
         <p className="text-xs opacity-70 mt-1">Фары включаются клавишей H. Радужные фары переливаются всеми цветами. Изменения сохраняются.</p>
       </div>
     </div>

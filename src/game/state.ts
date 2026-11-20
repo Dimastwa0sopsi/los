@@ -127,6 +127,7 @@ function migrate(s: Partial<GameState>): GameState | null {
   out.inventory = out.inventory ?? {};
   out.fridges = out.fridges ?? {};
   out.look = { ...defaultLook(out.look?.gender ?? 'm'), ...(out.look ?? {}) };
+  if (!(out.inventory.mask > 0)) out.look.mask = false;
   for (const k of ['money', 'health', 'food', 'water', 'energy'] as const) if (typeof out[k] !== 'number' || !isFinite(out[k])) out[k] = base[k];
   out.vehicles = (out.vehicles ?? []).filter((v) => VEHICLES[v.type]);
   return out;

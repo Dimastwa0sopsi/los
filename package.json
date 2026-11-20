@@ -1,7 +1,7 @@
 {
   "name": "react-vite-tailwind",
   "private": true,
-  "version": "0.6.5",
+  "version": "0.6.6",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -26,7 +26,10 @@
     "check:ads-server": "esbuild scripts/ads-server-check.ts --bundle --platform=node --format=esm --outfile=.check/ads-server.mjs --log-level=error && node .check/ads-server.mjs",
     "check:admin": "python3 scripts/admin_check.py && python3 scripts/server_cell_check.py && python3 scripts/admin_panel_smoke.py",
     "check:admin-game": "esbuild scripts/admin-game-check.tsx --bundle --platform=node --format=cjs --outfile=.check/admin-game.cjs --log-level=error --define:import.meta.env={} && node .check/admin-game.cjs",
-    "check:game-actions": "esbuild scripts/game-actions-check.ts --bundle --platform=node --format=cjs --outfile=.check/game-actions.cjs --log-level=error --loader:.png=empty --define:import.meta.env={} && node .check/game-actions.cjs"
+    "check:game-actions": "esbuild scripts/game-actions-check.ts --bundle --platform=node --format=cjs --outfile=.check/game-actions.cjs --log-level=error --loader:.png=empty --define:import.meta.env={} && node .check/game-actions.cjs",
+    "check:tuning": "esbuild scripts/tuning-check.ts --bundle --platform=node --format=cjs --outfile=.check/tuning.cjs --log-level=error --loader:.png=empty --define:import.meta.env={} && node .check/tuning.cjs",
+    "check:plates": "esbuild scripts/plates-check.ts --bundle --platform=node --format=cjs --outfile=.check/plates.cjs --log-level=error --loader:.png=empty --define:import.meta.env={} && node .check/plates.cjs",
+    "check:mask": "esbuild scripts/mask-check.ts --bundle --platform=node --format=cjs --outfile=.check/mask.cjs --log-level=error --loader:.png=empty --define:import.meta.env={} && node .check/mask.cjs"
   },
   "dependencies": {
     "clsx": "2.1.1",

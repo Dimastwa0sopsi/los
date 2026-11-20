@@ -1,0 +1,18 @@
+import './domstub';
+import { Vehicle } from '../src/game/vehicles';
+import { Game } from '../src/game/game';
+import { defaultTuning } from '../src/game/data';
+const owned: any = { uid: 'test-car', type: 'lada', color: '#fff', tuning: { ...defaultTuning(), plate: 'А123ВС77' }, condition: 1, fuel: 50, mileage: 2000, year: 2026, pos: null, missing: [], paid: 1000 };
+const v = new Vehicle('lada', 'owned', '#fff', owned); v.place(10, 10, 0); v.speed = 0;
+let bad = 0; const test = (name: string, ok: boolean) => { console.log(`${ok ? '✓' : '✗'} ${name}`); if (!ok) bad++; };
+test('два видимых номерных знака', !!v.model.plate && !!v.model.frontPlate);
+const g = Object.create(Game.prototype) as any; let down = true, saves = 0;
+g.state = { vehicles: [owned] }; g.vehicles = [v]; g.inVeh = null; g.interior = null; g.rideRemote = null; g.input = { down: () => down }; g.px = 10; g.pz = 10 + v.spec.len / 2 + 0.5; g.toast = () => {}; g.save = () => { saves++; };
+g.updatePlateHold(1); test('короткого удержания недостаточно', owned.tuning.plateFront !== false);
+g.updatePlateHold(1.1); test('зажатие N снимает передний знак и сохраняет задний', owned.tuning.plateFront === false && !!v.model.plate && !v.model.frontPlate && saves === 1);
+down = false; g.updatePlateHold(0.1); down = true; g.pz = 10 - v.spec.len / 2 - 0.5; g.updatePlateHold(2.1);
+test('сзади снимается только задний знак', owned.tuning.plateBack === false && !v.model.plate && saves === 2);
+const reloaded = new Vehicle('lada', 'owned', '#fff', owned);
+test('снятые номера не появляются после загрузки', !reloaded.model.plate && !reloaded.model.frontPlate && owned.tuning.plate === 'А123ВС77');
+test('ПТС показывает госномер и статус знаков', g.vehicleDocument('test-car')?.includes('А123ВС77') && g.vehicleDocument('test-car')?.includes('снят'));
+v.dispose(); reloaded.dispose(); process.exit(bad ? 1 : 0);
