@@ -292,6 +292,29 @@ export function getTex(key: string): THREE.Texture {
       }
       t = toTex(c); break;
     }
+    case 'riverbed': {
+      // дно реки: илистый песок, галька, редкие водоросли — видно сквозь воду
+      const [c, g] = canvas(512, 512); noise(g, 512, 512, '#8d8567', 22, 30000, 71);
+      const r = new RNG(45);
+      for (let i = 0; i < 26; i++) {                       // тёмный ил в ямах
+        g.fillStyle = `rgba(52,62,48,${0.10 + r.next() * 0.16})`;
+        g.beginPath(); g.ellipse(r.range(0, 512), r.range(0, 512), r.range(20, 70), r.range(12, 40), r.next() * 3, 0, 7); g.fill();
+      }
+      for (let i = 0; i < 900; i++) {                      // галька
+        const x = r.range(0, 512), y = r.range(0, 512), s = r.range(1.6, 5.4);
+        const l = r.range(96, 180) | 0;
+        g.fillStyle = `rgba(${l},${l - 4},${l - 18},${0.5 + r.next() * 0.4})`;
+        g.beginPath(); g.ellipse(x, y, s, s * r.range(0.5, 0.9), r.next() * 3, 0, 7); g.fill();
+      }
+      for (let i = 0; i < 34; i++) {                       // водоросли
+        const x = r.range(0, 512), y = r.range(0, 512);
+        g.strokeStyle = `rgba(72,112,74,${0.18 + r.next() * 0.22})`; g.lineWidth = r.range(1.4, 3);
+        g.beginPath(); g.moveTo(x, y);
+        for (let k = 1; k <= 5; k++) g.lineTo(x + Math.sin(k * 1.7) * 6, y - k * r.range(5, 9));
+        g.stroke();
+      }
+      t = toTex(c); break;
+    }
     case 'pebble': {
       // галечная полоса между песком и променадом
       const [c, g] = canvas(512, 512); noise(g, 512, 512, '#b9b2a2', 20, 26000, 62);
@@ -725,6 +748,15 @@ export function mat(key: string): THREE.Material {
       ? new THREE.MeshStandardMaterial({ map: getTex(k), roughness: 0.94, metalness: 0.02, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 })
       : L({ map: getTex(k), polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
   } else if (key === 'zebra') m = L({ map: getTex('zebra'), transparent: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, depthWrite: false });
+  else if (key === 'waterShallow') m = GFX.pbr
+    ? new THREE.MeshStandardMaterial({ map: getTex('water'), color: 0x9fd4e0, transparent: true, opacity: 0.30, metalness: 0.2, roughness: 0.2, depthWrite: false })
+    : new THREE.MeshPhongMaterial({ map: getTex('water'), color: 0xa8dbe4, transparent: true, opacity: 0.32, shininess: 70, depthWrite: false });
+  else if (key === 'waterMid') m = GFX.pbr
+    ? new THREE.MeshStandardMaterial({ map: getTex('water'), color: 0x4fa3c4, transparent: true, opacity: 0.55, metalness: 0.3, roughness: 0.14, depthWrite: false })
+    : new THREE.MeshPhongMaterial({ map: getTex('water'), color: 0x5aa9c8, transparent: true, opacity: 0.56, shininess: 90, depthWrite: false });
+  else if (key === 'waterDeep') m = GFX.pbr
+    ? new THREE.MeshStandardMaterial({ map: getTex('water'), color: 0x1d6b93, transparent: true, opacity: 0.84, metalness: 0.4, roughness: 0.08, depthWrite: false })
+    : new THREE.MeshPhongMaterial({ map: getTex('water'), color: 0x266f96, transparent: true, opacity: 0.86, shininess: 110, depthWrite: false });
   else if (key === 'water') m = GFX.pbr ? new THREE.MeshStandardMaterial({ map: getTex('water'), color: 0x7fb6d8, transparent: true, opacity: 0.9, metalness: 0.35, roughness: 0.12 }) : new THREE.MeshPhongMaterial({ map: getTex('water'), color: 0x88bbdd, transparent: true, opacity: 0.88, shininess: 80 });
   else m = L({ color: 0xff00ff });
   matCache.set(key, m);

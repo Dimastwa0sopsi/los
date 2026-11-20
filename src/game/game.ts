@@ -118,6 +118,14 @@ export class Game {
   px = 0; py = 0; pz = 0; pa = 0; pvy = 0; pvx = 0; pvz = 0; walkPhase = 0;
   /** визуальное погружение в воду: модель уходит под воду, физика остаётся на дне */
   dip = 0;
+  /** 0 — плывём у поверхности, 1 — нырнули ко дну (плавно) */
+  diveT = 0;
+  /** глубина воды под игроком в этом кадре (для камеры и подсказок) */
+  waterDepthNow = 0;
+  /** камера под водой: включаем «муть» */
+  private underWater = false;
+  private fogSaved: { color: number; near: number; far: number } | null = null;
+  private swimHinted = false;
   inVeh: Vehicle | null = null; passenger = false;
   camYaw = 0; camPitch = 0.25; camDist = 5; lastLook = 0;
   /** вид от первого лица */
@@ -678,6 +686,7 @@ export class Game {
     this.updateWorldSystems(dt);
     if (!this.interior) this.updateGates(dt);
     this.updateCamera(dt);
+    this.updateUnderwater();
     this.emitHud(dt);
     this.saveT += dt; if (this.saveT > 15) { this.saveT = 0; this.save(); }
   }
@@ -748,8 +757,14 @@ export class Game {
     this.envT += dt; if (this.envT > 0.5) { this.envT = 0; this.updateEnvironment(); }
     this.promptT += dt; if (this.promptT > 0.12) { this.promptT = 0; this.updatePrompt(); }
     if (this.minimap) { this.miniT += dt; if (this.miniT > 0.12) { this.miniT = 0; this.drawMinimap(this.minimap); } }
-    // вода
-    (this.W.water.material as THREE.MeshPhongMaterial).map!.offset.y -= dt * 0.02;
+    // вода: рябь текстурой + лёгкое дыхание поверхности (у воды есть настоящее дно)
+    {
+      const wmat = this.W.waters[0]?.material as THREE.MeshPhongMaterial | undefined;
+      const wmap = wmat?.map;
+      if (wmap) { wmap.offset.y -= dt * 0.022; wmap.offset.x = Math.sin(this.state.gameTime * 0.04) * 0.012; }
+      const bob = Math.sin(performance.now() / 850) * 0.014;
+      for (const w of this.W.waters) w.position.y = bob;
+    }
     // прибой: пена накатывает и отходит — сдвиг текстуры и лёгкая пульсация прозрачности
     if (this.W.shore) {
       const mat = this.W.shore.material as THREE.MeshLambertMaterial;
@@ -950,10 +965,13 @@ export class Game {
     const rx = -fz, rz = fx;
     let dx = fx * mv.y + rx * mv.x, dz = fz * mv.y + rz * mv.x;
     const mag = Math.hypot(dx, dz);
-    const inWater = !this.interior && this.isWater(this.px, this.pz);
+    const depth = this.interior ? 0 : this.waterDepthAt(this.px, this.pz);
+    this.waterDepthNow = depth;
+    const inWater = depth >= 0.55;                 // плывём только там, где реально глубоко
+    const wading = !inWater && depth > 0.08;       // по колено идём по дну
     const cb = this.combat;
     const fighting = cb.busy || cb.blocking || cb.aiming;
-    const sp = (this.crouch ? 1.5 : run && !fighting ? 6 : 2.6) * (inWater ? (run ? 0.55 : 0.85) : 1) * (this.carrying ? 0.8 : 1) * (cb.knockT > 0 ? 0 : cb.atk || cb.stagger > 0 ? 0.25 : cb.blocking ? 0.5 : cb.aiming ? 0.7 : 1);
+    const sp = (this.crouch ? 1.5 : run && !fighting ? 6 : 2.6) * (inWater ? (run ? 0.55 : 0.85) : wading ? 0.82 : 1) * (this.carrying ? 0.8 : 1) * (cb.knockT > 0 ? 0 : cb.atk || cb.stagger > 0 ? 0.25 : cb.blocking ? 0.5 : cb.aiming ? 0.7 : 1);
     // укрытие: спина прижата к стене, A/D — вдоль стены, W — выйти вперёд
     if (this.coverOn && (this.panel || this.carrying || inWater || cb.knockT > 0 || this.crouch)) this.exitCover();
     const cover = this.coverOn ? this.findWall() : null;
@@ -1014,14 +1032,27 @@ export class Game {
     if (this.py <= ground) { this.py = ground; this.pvy = 0; }
     if (inWater) {
       const pool = !this.interior ? this.poolAt(this.px, this.pz) : null;
-      // в бассейне вода по грудь: модель погружается (dip), высота столкновений не меняется
-      const deep = pool ? 0.62 : 0.14;
+      // держимся у поверхности; нажатый присед (Ctrl / кнопка) уводит ко дну
+      const diveKey = I.down('ControlLeft') || I.vDown('crouch');
+      this.diveT = clamp(this.diveT + (diveKey ? dt * 1.9 : -dt * 1.5), 0, 1);
+      const surf = pool ? -0.62 : -0.16;
+      const bottom = pool ? -0.62 : -(Math.min(depth, 3.6) - 0.5);
+      const target = surf + (bottom - surf) * this.diveT + Math.sin(performance.now() / 700) * 0.02;
       this.pvy = 0; this.crouch = false;
-      if (mag > 0.05) this.state.energy = Math.max(0, this.state.energy - dt * (pool ? 0.08 : 0.12));
-      this.dip += ((Math.sin(performance.now() / 700) * 0.02) - deep - this.dip) * Math.min(1, dt * 5);
+      if (mag > 0.05) this.state.energy = Math.max(0, this.state.energy - dt * (pool ? 0.08 : 0.12) * (1 + this.diveT * 1.6));
+      this.dip += (target - this.dip) * Math.min(1, dt * 5);
+      if (!this.swimHinted && !pool && depth > 1.6) {
+        this.swimHinted = true;
+        this.toast('🏊 Глубоко! Зажмите Ctrl (кнопка «присед») — нырнуть ко дну');
+      }
+    } else if (wading) {
+      // бредём по дну: ступни стоят на грунте под водой
+      this.dip += (-depth - this.dip) * Math.min(1, dt * 6);
+      this.diveT = 0;
     } else {
       this.dip += (0 - this.dip) * Math.min(1, dt * 7);
       if (Math.abs(this.dip) < 0.01) this.dip = 0;
+      this.diveT = 0;
     }
     // бой
     const attack = (I.mouseClicked || I.vPressed('attack') || (cb.gunOut && I.vDown('fire'))) && !this.carrying;
@@ -2055,11 +2086,16 @@ export class Game {
       if (periods > 0) { k.acc = Math.min(kt.income * KIOSK_MAX_PERIODS, k.acc + periods * kt.income); k.last += periods * KIOSK_PERIOD * 1000; }
     }
   }
-  isWater(x: number, z: number) {
+  /** глубина воды в точке (0 — сухо): русло реки по профилю, пруды и бассейны */
+  waterDepthAt(x: number, z: number) {
+    if (this.interior) return 0;
     const b = this.L.bridges.find((r) => x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1);
-    if (b) return false;                       // на мосту — твёрдый настил
-    if (this.poolAt(x, z)) return true;        // бассейн или пруд во дворе
-    return Math.abs(x - this.L.river.center(z)) < this.L.river.half - 2;
+    if (b) return 0;                           // на мосту — твёрдый настил
+    if (this.poolAt(x, z)) return 1.35;        // бассейн или пруд во дворе
+    return this.L.river.depth(x, z);
+  }
+  isWater(x: number, z: number) {
+    return this.waterDepthAt(x, z) > 0.12;
   }
   /** бассейн/пруд под точкой (внутри чаши, не на бортике) */
   poolAt(x: number, z: number) {
@@ -4604,7 +4640,7 @@ export class Game {
     }
     if (this.inVeh) { const v = this.inVeh; return this.tmpV.set(v.x, v.y + Math.min(3, v.spec.hei * 0.8 + 0.6), v.z).clone(); }
     if (this.lying && this.interior?.bed) return new THREE.Vector3(this.interior.bed.x, this.interior.bed.y + 0.8, this.interior.bed.z);
-    return new THREE.Vector3(this.px, this.py + (this.crouch ? 1.05 : 1.6), this.pz);
+    return new THREE.Vector3(this.px, this.py + (this.crouch ? 1.05 : 1.6) + this.dip, this.pz);
   }
   private desiredCam(target: THREE.Vector3) {
     const v = this.inVeh ?? this.rideVeh();
@@ -4619,14 +4655,17 @@ export class Game {
     const d = Math.max(0.6, Math.min(dist, hit - 0.3));
     const pos = target.clone().addScaledVector(dir, d);
     if (this.interior) pos.y = Math.min(pos.y, this.py + (this.interior.bounds.h - 0.3));
-    pos.y = Math.max(pos.y, (this.interior ? this.py : 0) + 0.3);
+    const camFloor = this.interior ? this.py + 0.3
+      : this.waterDepthNow > 0.55 ? this.L.waterY - this.waterDepthNow + 0.45     // под водой — до дна
+      : 0.3;
+    pos.y = Math.max(pos.y, camFloor);
     return pos;
   }
   private updateCamera(dt: number) {
     if (this.firstPerson && !this.camMode && this.panel?.type !== 'editor') {
       const v = this.inVeh;
       let px = this.px, py = this.py, pz = this.pz, yaw = this.camYaw;
-      let eyeY = this.crouch ? 1.06 : 1.62;
+      let eyeY = (this.crouch ? 1.06 : 1.62) + this.dip;
       if (v) {
         // камера садится на место водителя (или пассажира) — видно руль, торпедо и сиденья
         const seat = this.passenger ? (v.model.seats[1] ?? v.model.passenger) : v.model.driver;
@@ -4712,6 +4751,24 @@ export class Game {
     this.camera.position.y += Math.sin(tm * 13.1) * 0.035 * amp;
     const fov = this.camera.fov + s * 5 * scale;
     if (Math.abs(this.camera.fov - fov) > 0.05) { this.camera.fov = fov; this.camera.updateProjectionMatrix(); }
+  }
+  /** камера под водой: сине-зелёная муть и короткая видимость (видно дно, рыбу, сваи) */
+  private updateUnderwater() {
+    const L = this.L; if (!L) return;
+    const c = this.camera.position;
+    const d = this.waterDepthAt(c.x, c.z);
+    const under = d > 0.3 && c.y < L.waterY - 0.02;
+    const fog = this.scene.fog as THREE.Fog | null;
+    if (under === this.underWater) return;
+    this.underWater = under;
+    if (!fog) return;
+    if (under) {
+      this.fogSaved = { color: fog.color.getHex(), near: fog.near, far: fog.far };
+      fog.color.setHex(0x0d4a55); fog.near = 2; fog.far = 55;
+    } else if (this.fogSaved) {
+      fog.color.setHex(this.fogSaved.color); fog.near = this.fogSaved.near; fog.far = this.fogSaved.far;
+      this.fogSaved = null;
+    }
   }
   private followSky(dt: number) {
     const c = this.camera.position, far = this.camera.far;

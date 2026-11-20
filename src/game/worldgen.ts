@@ -57,7 +57,9 @@ export interface WorldLayout {
   busStops: BusStop[]; busRoutes: BusRoute[]; busDepot: { x: number; z: number; a: number };
   livestock: { office: { x: number; z: number }; feed: { x: number; z: number }; troughs: { x: number; z: number }[]; coop: { x: number; z: number }; crate: { x: number; z: number } };
   parked: StaticVehicle[]; bazaarSlots: { id: number; x: number; z: number; a: number; market: number }[]; vendors: { x: number; z: number; a: number; car: number }[];
-  river: { center: (z: number) => number; half: number };
+  river: { center: (z: number) => number; half: number; depth: (x: number, z: number) => number };
+  /** уровень поверхности воды */
+  waterY: number;
   /** настилы мостов — по ним можно ехать, вода здесь не мешает */
   bridges: { x0: number; x1: number; z0: number; z1: number; y: number }[];
   /** бассейны и пруды: в них реально плавают (вода внутри рамки, бортик — ступенька) */
@@ -134,6 +136,22 @@ export function generateLayout(): WorldLayout {
   const riverCenter = (z: number) => -310 + 22 * Math.sin(z / 260);
   const riverHalf = 34;
   const bankE = (z: number) => riverCenter(z) + riverHalf;
+  /** уровень воды над землёй: поверхность реки чуть выше берегового грунта */
+  const waterY = 0.06;
+  /**
+   * Настоящая глубина русла (метры от поверхности вниз, 0 у берега).
+   * По фарватеру до ~4.6 м, у пляжа — длинная отмель, чтобы заходить постепенно.
+   */
+  const riverDepth = (x: number, z: number) => {
+    const t = Math.abs(x - riverCenter(z)) / riverHalf;      // 0 — фарватер, 1 — берег
+    if (t >= 1) return 0;
+    const beachZone = z > 360 && z < 620;
+    const deepest = beachZone ? 1.9 : 4.6;
+    const shape = Math.pow(1 - t * t, beachZone ? 1.45 : 0.85);
+    // лёгкая неровность дна: ямы и отмели, чтобы дно не было «корытом»
+    const wobble = 0.86 + 0.14 * Math.sin(z / 74 + 1.3) * Math.cos(x / 47);
+    return deepest * shape * wobble;
+  };
 
   // ---------- Блоки города ----------
   const parkSet = new Set(['3,3', '14,13', '4,14', '12,3', '8,15', '16,7']);
@@ -1534,7 +1552,7 @@ export function generateLayout(): WorldLayout {
   void beachRoad; void wh; void clamp;
   return {
     nodes, edges, adj, buildings, props, colliders, kiosks, villages, blocks, parks, pools, staticVehicles, garages, parked: [...parked, ...parkedLot], scooterDocks, livestock, bazaarSlots, vendors, lots, parkades, depot, truckDests,
-    river: { center: riverCenter, half: riverHalf }, beach, busStops, busRoutes, busDepot,
+    river: { center: riverCenter, half: riverHalf, depth: riverDepth }, waterY, beach, busStops, busRoutes, busDepot,
     industrial: { ...ind, pickup: { x: wh.door.x, z: wh.door.z }, trucks, office: { x: cp.door.x, z: cp.door.z } },
     farm, playerSpawn: spawn, dealerLot, marketLot, helipad,
     bridges, newCity,

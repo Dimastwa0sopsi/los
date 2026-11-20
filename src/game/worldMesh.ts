@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { CHUNK, CELL, ROAD_W, N, SIDEWALK } from './config';
 import type { WorldLayout, Building, Prop } from './worldgen';
 import { Batcher, T, M, stripQuad } from './geom';
-import { FACADE_TILE, mat, GFX } from './textures';
+import { FACADE_TILE, mat, getTex, GFX } from './textures';
 import { KIOSK_TYPES } from './data';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
@@ -18,7 +18,8 @@ export interface WorldMeshes {
   wheat: THREE.InstancedMesh;
   wheatCells: { x: number; z: number; done: boolean }[];
   garageGates: THREE.Mesh[];
-  water: THREE.Mesh;
+  /** поверхности воды: отмель, средняя глубина, фарватер */
+  waters: THREE.Mesh[];
   /** прибой: пенная полоса у кромки воды, анимируется в game.ts */
   shore: THREE.Mesh | null;
   /** створки ворот на петлях: один инстанс-меш, матрицы обновляет game.ts */
@@ -55,35 +56,113 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
   // ---------- земля ----------
   progress(0.12, 'Земля и вода');
   const bnd = L.bounds;
-  const groundGeo = new THREE.PlaneGeometry(bnd.x1 - bnd.x0 + 800, bnd.z1 - bnd.z0 + 800);
-  groundGeo.rotateX(-Math.PI / 2);
-  const uv = groundGeo.getAttribute('uv') as THREE.BufferAttribute;
-  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 300, uv.getY(i) * 300);
-  const ground = new THREE.Mesh(groundGeo, mat('tex:grass'));
-  ground.position.set((bnd.x0 + bnd.x1) / 2, 0, (bnd.z0 + bnd.z1) / 2);
-  ground.receiveShadow = true; ground.matrixAutoUpdate = false; ground.updateMatrix();
-  root.add(ground);
-  // река
-  const wb = new Batcher(); const bed = new Batcher();
-  for (let z = bnd.z0 - 400; z < bnd.z1 + 400; z += 20) {
-    const a = L.river.center(z), b = L.river.center(z + 20);
-    stripQuad(wb, 'water', a, z, b, z + 20, L.river.half * 2, 0.08, 30);
-    stripQuad(bed, 'c:#3b5a4a', a, z, b, z + 20, L.river.half * 2 + 6, 0.012, 30);
+  // плоскость травы больше не одна: суша строится берегами вдоль русла (ниже)
+  // ---------- РЕКА: вырезанное ложе, настоящее дно и вода слоями ----------
+  // Раньше вода была одной плоской полосой поверх травы: под ней ничего не было,
+  // а «мокрый песок» заходил на воду на 5 метров — из-за этого игрок «купался в песке».
+  // Теперь земля строится берегами вдоль русла (с вырезом), между берегами лежит дно
+  // с реальной глубиной (L.river.depth), а поверх — вода тремя полосами прозрачности:
+  // отмель → средняя глубина → фарватер.
+  const WATER_Y = L.waterY;
+  const RZ = 12;                                       // шаг полос вдоль русла
+  const GX0 = bnd.x0 - 400, GX1 = bnd.x1 + 400, GZ0 = bnd.z0 - 400, GZ1 = bnd.z1 + 400;
+  const bankHalf = L.river.half;
+  const bankX = (z: number) => L.river.center(z);
+  // плоский четырёхугольник на земле: точки по кругу, UV в метрах (трава/дно не «мылятся»)
+  const flat4 = (b: Batcher, key: string, pts: [number, number][], y: number, s = 12.5) => {
+    const area = (pts[0][0] * pts[1][1] - pts[1][0] * pts[0][1]) + (pts[1][0] * pts[2][1] - pts[2][0] * pts[1][1])
+      + (pts[2][0] * pts[3][1] - pts[3][0] * pts[2][1]) + (pts[3][0] * pts[0][1] - pts[0][0] * pts[3][1]);
+    const order = area > 0 ? [0, 1, 2, 0, 2, 3] : [0, 3, 2, 0, 2, 1];
+    const pos: number[] = [], uv2: number[] = [];
+    for (const i of order) { pos.push(pts[i][0], y, pts[i][1]); uv2.push(pts[i][0] / s, pts[i][1] / s); }
+    b.raw(key, pos, uv2);
+  };
+  const gb = new Batcher();                            // суша двумя берегами (без воды посередине)
+  const wShallow = new Batcher(), wMid = new Batcher(), wDeep = new Batcher();
+  const bedPos: number[] = [], bedUv: number[] = [], bedCol: number[] = [];
+  const cShore = new THREE.Color('#c8b184'), cShelf = new THREE.Color('#6f8a6b'), cDeep = new THREE.Color('#143038');
+  const ACROSS = 14;
+  const bedColor = (depth: number, out: THREE.Color) => {
+    const k = Math.min(1, depth / 3.6);
+    if (k < 0.45) out.copy(cShore).lerp(cShelf, k / 0.45);
+    else out.copy(cShelf).lerp(cDeep, Math.min(1, (k - 0.45) / 0.55));
+    return out;
+  };
+  const tmpC = new THREE.Color();
+  const bedTri = (a: [number, number, number], b2: [number, number, number], c: [number, number, number]) => {
+    // нормаль по (b-a)×(c-a): если смотрит вниз — меняем обход, чтобы дно было видно сверху
+    const ny = (b2[2] - a[2]) * (c[0] - a[0]) - (b2[0] - a[0]) * (c[2] - a[2]);
+    const t3 = ny >= 0 ? [a, b2, c] : [a, c, b2];
+    for (const v of t3) {
+      bedPos.push(v[0], v[1], v[2]);
+      bedUv.push(v[0] / 4.5, v[2] / 4.5);
+      const col = bedColor(Math.max(0, -v[1]), tmpC);
+      bedCol.push(col.r, col.g, col.b);
+    }
+  };
+  for (let z = GZ0; z < GZ1; z += RZ) {
+    const z1 = Math.min(GZ1, z + RZ);
+    const c0 = bankX(z), c1 = bankX(z1);
+    const l0 = c0 - bankHalf, l1 = c1 - bankHalf;
+    const r0 = c0 + bankHalf, r1 = c1 + bankHalf;
+    // суша: левый и правый берег, кромка точно по линии воды
+    flat4(gb, 'tex:grass', [[GX0, z], [GX0, z1], [l1, z1], [l0, z]], 0);
+    flat4(gb, 'tex:grass', [[r0, z], [r1, z1], [GX1, z1], [GX1, z]], 0);
+    // дно: поперёк русла 14 сегментов, глубина по профилю
+    const px: number[][] = [], py: number[][] = [];
+    for (const zz of [z, z1]) {
+      const lx = zz === z ? l0 : l1, rx = zz === z ? r0 : r1;
+      const rowX: number[] = [], rowY: number[] = [];
+      for (let j = 0; j <= ACROSS; j++) {
+        const x = lx + (rx - lx) * (j / ACROSS);
+        rowX.push(x); rowY.push(-L.river.depth(x, zz));
+      }
+      px.push(rowX); py.push(rowY);
+    }
+    for (let j = 0; j < ACROSS; j++) {
+      const a: [number, number, number] = [px[0][j], py[0][j], z];
+      const b2: [number, number, number] = [px[0][j + 1], py[0][j + 1], z];
+      const c: [number, number, number] = [px[1][j + 1], py[1][j + 1], z1];
+      const d: [number, number, number] = [px[1][j], py[1][j], z1];
+      bedTri(a, b2, c); bedTri(a, c, d);
+      // поверхность воды: полоса тем прозрачнее, чем глубже
+      const depth = (-(py[0][j] + py[0][j + 1] + py[1][j] + py[1][j + 1]) / 4);
+      const band = depth < 0.55 ? wShallow : depth < 2.1 ? wMid : wDeep;
+      flat4(band, depth < 0.55 ? 'waterShallow' : depth < 2.1 ? 'waterMid' : 'waterDeep',
+        [[px[0][j], z], [px[0][j + 1], z], [px[1][j + 1], z1], [px[1][j], z1]], WATER_Y, 26);
+    }
   }
-  const water = wb.build()[0]; root.add(water);
-  bed.build().forEach((m) => root.add(m));
-  // ---------- прибой: пена у кромки воды (полоса следует за руслом) ----------
+  gb.build().forEach((m) => { m.receiveShadow = true; root.add(m); });
+  {
+    const bg = new THREE.BufferGeometry();
+    bg.setAttribute('position', new THREE.Float32BufferAttribute(bedPos, 3));
+    bg.setAttribute('uv', new THREE.Float32BufferAttribute(bedUv, 2));
+    bg.setAttribute('color', new THREE.Float32BufferAttribute(bedCol, 3));
+    bg.computeVertexNormals(); bg.computeBoundingSphere();
+    const bmat = GFX.pbr
+      ? new THREE.MeshStandardMaterial({ map: getTex('riverbed'), vertexColors: true, roughness: 0.95, metalness: 0.02 })
+      : new THREE.MeshLambertMaterial({ map: getTex('riverbed'), vertexColors: true });
+    const bedMesh = new THREE.Mesh(bg, bmat);
+    bedMesh.receiveShadow = true; bedMesh.matrixAutoUpdate = false; bedMesh.updateMatrix();
+    root.add(bedMesh);
+  }
+  // вода: три слоя прозрачности, чтобы отмель просвечивала, а фарватер был тёмным
+  const waters: THREE.Mesh[] = [];
+  for (const [batcher, key] of [[wShallow, 'waterShallow'], [wMid, 'waterMid'], [wDeep, 'waterDeep']] as const) {
+    batcher.build().forEach((m) => { m.renderOrder = 3; m.userData.water = true; waters.push(m); root.add(m); });
+  }
+  // ---------- прибой: пена ровно по кромке воды (полоса следует за руслом) ----------
   let shore: THREE.Mesh | null = null;
   {
     const fb = new Batcher();
     const be0 = L.beach;
     for (let z = be0.z0 - 10; z < be0.z1 + 10; z += 4) {
       const a = L.river.center(z) + L.river.half, c = L.river.center(z + 4) + L.river.half;
-      stripQuad(fb, 'foam', a - 1.2, z, c - 1.2, z + 4, 5.2, 0.118, 2.4);   // вал прибоя
-      stripQuad(fb, 'foam', a + 2.4, z, c + 2.4, z + 4, 2.4, 0.116, 1.8);   // тонкий язык на песке
+      stripQuad(fb, 'foam', a - 0.9, z, c - 0.9, z + 4, 3.6, WATER_Y + 0.012, 2.4);  // вал прибоя на самой воде
+      stripQuad(fb, 'foam', a + 2.6, z, c + 2.6, z + 4, 3.4, 0.112, 1.8);           // язык пены на песке
     }
     const built = fb.build();
-    if (built.length) { shore = built[0]; shore.renderOrder = 2; root.add(shore); }
+    if (built.length) { shore = built[0]; shore.renderOrder = 4; root.add(shore); }
   }
   await tick();
   // ---------- дороги ----------
@@ -170,10 +249,10 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
       const b0 = bankAt(z0), b1 = bankAt(z1), bm = bankAt((z0 + z1) / 2);
       const bb = B(bm, (z0 + z1) / 2);
       // вода → мокрый песок: полоса 14 м вдоль кромки
-      stripQuad(bb, 'tex:sandwet', b0 - 2, z0, b1 - 2, z1, 14, 0.104, 9);
+      stripQuad(bb, 'tex:sandwet', b0 + 6.6, z0, b1 + 6.6, z1, 13.4, 0.104, 9);   // от кромки воды вглубь
       // сухой песок до галечной полосы
-      const dryFrom = bm + 5, dryTo = be.x1 - 12;
-      if (dryTo > dryFrom + 2) stripQuad(bb, 'tex:sand', (b0 + 5 + dryTo) / 2, z0, (b1 + 5 + dryTo) / 2, z1, dryTo - dryFrom, 0.1, 7);
+      const dryFrom = bm + 12, dryTo = be.x1 - 12;
+      if (dryTo > dryFrom + 2) stripQuad(bb, 'tex:sand', (b0 + 12 + dryTo) / 2, z0, (b1 + 12 + dryTo) / 2, z1, dryTo - dryFrom, 0.1, 7);
       // галька перед променадом
       stripQuad(bb, 'tex:pebble', be.x1 - 7, z0, be.x1 - 7, z1, 10, 0.108, 6);
     }
@@ -329,7 +408,7 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
     root.add(gates);
   }
   await tick();
-  return { root, chunks, lights, bulbs, wheat, wheatCells, garageGates, water, gates, gateLeaves, shore };
+  return { root, chunks, lights, bulbs, wheat, wheatCells, garageGates, waters, gates, gateLeaves, shore };
 }
 
 // ---------- многоуровневый паркинг ----------
