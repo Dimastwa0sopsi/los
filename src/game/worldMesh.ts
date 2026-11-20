@@ -251,6 +251,7 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
     }
   }
   for (const n of L.nodes) {
+    if (n.dead || !L.adj[n.id]?.length) continue;      // узлы-сироты после чистки дублей: дорог нет
     const deg = L.adj[n.id].length;
     if (n.gi !== undefined) B(n.x, n.z).add('road:patch', T.plane, M(n.x, 0.035, n.z, 0, ROAD_W, ROAD_W, 1, -Math.PI / 2), 12);
     else if (deg !== 2 || true) {
@@ -262,24 +263,33 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
   await tick();
   // ---------- поверхности кварталов ----------
   progress(0.24, 'Кварталы и тротуары');
+  // Квартал — это НЕ бетонная плита: газон на всю площадь, асфальт только на служебных
+  // кварталах (рынок, авторынок, парковки, гаражи, склад), тротуар — узким кольцом по краю.
+  // Раньше весь квартал заливался текстурой тротуара, из-за чего в городе не было травы.
+  const PAVED_BLOCKS = ['market', 'dealer', 'parking', 'parkade', 'garages', 'storage'];
   for (const bl of L.blocks) {
     const x0 = bl.ox ?? bl.i * CELL + ROAD_W / 2, z0 = bl.oz ?? bl.j * CELL + ROAD_W / 2, s = CELL - ROAD_W;
-    const b = B(x0 + s / 2, z0 + s / 2);
-    b.box('tex:sidewalk', x0 + s / 2, 0, z0 + s / 2, s, 0.15, s, 0, 2.5);
+    const cx = x0 + s / 2, cz = z0 + s / 2;
+    const b = B(cx, cz);
+    const paved = PAVED_BLOCKS.includes(bl.type);
+    // основание квартала: газон (или асфальт на служебных) — с него и начинается вся поверхность
+    b.box(paved ? 'tex:asphalt' : 'tex:grass', cx, 0, cz, s, 0.15, s, 0, paved ? 6 : 4);
     const cc = 'c:#c9c6bf';
-    b.box(cc, x0 + s / 2, 0, z0 + 0.12, s, 0.18, 0.24); b.box(cc, x0 + s / 2, 0, z0 + s - 0.12, s, 0.18, 0.24);
-    b.box(cc, x0 + 0.12, 0, z0 + s / 2, 0.24, 0.18, s); b.box(cc, x0 + s - 0.12, 0, z0 + s / 2, 0.24, 0.18, s);
+    b.box(cc, cx, 0, z0 + 0.12, s, 0.18, 0.24); b.box(cc, cx, 0, z0 + s - 0.12, s, 0.18, 0.24);
+    b.box(cc, x0 + 0.12, 0, cz, 0.24, 0.18, s); b.box(cc, x0 + s - 0.12, 0, cz, 0.24, 0.18, s);
+    // тротуар по периметру квартала: четыре полосы шириной SIDEWALK
+    const sw = SIDEWALK;
+    b.add('tex:sidewalk', T.plane, M(cx, 0.158, z0 + sw / 2, 0, s, sw, 1, -Math.PI / 2), 2.5);
+    b.add('tex:sidewalk', T.plane, M(cx, 0.158, z0 + s - sw / 2, 0, s, sw, 1, -Math.PI / 2), 2.5);
+    b.add('tex:sidewalk', T.plane, M(x0 + sw / 2, 0.158, cz, 0, sw, s - 2 * sw, 1, -Math.PI / 2), 2.5);
+    b.add('tex:sidewalk', T.plane, M(x0 + s - sw / 2, 0.158, cz, 0, sw, s - 2 * sw, 1, -Math.PI / 2), 2.5);
     const ix = x0 + SIDEWALK, iz = z0 + SIDEWALK, is = s - SIDEWALK * 2;
-    if (bl.type === 'park' || bl.type === 'private') {
-      b.add('tex:grass', T.plane, M(ix + is / 2, 0.155, iz + is / 2, 0, is, is, 1, -Math.PI / 2), 8);
-      if (bl.type === 'park') {
-        const cx = ix + is / 2, cz = iz + is / 2;
-        b.add('tex:sidewalk', T.plane, M(cx, 0.165, cz, 0, 4, is, 1, -Math.PI / 2), 2.5);
-        b.add('tex:sidewalk', T.plane, M(cx, 0.166, cz, 0, is, 4, 1, -Math.PI / 2), 2.5);
-        for (let k = 0; k < 16; k++) { const a0 = (k / 16) * Math.PI * 2, a1 = ((k + 1) / 16) * Math.PI * 2; stripQuad(b, 'tex:sidewalk', cx + Math.cos(a0) * 13, cz + Math.sin(a0) * 13, cx + Math.cos(a1) * 13, cz + Math.sin(a1) * 13, 3, 0.167, 3); }
-      }
+    if (bl.type === 'park') {
+      // дорожки парка поверх газона: две аллеи и кольцо
+      b.add('tex:sidewalk', T.plane, M(ix + is / 2, 0.165, iz + is / 2, 0, 4, is, 1, -Math.PI / 2), 2.5);
+      b.add('tex:sidewalk', T.plane, M(ix + is / 2, 0.166, iz + is / 2, 0, is, 4, 1, -Math.PI / 2), 2.5);
+      for (let k = 0; k < 16; k++) { const a0 = (k / 16) * Math.PI * 2, a1 = ((k + 1) / 16) * Math.PI * 2; stripQuad(b, 'tex:sidewalk', ix + is / 2 + Math.cos(a0) * 13, iz + is / 2 + Math.sin(a0) * 13, ix + is / 2 + Math.cos(a1) * 13, iz + is / 2 + Math.sin(a1) * 13, 3, 0.167, 3); }
     }
-    if (['market', 'dealer', 'parking', 'parkade', 'garages', 'storage'].includes(bl.type)) b.add('tex:asphalt', T.plane, M(ix + is / 2, 0.156, iz + is / 2, 0, is, is, 1, -Math.PI / 2), 6);
   }
   // промзона, пляж, парковка, поля
   const ind = L.industrial;
