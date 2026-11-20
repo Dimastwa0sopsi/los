@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { discoverServer } from '../game/discovery';
 import menuBg from '../assets/menu.jpg';
 import type { Game } from '../game/game';
 import { ONLINE_URL, getServerUrl, hostOf, diagnoseServer, type ServerDiag } from '../game/net';
@@ -16,7 +17,11 @@ export function ServerDownModal({ text, onMenu, onRetry, onSolo }: { text?: stri
   const [checking, setChecking] = useState(true);
   const run = async () => {
     setChecking(true);
-    try { setDiag(await diagnoseServer()); } catch { setDiag(null); } finally { setChecking(false); }
+    try {
+      // заодно перечитываем live.json: адрес туннеля мог смениться
+      await discoverServer(true).catch(() => null);
+      setDiag(await diagnoseServer());
+    } catch { setDiag(null); } finally { setChecking(false); }
   };
   useEffect(() => { void run(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
   const tone = diag?.reason === 'ok' ? 'ok' : diag ? 'bad' : 'wait';
@@ -100,7 +105,10 @@ export function OnlineJoin({ variant = 'start', g, initial, onLaunch, onClose, o
   const [diagT, setDiagT] = useState(true);
   const check = async () => {
     setDiagT(true);
-    try { setDiag(await diagnoseServer()); } catch { setDiag(null); } finally { setDiagT(false); }
+    try {
+      await discoverServer(true).catch(() => null);
+      setDiag(await diagnoseServer());
+    } catch { setDiag(null); } finally { setDiagT(false); }
   };
   useEffect(() => { if (variant === 'panel') void check(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [variant]);
   // те же правила, что и в Game.enterOnline: буквы/цифры/пробел/_-. , 2–16 символов
