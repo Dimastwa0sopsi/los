@@ -49,6 +49,7 @@ export interface HudState {
 }
 export interface Remote { plate: string; crouch: boolean; listings: Vehicle[]; listKey: string; props: [string, number][]; taxi: boolean; id: number; char: Character; tag: THREE.Sprite; veh: Vehicle | null; vehKey: string; x: number; z: number; y: number; a: number; phase: number; lookKey: string; color: string; name: string; spd: number; flinch: number; inVeh: boolean; ikey: string; visible: boolean; weapon: number; tagName: string; hp: number; driving: boolean; vehSeat: number; vehIdle: number }
 export type Panel =
+  | { type: 'context'; choices: { label: string; run: () => void }[] }
   | { type: 'shop'; kind: ShopKind; title: string; items: string[] } | { type: 'kiosk'; id: number } | { type: 'market'; sellUid?: string }
   | { type: 'tuning'; uid: string } | { type: 'clothes' } | { type: 'barber' } | { type: 'hospital' } | { type: 'police'; title: string }
   | { type: 'property'; b: number; unit: number } | { type: 'garage'; id: number } | { type: 'vadmin'; village: string } | { type: 'factory' } | { type: 'bank' }
@@ -544,6 +545,7 @@ export class Game {
   }
   private canEnterSaved(b: Building, unit?: number) {
     if (b.kind === 'house' || b.kind === 'vhouse') return this.state.properties.includes(`${b.id}:0`);
+    if (b.kind === 'banya' && b.bathOwner !== undefined) return this.state.properties.includes(`${b.bathOwner}:0`);
     if (b.kind === 'apartment' && unit !== undefined) return this.state.properties.includes(`${b.id}:${unit}`);
     return true;
   }
@@ -579,6 +581,13 @@ export class Game {
     const kind = interiorForBuilding(b.kind);
     if (!kind) return;
     if (b.kind === 'casino' && this.state.money < 50000) { this.sound.error(); this.toast('🕴 Охрана разворачивает вас: нужно $50 000'); return; }
+    if (b.kind === 'banya' && b.bathOwner !== undefined) {
+      const houseKey = `${b.bathOwner}:0`, bathKey = `bath:${b.bathOwner}`;
+      if (!this.state.properties.includes(houseKey)) {
+        const owner = this.takenBy(houseKey), lock = this.takenBy(bathKey);
+        if (!owner || lock?.locked) { if (!silent) this.toast('🔒 Баня заперта'); return; }
+      }
+    }
     if (b.kind === 'house' || b.kind === 'vhouse') {
       const id = `${b.id}:0`;
       if (!this.state.properties.includes(id)) {
@@ -726,6 +735,10 @@ export class Game {
     // хмель выветривается, диско-свет переливается, если включён
     if (this.buzzT > 0) this.buzzT = Math.max(0, this.buzzT - dt);
     if (this.discoOn && this.interior && this.interiorKind === 'bar') this.pulseDisco();
+    if (this.interiorKind === 'banya' && this.interior) {
+      const t = performance.now() / 1000;
+      this.interior.group.traverse(o => { if (o.userData.steam) o.position.y = 2.0 + Math.sin(t * 0.55 + o.position.x) * 0.12; });
+    }
     // ИИ транспорт
     this.updateTraffic(dt);
     this.updatePolice(dt);
@@ -896,18 +909,27 @@ export class Game {
       }
       if (I.pressed(K.autopilot) || I.vPressed('autopilot')) this.toggleAutopilot();
     }
-    // E — универсальная клавиша действия: сесть/выйти из транспорта ИЛИ контекстное действие.
-    // Если на это нажатие произошёл вход/выход — контекст не дёргаем, чтобы не было двойных срабатываний.
-    const wantAct = I.pressed(K.interact) || I.vPressed('enter');
-    const vehBefore = this.inVeh, rideBefore = this.rideRemote;
-    if (wantAct) { if (this.inVeh) this.exitVehicle(); else if (this.rideRemote) this.exitRemoteRide(); else this.tryEnterVehicle(); }
-    const switched = this.inVeh !== vehBefore || this.rideRemote !== rideBefore;
-    const eKey = ((!switched && I.pressed(K.interact)) && !(v && v.isHeli)) || I.vPressed('interact');
-    if (eKey && this.prompt) this.prompt.act();
-    if ((I.pressed(K.work) || I.vPressed('work')) && this.prompt?.r) this.prompt.r();
-    else if (I.pressed(K.work) && !this.lying) this.cycleWeapon();
-    // эмоции открываются из телефона и по / (отдельной клавиши больше нет)
-    if ((I.pressed(K.rob) || I.vPressed('rob')) && this.prompt?.l) this.prompt.l();
+    // F — посадка; E — контекстное действие или выход из транспорта.
+    if (I.pressed(K.enterVehicle) && !this.inVeh && !this.rideRemote) this.tryEnterVehicle();
+    else if (I.pressed(K.enterVehicle) && this.inVeh?.isHeli) this.exitVehicle();
+    if (I.vPressed('enter')) { if (this.inVeh) this.exitVehicle(); else if (this.rideRemote) this.exitRemoteRide(); else this.tryEnterVehicle(); }
+    const eKey = (I.pressed(K.interact) && !(v && v.isHeli)) || I.vPressed('interact');
+    if (eKey) {
+      if (this.prompt?.keys.includes('E') || (I.vPressed('interact') && this.prompt?.keys.includes('F'))) {
+        const p = this.prompt;
+        if (p.r || p.l) {
+          const label = (key: string, fallback: string) => p.text.match(new RegExp(`${key}\\s*—\\s*([^·]+)`))?.[1].trim() || fallback;
+          const choices = [{ label: label('E', 'Основное действие'), run: p.act }];
+          if (p.r) choices.push({ label: label('R', 'Начать смену'), run: p.r });
+          if (p.l) choices.push({ label: label('L', 'Дополнительное действие'), run: p.l });
+          this.openPanel({ type: 'context', choices });
+        } else p.act();
+      }
+      else if (this.inVeh) this.exitVehicle();
+      else if (this.rideRemote) this.exitRemoteRide();
+    }
+    if (I.pressed(K.work) && !this.lying) this.cycleWeapon();
+    // Все действия у объектов выбираются по E; R остаётся переключением оружия.
     if (I.vPressed('phone')) this.togglePanel({ type: 'phone' });
     if (I.vPressed('inventory')) this.togglePanel({ type: 'inventory' });
     if (I.vPressed('map')) this.togglePanel({ type: 'map', mode: 'waypoint' });
@@ -1658,7 +1680,7 @@ export class Game {
     const spot = this.roadSpotNear(this.px, this.pz);
     const ai = this.routeFor(v, spot);
     if (!ai) { v.dispose(); this.toast('Такси не может проехать к вам'); return; }
-    ai.onArrive = () => { if (this.taxi?.v === v && this.taxi.stage === 'coming') { this.taxi.stage = 'waiting'; v.speed = 0; this.toast('Такси прибыло и ждёт вас (E — сесть)'); } };
+    ai.onArrive = () => { if (this.taxi?.v === v && this.taxi.stage === 'coming') { this.taxi.stage = 'waiting'; v.speed = 0; this.toast('Такси прибыло и ждёт вас (F — сесть)'); } };
     v.ai = ai; ai.obeyLights = true; this.addVehicle(v);
     this.taxi = { v, stage: 'coming', dist: 0, t: 0 };
     this.toast('Такси вызвано — следите за значком 🚕 на карте');
@@ -1783,7 +1805,7 @@ export class Game {
     v.speed = 0; v.fuel = 100; v.condition = 1; v.hasDriver = false; v.lightsUserOff = true;
     this.addVehicle(v);
     const d = Math.round(Math.hypot(v.x - this.px, v.z - this.pz));
-    this.toast(`🎁 ${v.spec.name} рядом (${d} м) · E — сесть · в собственность не переходит`);
+    this.toast(`🎁 ${v.spec.name} рядом (${d} м) · F — сесть · в собственность не переходит`);
     this.sound.coin();
     return true;
   }
@@ -2328,7 +2350,7 @@ export class Game {
         if (v.role === 'npcpuppet' || (v.role === 'remote' && !this.remoteOwnerOf(v))) continue;
         const owner = v.role === 'remote' ? this.remoteOwnerOf(v) : null;
         const label = v.role === 'rental' ? `E — арендовать самокат ($${SCOOTER_RATE}/мин)` : v.role === 'job' && v.spec.body === 'bus' ? 'E — сесть за руль автобуса' : v.role === 'job' && v.spec.body === 'semi' ? 'E — сесть в фуру (рейс)' : owner ? `E — сесть ${owner.taxi ? 'в такси' : 'пассажиром'} к ${owner.name}` : v.role === 'parked' ? `E — угнать: ${v.spec.name}` : (v.role === 'traffic' && v.dummy) ? `E — выкинуть водителя: ${v.spec.name}` : this.taxi?.v === v ? 'E — сесть в такси' : v.role === 'job' ? 'E — Комбайн: начать уборку поля' : v.owned ? `E — сесть: ${v.spec.name}` : v.role === 'deco' ? `${v.spec.name} — заперто` : `E — сесть: ${v.spec.name}`;
-        vp = { text: label, keys: ['E'], act: () => this.tryEnterVehicle() };
+        vp = { text: label.replace(/^E —/, 'F —'), keys: ['F'], act: () => this.tryEnterVehicle() };
         break;
       }
     }
@@ -2461,6 +2483,11 @@ export class Game {
     if (action.startsWith('pc:')) return { text: 'E — Сесть за ' + label, keys: ['E'], act: () => { if (!this.state.officeJob) { this.toast('Сначала устройтесь в отделе кадров «ЛосТех»'); return; } this.openPanel({ type: 'pc', mode: 'office' }); } };
     if (action === 'coffee') return { text: 'E — Кофе ($3, +бодрость)', keys: ['E'], act: () => { if (this.pay(3)) { this.state.energy = Math.min(100, this.state.energy + 25); this.toast('☕ Бодрит!'); } } };
     if (action === 'trucker') return { text: 'E — ' + label, keys: ['E'], act: () => this.openPanel({ type: 'trucker' }) };
+    if (action === 'bath_lock' && b.kind === 'banya' && b.bathOwner !== undefined) {
+      const owner = `${b.bathOwner}:0`, key = `bath:${b.bathOwner}`;
+      if (!this.state.properties.includes(owner)) return { text: 'Замок бани доступен хозяину', keys: [], act: () => {} };
+      return { text: `E — ${this.isLocked(key) ? 'открыть' : 'закрыть'} баню`, keys: ['E'], act: () => this.toggleBathLock(b.bathOwner!) };
+    }
     if (action === 'basement') return { text: 'E — ' + label, keys: ['E'], act: () => this.enterBasement(b) };
     // ---------- ШАХТА «ЧЁРНАЯ ЖИЛА» ----------
     if (action === 'mine_uniform') return { text: 'E — ' + label, keys: ['E'], act: () => this.mineHire() };
@@ -4233,6 +4260,13 @@ export class Game {
   }
   // ================= НЕДВИЖИМОСТЬ: замки и занятость =================
   isLocked(id: string) { return !!this.state.locks?.[id]; }
+  toggleBathLock(owner: number) {
+    if (!this.state.properties.includes(`${owner}:0`)) return;
+    const id = `bath:${owner}`;
+    (this.state.locks ??= {})[id] = !this.state.locks[id];
+    this.toast(this.state.locks[id] ? '🔒 Баня заперта' : '🔓 Баня открыта');
+    this.sound.door(); this.save(); this.netN = 0;
+  }
   toggleLock(id: string) {
     if (!this.state.properties.includes(id)) return;
     (this.state.locks ??= {})[id] = !this.state.locks[id];
@@ -4629,7 +4663,11 @@ export class Game {
       if (this.netN % 8 === 1) {
         st.l = [L.gender, L.skin, L.hair, L.hairColor, L.top, L.topColor, L.bottom, L.bottomColor, L.shoes, L.eyes ?? '', String(L.height ?? ''), String(L.build ?? ''), L.beard ?? '', L.lips ?? '', L.acc ?? ''] as unknown as RemoteState['l'];
         st.n = this.state.nick ?? '';
-        st.pr = this.state.properties.map((id) => [id, this.isLocked(id) ? 1 : 0] as [string, number]);
+        st.pr = this.state.properties.flatMap((id) => {
+          const entry: [string, number] = [id, this.isLocked(id) ? 1 : 0];
+          const house = this.L.buildings[Number(id.split(':')[0])];
+          return house?.kind === 'vhouse' ? [entry, [`bath:${house.id}`, this.isLocked(`bath:${house.id}`) ? 1 : 0] as [string, number]] : [entry];
+        });
         st.ls = (this.state.listings ?? []).map((l) => { const o = this.state.vehicles.find((x) => x.uid === l.uid); return o ? { slot: l.slot, type: o.type, color: o.tuning.paint ?? o.color, year: o.year, mil: Math.round(o.mileage), cond: Math.round(o.condition * 100) / 100, price: l.price } : null; }).filter(Boolean) as Listing[];
       }
       net.sendState(st);
@@ -5170,7 +5208,7 @@ export class Game {
         for (const cv of cops) best = Math.min(best, Math.hypot(cv.x - this.px, cv.z - this.pz));
         return best < 120 ? { n: cops.length, dist: Math.round(best) } : null;
       })(),
-      prompt: this.prompt?.text ?? null, promptKeys: this.prompt?.keys ?? [], location: this.locationName(), job: this.jobText(), taxi: this.taxiText(), inside: !!this.interior,
+      prompt: this.prompt ? (this.prompt.r || this.prompt.l ? 'E — выбрать действие' : this.prompt.text) : null, promptKeys: this.prompt ? (this.prompt.r || this.prompt.l ? ['E'] : this.prompt.keys) : [], location: this.locationName(), job: this.jobText(), taxi: this.taxiText(), inside: !!this.interior,
       weapon: this.weapon, ammo: this.combat.reserve, lying: this.lying, fps: this.fps, intro: !!this.intro, carrying: this.carrying, destination: !!this.destination,
       online: this.online && this.net ? { status: this.net.status, players: this.net.players.size, id: this.net.id, nick: s.nick ?? '' } : null,
       gun: this.combat.armed ? { mag: this.combat.mag, reserve: this.combat.reserve, aiming: this.combat.aiming, spread: this.combat.spread, reloading: this.combat.reloadT > 0, name: WEAPONS[this.weapon]?.name ?? '', ammoName: AMMO_NAMES[WEAPONS[this.weapon]?.ammo ?? 'p'], driveBy: this.combat.driveBy } : null,

@@ -17,6 +17,8 @@ export interface Building {
   door: { x: number; z: number; a: number }; cls?: 'eco' | 'mid' | 'lux'; price?: number; forSale?: boolean;
   village?: string; facade: string; roof: 'flat' | 'gable'; enter: boolean; color?: string; fenced?: boolean;
   beds?: { x: number; z: number }[];
+  /** Дом, к участку которого относится баня. */
+  bathOwner?: number;
 }
 export type PropType = 'tree' | 'pine' | 'bush' | 'lamp' | 'bench' | 'hydrant' | 'trash' | 'swing' | 'slide' | 'sandbox' | 'carousel' |
   'fence' | 'bed' | 'banya' | 'porch' | 'gate' | 'umbrella' | 'towel' | 'lounger' | 'container' | 'tank' | 'crane' | 'dock' | 'booth' |
@@ -101,6 +103,7 @@ export function generateLayout(): WorldLayout {
   const pools: WorldLayout['pools'] = [];
   const kiosks: Kiosk[] = [];
   const villages: Village[] = [];
+  const specialBathSpots = new Map<Building, { x: number; z: number; face: 'n' | 's' | 'e' | 'w' }>();
   const staticVehicles: StaticVehicle[] = [];
   const bridges: WorldLayout['bridges'] = [];
   const garages: Garage[] = [];
@@ -287,8 +290,10 @@ export function generateLayout(): WorldLayout {
   const plotFence = (bd: Building, pad = 2.4, h = 1.25, c = '#8b6b4a') => {
     if (bd.fenced) return;
     bd.fenced = true;
-    const x0 = bd.x - bd.w / 2 - pad, x1 = bd.x + bd.w / 2 + pad;
-    const z0 = bd.z - bd.d / 2 - pad, z1 = bd.z + bd.d / 2 + pad;
+    const dx0 = bd.door.x - bd.x, dz0 = bd.door.z - bd.z;
+    const extra = bd.kind === 'vhouse' ? 6 : 0;
+    const x0 = bd.x - bd.w / 2 - pad - (dx0 > Math.abs(dz0) ? extra : 0), x1 = bd.x + bd.w / 2 + pad + (-dx0 > Math.abs(dz0) ? extra : 0);
+    const z0 = bd.z - bd.d / 2 - pad - (dz0 > Math.abs(dx0) ? extra : 0), z1 = bd.z + bd.d / 2 + pad + (-dz0 > Math.abs(dx0) ? extra : 0);
     const gate = 4.4;                        // ширина ворот: во двор заезжает машина
     const dx = bd.door.x - bd.x, dz = bd.door.z - bd.z;
     const south = dz > Math.abs(dx), north = -dz > Math.abs(dx), east = dx > Math.abs(dz);
@@ -818,7 +823,7 @@ export function generateLayout(): WorldLayout {
     { name: VILLAGE_NAMES[0], from: cid(5, 0), conn: [[300, -300]], street: [540, -300] },
   ];
   let villageEntryNode = 0;
-  let sosnovkaLaneEnd = 0;
+  let sosnovkaLaneEnd = 0, sosnovkaStreetEnd = 0;
   const villageHouseSpots: { x: number; z: number; vi: number; ux: number; uz: number; nx: number; nz: number }[] = [];
   for (let vi = 0; vi < vdefs.length; vi++) {
     const v = vdefs[vi];
@@ -826,7 +831,8 @@ export function generateLayout(): WorldLayout {
     const sNode = connIds[connIds.length - 1];
     if (vi === 0) villageEntryNode = sNode;
     const sx = nodes[sNode].x, sz = nodes[sNode].z;
-    roadSeg(sNode, [v.street], 'village', 8, );
+    const streetEnd = roadSeg(sNode, [v.street], 'village', 8).at(-1)!;
+    if (vi === 0) sosnovkaStreetEnd = streetEnd;
     const ex = v.street[0], ez = v.street[1];
     const L = Math.hypot(ex - sx, ez - sz);
     const ux = (ex - sx) / L, uz = (ez - sz) / L;
@@ -946,7 +952,7 @@ export function generateLayout(): WorldLayout {
     }
     // баня
     const bn = P(6.5, 24);
-    addProp({ t: 'banya', x: bn.x, z: bn.z, r: Math.atan2(-nx, -nz) }, { w: 4, d: 4, h: 2.8 });
+    specialBathSpots.set(b, { x: bn.x, z: bn.z, face });
     // мост к городу у дорог исключён — дома стоят только вдоль главной улицы
   }
 
@@ -1491,8 +1497,10 @@ export function generateLayout(): WorldLayout {
     const northWest = roadSeg(west, [[680, -350]], 'village', 8).at(-1)!;
     const middleNorth = roadSeg(northWest, [[780, -350]], 'village', 8).at(-1)!;
     const northEast = roadSeg(middleNorth, [[880, -350]], 'village', 8).at(-1)!;
-    addEdge(middleNorth, middleSouth, 'village', 8);
-    addEdge(sosnovkaLaneEnd, west, 'village', 8);
+    // Сомкнуть оба конца улиц Сосновки и довести дорогу до Егоровки.
+    addEdge(sosnovkaStreetEnd, sosnovkaLaneEnd, 'village', 8);
+    const link = roadSeg(sosnovkaLaneEnd, [[610, -262], [610, -290]], 'village', 8).at(-1)!;
+    addEdge(link, entry, 'village', 8);
     addEdge(northEast, east, 'village', 8);
     villages.push({ name, sx: 680, sz: -290, ex: 880, ez: -290, signX: 726, signZ: -242, cx: 780, cz: -320 });
     addProp({ t: 'vsign', x: 726, z: -242, r: 0, c: name }, { w: 0.4, d: 0.4, h: 2.4 });
@@ -1910,10 +1918,54 @@ export function generateLayout(): WorldLayout {
   // Новые объекты добавляются только после перенумерации старого мира.
   addBuilding({ kind: 'vshop', name: 'Сельмаг · Ольховка', x: 1156, z: 1535, w: 20, d: 14, h: 5, door: doorFor(1156, 1535, 20, 14, 's'), facade: 'wood', roof: 'gable', enter: true, village: 'Ольховка', color: '#7c2d12' });
   truckDests.push({ name: 'Сельмаг · Ольховка', x: 1156, z: 1544 });
-  for (const [name, x, z] of [['Сосновка', 580, -320], ['Кленовка', 835, 1860], ['Ольховка', 1090, 1615], ['Егоровка', 860, -400]] as const) {
-    addBuilding({ kind: 'banya', name: 'Баня · ' + name, x, z, w: 9, d: 8, h: 4, door: doorFor(x, z, 9, 8, 's'), facade: 'wood', roof: 'gable', enter: true, village: name, color: '#855c3b' });
-    path(x, z + 5, x, z + 9, 1.5);
+  // Старые общественные бани переносим на первые участки, не меняя их ID;
+  // остальные добавляем в конец списка — номера купленных домов не меняются.
+  const homes = buildings.filter(b => b.kind === 'vhouse');
+  const oldBaths: Building[] = [];
+  for (const name of ['Сосновка', 'Кленовка', 'Ольховка', 'Егоровка']) {
+    const home = homes.find(b => b.village === name)!;
+    const bath = addBuilding({ kind: 'banya', name: 'Баня · ' + name, x: home.x, z: home.z, w: 3.4, d: 3.4, h: 3, door: home.door, facade: 'wood', roof: 'gable', enter: true, village: name, color: '#855c3b' });
+    oldBaths.push(bath);
   }
+  const firstHomes = oldBaths.map(b => homes.find(h => h.village === b.village)!);
+  for (const home of homes) {
+    const dx = home.door.x - home.x, dz = home.door.z - home.z;
+    const face: 'n' | 's' | 'e' | 'w' = Math.abs(dx) > Math.abs(dz) ? (dx > 0 ? 'e' : 'w') : (dz > 0 ? 's' : 'n');
+    const spot = specialBathSpots.get(home);
+    const ux = Math.abs(dx) > Math.abs(dz) ? -Math.sign(dx) : 0, uz = ux === 0 ? -Math.sign(dz) : 0;
+    const distance = (ux ? home.w : home.d) / 2 + 4;
+    const x = spot?.x ?? home.x + ux * distance, z = spot?.z ?? home.z + uz * distance;
+    // Случайные лесные деревья не должны прорастать сквозь новую баню.
+    for (let i = props.length - 1; i >= 0; i--) {
+      const p = props[i];
+      if (!['tree', 'pine', 'bush'].includes(p.t) || Math.abs(p.x - x) > 2.1 || Math.abs(p.z - z) > 2.1) continue;
+      const ci = colliders.findIndex(c => !c.tag && Math.abs((c.x0 + c.x1) / 2 - p.x) < 0.001 && Math.abs((c.z0 + c.z1) / 2 - p.z) < 0.001);
+      if (ci >= 0) colliders.splice(ci, 1);
+      props.splice(i, 1);
+    }
+    // Живность оставляем во дворе, но не внутри стен бани.
+    for (const p of props) {
+      if (p.t !== 'chicken' && p.t !== 'cow') continue;
+      if (Math.abs(p.x - x) >= 1.9 || Math.abs(p.z - z) >= 1.9) continue;
+      const offsets = [[4, 0], [-4, 0], [0, 4], [0, -4], [5, 2], [-5, 2]];
+      for (const [ox, oz] of offsets) {
+        const px = x + ox, pz = z + oz;
+        if (buildings.some(b => Math.abs(px - b.x) < b.w / 2 + 0.4 && Math.abs(pz - b.z) < b.d / 2 + 0.4)) continue;
+        if (colliders.some(c => c.y1 > 0.5 && px > c.x0 - 0.3 && px < c.x1 + 0.3 && pz > c.z0 - 0.3 && pz < c.z1 + 0.3)) continue;
+        p.x = px; p.z = pz; break;
+      }
+    }
+    // Дверь бани смотрит к дому, а не наружу участка.
+    const bathFace = spot?.face ?? face;
+    let bath = oldBaths[firstHomes.indexOf(home)];
+    if (!bath) bath = addBuilding({ kind: 'banya', name: 'Баня · ' + home.village, x, z, w: 3.4, d: 3.4, h: 3, door: doorFor(x, z, 3.4, 3.4, bathFace), facade: 'wood', roof: 'gable', enter: true, village: home.village, color: '#855c3b', bathOwner: home.id });
+    else {
+      bath.x = x; bath.z = z; bath.door = doorFor(x, z, 3.4, 3.4, bathFace); bath.bathOwner = home.id;
+      const col = colliders.find(c => c.tag === 'b' + bath.id)!;
+      Object.assign(col, { x0: x - 1.7, x1: x + 1.7, z0: z - 1.7, z1: z + 1.7 });
+    }
+  }
+
 
   void beachRoad; void wh; void clamp;
   return {

@@ -37,6 +37,21 @@ try {
     if (!bath) throw new Error('нет доступной бани: ' + v.name);
     if (L.colliders.some(c => c.tag !== 'b' + bath.id && c.y1 > 0.5 && bath.door.x > c.x0 - 0.35 && bath.door.x < c.x1 + 0.35 && bath.door.z > c.z0 - 0.35 && bath.door.z < c.z1 + 0.35)) throw new Error('вход в баню заблокирован: ' + v.name);
   }
+  for (const home of L.buildings.filter(b => b.kind === 'vhouse')) {
+    const baths = L.buildings.filter(b => b.kind === 'banya' && b.bathOwner === home.id);
+    if (baths.length !== 1) throw new Error(`у дома ${home.id} должно быть по одной бане`);
+    const b = baths[0];
+    if (b.w > 4 || b.d > 4 || Math.hypot(b.x - home.x, b.z - home.z) > 25) throw new Error('баня вне участка или слишком большая: ' + home.id);
+    if (L.colliders.some(c => c.tag !== 'b' + b.id && c.y1 > 0.5 && b.door.x > c.x0 - 0.35 && b.door.x < c.x1 + 0.35 && b.door.z > c.z0 - 0.35 && b.door.z < c.z1 + 0.35)) throw new Error('заблокирован вход бани у дома ' + home.id);
+    if (L.buildings.some(o => o.id !== b.id && Math.abs(o.x - b.x) < (o.w + b.w) / 2 && Math.abs(o.z - b.z) < (o.d + b.d) / 2)) throw new Error('баня пересекает постройку у дома ' + home.id);
+  }
+  const edgeAt = (ax: number, az: number, bx: number, bz: number) => L.edges.some(e => {
+    const a = L.nodes[e.a], b = L.nodes[e.b];
+    return (a.x === ax && a.z === az && b.x === bx && b.z === bz) || (b.x === ax && b.z === az && a.x === bx && a.z === bz);
+  });
+  if (!edgeAt(540, -300, 560, -262)) throw new Error('концы улиц Сосновки не соединены');
+  if (!edgeAt(610, -290, 660, -290)) throw new Error('нет дороги Сосновка — Егоровка');
+  if (edgeAt(780, -350, 780, -290)) throw new Error('посередине Егоровки осталась дорога');
   if (!L.buildings.some(b => b.kind === 'vshop' && b.village === 'Ольховка' && b.w >= 20)) throw new Error('нет большого сельмага Ольховки');
   if (!L.props.some(p => p.t === 'fountain' && p.x > 680 && p.x < 880 && p.z < -290 && p.z > -350)) throw new Error('нет фонтана Егоровки');
   const start = L.nodes.find(n => n.x === 560 && n.z === -262)!;

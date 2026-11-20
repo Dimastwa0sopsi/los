@@ -103,8 +103,14 @@ for (const kind of KINDS) {
     if (it.doorSpots.hatch && solidAt(it, it.doorSpots.hatch.x, it.doorSpots.hatch.z, 0, 1.8)) problems.push('возврат из подвала внутри мебели');
     if (it.bed && solidAt(it, it.bed.x + 1.2, it.bed.z, 0, 1.8)) problems.push('нельзя встать с кровати');
   }
+  if (kind === 'banya') {
+    let steam = 0, woodFloor = 0;
+    it.group.traverse(o => { if (o.userData.steam) steam++; if (o.userData.matKey === 'tex:parquet') woodFloor++; });
+    if (!steam || !woodFloor || !it.acts.some(a => a.action === 'bath_lock')) problems.push('нет пара, деревянного пола или замка');
+  }
   if (kind === 'banya' && !at((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2 - 2, 0.8, walkableRoute)) problems.push('парная недоступна');
-  if (kind === 'basement' && it.acts.some(a => a.action.startsWith('pot:'))) problems.push('в подвале остались горшки');
+  if (kind === 'basement' && (it.pots?.length !== 6 || it.acts.filter(a => a.action.startsWith('pot:')).length !== 6)) problems.push('не восстановлены шесть горшков');
+  if (!solidAt(it, (b.x0 + b.x1) / 2, b.z1, 0, 1.8)) problems.push('из двери можно выйти за границы');
   if (exit && !at(exit.x, exit.z, 2.4)) problems.push('выход недостижим');
   const deadActs = it.acts.filter((a) => a.action !== 'exit' && !at(a.x, a.z)).map((a) => a.label.slice(0, 26));
   if (deadActs.length) problems.push(`недостижимо: ${deadActs.join(', ')}`);

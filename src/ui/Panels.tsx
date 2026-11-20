@@ -72,6 +72,9 @@ export function GamePanel({ g, panel, close }: { g: Game; panel: Panel; close: (
   const s = g.getState();
   const wrap = (fn: () => void) => () => { fn(); r(); };
   switch (panel.type) {
+    case 'context': return <Modal title="Выберите действие" onClose={close}>
+      <div className="lg-list">{panel.choices.map((choice, i) => <button key={i} className="lg-btn" onClick={() => { close(); choice.run(); }}>{choice.label}</button>)}</div>
+    </Modal>;
     case 'shop': return (
       <Modal title={panel.title} onClose={close}>
         <p className="lg-money-line">Ваши деньги: <b>{$(s.money)}</b></p>
@@ -80,7 +83,7 @@ export function GamePanel({ g, panel, close }: { g: Game; panel: Panel; close: (
             <button className="lg-btn sm" onClick={wrap(() => g.buy(id))}>{$(it.price)}</button>{!it.weapon && <button className="lg-btn sm" onClick={wrap(() => g.buy(id, 5))}>×5</button>}</div>); })}</div>
         {(panel.kind === 'vshop' || panel.kind === 'supermarket') && <button className="ui-btn mt-2" onClick={wrap(() => g.sellProduce('veg'))}>🧺 Продать урожай с огорода</button>}
         {panel.kind === 'gunshop' && <button className="ui-btn danger mt-2" onClick={wrap(() => g.sellProduce('drug'))}>🍁 Сбыть «дурман» из-под прилавка (риск розыска)</button>}
-        <p className="text-xs opacity-70 mt-2">R у кассы — устроиться на смену. L — ограбление (нужно оружие, даёт розыск).</p>
+        <p className="text-xs opacity-70 mt-2">У кассы нажмите E и выберите действие. Для ограбления прицельтесь в кассира.</p>
       </Modal>);
     case 'kiosk': {
       const k = g.L.kiosks[panel.id]; const kt = KIOSK_TYPES[k.type]; const own = s.kiosks.find((o) => o.id === k.id);
@@ -183,7 +186,7 @@ function BarMenu({ g, close, name }: { g: Game; close: () => void; name?: string
       <p className="text-xs opacity-70 mt-2">Крепкое спиртное слегка качает руль. За руль после бара лучше не садиться.</p>
     </>}
     {tab === 'shift' && <>
-      <p className="opacity-85">Разлейте напитки пятерым гостям: подойдите к стойке, нажмите R — начнётся смена. За каждого гостя $35, за пять — бонус $80.</p>
+      <p className="opacity-85">Разлейте напитки пятерым гостям: подойдите к стойке, нажмите E и выберите смену. За каждого гостя $35, за пять — бонус $80.</p>
       <div className="flex gap-2 mt-3">
         <button className="lg-btn lg-btn-main" onClick={() => { if (onShift) g.quitJob(); else g.startShift(); close(); }}>{onShift ? 'Завершить смену' : 'Устроиться барменом'}</button>
       </div>

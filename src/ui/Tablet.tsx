@@ -352,6 +352,7 @@ function Homes({ g, close }: P) {
             <div className="row">🏠 <div className="grow"><b>{g.propertyName(id)}</b><small>{locked ? '🔒 заперто — гости не войдут' : '🔓 открыто — игроки могут зайти в гости'}{home ? ' · ⭐ точка появления' : ''}</small></div></div>
             <div className="btns">
               <button className="ui-btn sm" onClick={() => g.toggleLock(id)}>{locked ? '🔓 Открыть' : '🔒 Запереть'}</button>
+              {g.L.buildings[Number(id.split(':')[0])]?.kind === 'vhouse' && <button className="ui-btn sm" onClick={() => g.toggleBathLock(Number(id.split(':')[0]))}>{g.isLocked(`bath:${id.split(':')[0]}`) ? '🔓 Открыть баню' : '🔒 Запереть баню'}</button>}
               {!home && <button className="ui-btn sm" onClick={() => g.setSpawnHome(id)}>⭐ Появляться здесь</button>}
               <button className="ui-btn sm" onClick={() => { g.gotoProperty(id); close(); }}>📍 Маршрут</button>
             </div>
@@ -360,7 +361,7 @@ function Homes({ g, close }: P) {
       })}
       {!s.properties.length && <p className="tb-empty">У вас пока нет жилья. На карте зелёные домики — свободные, красные — уже купленные.</p>}
       <button className="ui-btn main" onClick={findFree}>🔎 Найти ближайший свободный дом</button>
-      <p className="tb-note">Квартиры продаются в подъездах многоэтажек. Замок также переключается клавишей L у своей двери.</p>
+      <p className="tb-note">Квартиры продаются в подъездах многоэтажек. У своей двери нажмите E и выберите действие с замком.</p>
     </div>
   );
 }
@@ -644,7 +645,7 @@ function Vzhuh({ g, close }: P) {
   const mine = g.getState().vehicles.filter((o) => VEHICLES[o.type].body === 'scooter');
   return (
     <div className="tb-list">
-      <div className="tb-card big">🛴 <div><b>Тариф: ${SCOOTER_RATE} в минуту</b><small>Подойдите к самокату и нажмите E · X — трюк · E — завершить аренду</small></div></div>
+      <div className="tb-card big">🛴 <div><b>Тариф: ${SCOOTER_RATE} в минуту</b><small>Подойдите к самокату и нажмите F · X — трюк · E — завершить аренду</small></div></div>
       <h4 className="tb-h">Ближайшие станции</h4>
       {docks.slice(0, 6).map(({ d, dist, free }, i) => <div className="tb-card" key={i}>📍 <div className="grow"><b>Станция · {Math.round(dist)} м</b><small>свободно: {free}</small></div><button className="ui-btn sm" onClick={() => { g.destination = { x: d.x, z: d.z }; g.toast('Маршрут к станции проложен'); close(); }}>Маршрут</button></div>)}
       <h4 className="tb-h">Свой самокат</h4>
