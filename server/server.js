@@ -225,19 +225,8 @@ const ADMIN_ACTIONS = [
   { id: 'tp_center', g: 'tp', t: '🎯 Центр города', need: true },
   { id: 'tp_field', g: 'tp', t: '🌾 В поле (ферма)', need: true },
   { id: 'tp_all_to_player', g: 'tp', t: '👥 Всех к игроку', need: false, target: true },
-  // ——— Транспорт (14) ———
-  { id: 'car_set', g: 'car', t: '🚗 Выдать модель (в собственность)', need: true, car: true },
-  { id: 'car_spawn', g: 'car', t: '🎁 Заспавнить рядом (без собственности)', need: true, car: true },
-  { id: 'car_premium', g: 'car', t: '💎 Люкс-авто', need: true },
-  { id: 'car_sport', g: 'car', t: '🏎️ Спорткар', need: true },
-  { id: 'car_suv', g: 'car', t: '🚙 Внедорожник', need: true },
-  { id: 'car_moto', g: 'car', t: '🏍️ Мотоцикл', need: true },
-  { id: 'car_heli', g: 'car', t: '🚁 Вертолёт', need: true },
-  { id: 'car_truck', g: 'car', t: '🚚 Фура', need: true },
-  { id: 'car_bus', g: 'car', t: '🚌 Автобус', need: true },
-  { id: 'car_scooter', g: 'car', t: '🛴 Самокат', need: true },
-  { id: 'car_random', g: 'car', t: '🎲 Случайная модель', need: true },
-  { id: 'car_stock', g: 'car', t: '↩️ Сбросить на «Норд-07»', need: true },
+  // ——— Транспорт (4): только сервис, никакой выдачи машин ———
+  { id: 'car_repair', g: 'car', t: '🔧 Починить машину (в которой сидит)', need: true },
   { id: 'car_number', g: 'car', t: '🔢 Задать номер', need: true, number: true },
   { id: 'car_number_random', g: 'car', t: '🎰 Случайный номер', need: true },
   { id: 'car_number_clear', g: 'car', t: '🚫 Снять номер', need: true },
@@ -255,6 +244,8 @@ const ADMIN_ACTIONS = [
   // ——— Игрок (12) ———
   { id: 'player_info', g: 'player', t: '📇 Карточка игрока', need: true },
   { id: 'player_heal', g: 'player', t: '❤️ Вылечить', need: true },
+  { id: 'player_feed', g: 'player', t: '🍗 Накормить и напоить (+силы)', need: true },
+  { id: 'player_starve', g: 'player', t: '🥵 Истощить (голод, жажда, силы)', need: true },
   { id: 'player_kill', g: 'player', t: '💀 Обнулить здоровье', need: true },
   { id: 'player_freeze', g: 'player', t: '🧊 Заморозить', need: true },
   { id: 'player_unfreeze', g: 'player', t: '🔥 Разморозить', need: true },
@@ -645,6 +636,8 @@ const ADMIN_HANDLERS = {
     return { ok: true, message: `Собрали ${n} игроков у ${t.name}` };
   },
   // Транспорт
+  // починка машины, в которой сидит игрок: кузов, колёса, стёкла, бак
+  car_repair: (a) => (a.name ? (admTo(a.name, 'repair') ? { ok: true, message: `${a.name}: машина починена` } : { ok: false, error: 'Игрок не в сети' }) : noPlayer()),
   car_set: (a) => (a.name ? setCar(a.name, a.carId, a.number) : noPlayer()),
   // спавн машины рядом с игроком: в базу и в собственность ничего не пишется
   car_spawn: (a) => {
@@ -715,6 +708,8 @@ const ADMIN_HANDLERS = {
     };
   },
   player_heal: (a) => (a.name ? (admTo(a.name, 'heal') ? { ok: true, message: `${a.name} вылечен` } : { ok: false, error: 'Игрок не в сети' }) : noPlayer()),
+  player_feed: (a) => (a.name ? (admTo(a.name, 'feed') ? { ok: true, message: `${a.name} накормлен и напоен` } : { ok: false, error: 'Игрок не в сети' }) : noPlayer()),
+  player_starve: (a) => (a.name ? (admTo(a.name, 'starve') ? { ok: true, message: `${a.name} истощён (голод и жажда)` } : { ok: false, error: 'Игрок не в сети' }) : noPlayer()),
   player_kill: (a) => (a.name ? (admTo(a.name, 'kill') ? { ok: true, message: `${a.name}: здоровье обнулено` } : { ok: false, error: 'Игрок не в сети' }) : noPlayer()),
   player_freeze: (a) => { if (!a.name) return noPlayer(); FROZEN.add(a.name.toLowerCase()); admTo(a.name, 'freeze'); return { ok: true, message: `${a.name} заморожен` }; },
   player_unfreeze: (a) => { if (!a.name) return noPlayer(); FROZEN.delete(a.name.toLowerCase()); admTo(a.name, 'unfreeze'); return { ok: true, message: `${a.name} разморожен` }; },
