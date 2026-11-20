@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "check:world": "esbuild scripts/world-check.ts --bundle --platform=node --format=cjs --outfile=.check/world.cjs --log-level=error && node .check/world.cjs",
-    "check:terrain": "esbuild scripts/terrain-probe.ts --bundle --platform=node --format=cjs --outfile=.check/terrain.cjs --log-level=error && node .check/terrain.cjs"
+    "check:terrain": "esbuild scripts/terrain-probe.ts --bundle --platform=node --format=cjs --outfile=.check/terrain.cjs --log-level=error && node .check/terrain.cjs",
+    "check:keys": "esbuild scripts/keys-check.ts --bundle --platform=node --format=cjs --outfile=.check/keys.cjs --log-level=warning && node .check/keys.cjs"
   },
   "dependencies": {
     "clsx": "2.1.1",

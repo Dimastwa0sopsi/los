@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Modal } from './MenuScreens';
+import { bindingsFor } from '../game/keys';
 
 type TabId = 'start' | 'foot' | 'car' | 'money' | 'home' | 'world';
 
@@ -41,7 +42,9 @@ export function HelpPanel({ close, startTab = 'start', mobile = false }: { close
             <Key k="мышь">смотреть по сторонам · <b>колесо</b> — приблизить</Key>
             <Key k="E">действие рядом (войти, купить, сесть) — подсказка появляется внизу</Key>
             <Key k="Tab">телефон: карта, работа, объявления, банк</Key>
-            <Key k="Enter">чат и команды · <b>/help</b> — список команд</Key>
+            <Key k="T">чат и команды · <b>/help</b> — список команд</Key>
+            <Key k="U">музыка и радио — где угодно, хоть пешком</Key>
+            <Key k="C">присесть</Key>
             <Key k="Esc">пауза и настройки</Key>
             <Key k="F1">эта справка в любой момент</Key>
             <h6>Если играешь с телефона</h6>
@@ -52,21 +55,16 @@ export function HelpPanel({ close, startTab = 'start', mobile = false }: { close
         {tab === 'foot' && (
           <>
             <h6>Движение и взаимодействие</h6>
-            <Key k="Shift">бег (тратит бодрость)</Key>
-            <Key k="Space">прыжок</Key>
-            <Key k="Ctrl">присесть (тише и незаметнее)</Key>
+            {bindingsFor('foot').map((b) => <Key key={b.action} k={b.key}>{b.what}</Key>)}
             <Key k="V">вид от первого / третьего лица</Key>
-            <Key k="Q">режим укрытия за стенами и машинами</Key>
             <h6>Драки и оружие</h6>
             <Key k="ЛКМ">удар или выстрел</Key>
             <Key k="ПКМ">прицеливание / блок</Key>
-            <Key k="R">перезарядка</Key>
             <Key k="1…5">выбор оружия из хотбара</Key>
             <p>Ствол в руках у кассира — это ограбление: деньги быстро, но растёт розыск. Полиция видит по звёздам вверху справа.</p>
             <h6>Эмоции</h6>
-            <Key k="F">все анимации</Key>
             <Key k="/">танцы</Key>
-            <Key k="C">эмоция в чат (быстро)</Key>
+            <p>Эмоции и позы — в телефоне: приложение «Эмоции» на главном экране.</p>
           </>
         )}
         {tab === 'car' && (
@@ -74,15 +72,10 @@ export function HelpPanel({ close, startTab = 'start', mobile = false }: { close
             <h6>За рулём</h6>
             <Key k="W S">газ и тормоз (задний ход на S)</Key>
             <Key k="A D">руль</Key>
-            <Key k="Пробел">ручник · вместе с рулём — дрифт</Key>
-            <Key k="Q 1…6">передачи (в механике), коробка — в настройках</Key>
-            <Key k="H">фары</Key>
-            <Key k="K">сигнал</Key>
-            <Key k="Z">автопилот по GPS-маршруту</Key>
-            <Key k="J">круиз-контроль</Key>
-            <Key k="X">вили на мотоцикле</Key>
-            <Key k="PageUp / PageDown">гидроподвеска (если куплена)</Key>
-            <Key k="U">гидро-прыжок</Key>
+            {bindingsFor('car').map((b) => <Key key={b.action} k={b.key}>{b.what}</Key>)}
+            <Key k="Q + 1…6">передачи в механической коробке</Key>
+            <Key k="U">музыка и радио (работает и пешком)</Key>
+            <Key k="T">чат</Key>
             <h6>Самокаты и аренда</h6>
             <p>🛴 Стойки аренды стоят в городе, у «Вжух Store» и в каждой деревне. Садись — и катайся, деньги списываются за минуты. Электросамокат не требует прав и бензина.</p>
             <h6>Гонки</h6>

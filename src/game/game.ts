@@ -16,6 +16,7 @@ import { PedSystem, randomLook, type Ped } from './npc';
 import { buildInterior, interiorForBuilding, type Interior, type InteriorKind } from './interiors';
 import { Sound } from './audio';
 import { Input } from './input';
+import { K } from './keys';
 import { Weather } from './weather';
 import { Radio } from './radio';
 import { allMaterials, disposeTextures, mat, GFX, getTex } from './textures';
@@ -628,37 +629,31 @@ export class Game {
   // ================= ГЛОБАЛЬНЫЕ КЛАВИШИ =================
   private globalKey(code: string) {
     if (this.intro) return;
-    if (code === 'Tab') { this.togglePanel({ type: 'phone' }); return; }
-    // Enter или C — чат
-    if ((code === 'Enter' || code === 'KeyC') && !this.panel && !this.camMode) { this.input.releaseAll(); this.input.unlock(); this.chatFocus?.(); return; }
-    // / — танцы: быстрый доступ к 12 танцам (F — все анимации)
-    if (code === 'Slash' && !this.camMode) {
+    if (code === K.phone) { this.togglePanel({ type: 'phone' }); return; }
+    // T — чат (Enter работает только как «отправить» внутри поля ввода)
+    if (code === K.chat && !this.panel && !this.camMode) { this.input.releaseAll(); this.input.unlock(); this.chatFocus?.(); return; }
+    // / — танцы: быстрый доступ к 12 танцам
+    if (code === K.dances && !this.camMode) {
       if (this.panel?.type === 'emotes' && this.panel.dance) { this.closePanel(); return; }
       if (!this.panel && !this.inVeh) { this.openPanel({ type: 'emotes', dance: true }); return; }
       if (!this.panel && this.inVeh) { this.toast('🕺 Танцевать можно пешком — выйдите из машины'); return; }
     }
-    // F — эмоции (открывает и закрывает колесо анимаций)
-    if (code === 'KeyF' && !this.camMode) {
-      if (this.panel?.type === 'emotes') { this.closePanel(); return; }
-      if (!this.panel && !this.inVeh) { this.openPanel({ type: 'emotes' }); return; }
-      if (!this.panel && this.inVeh) { this.toast('💃 Эмоции доступны пешком (F)'); return; }
-    }
-    // T — радио в машине (чат теперь на Enter/C)
-    if (code === 'KeyT' && !this.camMode) {
+    // F больше не открывает анимации: эмоции живут в телефоне и по /
+    // U — музыка: радио играет и в машине, и пешком
+    if (code === K.music && !this.camMode) {
       if (this.panel?.type === 'radio') { this.closePanel(); return; }
-      if (!this.panel && this.inVeh && !this.passenger) { this.openPanel({ type: 'radio' }); return; }
-      if (!this.panel) { this.toast('📻 Радио включается в машине (T)'); return; }
+      if (!this.panel) { this.openPanel({ type: 'radio' }); return; }
     }
-    if (code === 'Backquote' && !this.input.keys.has('KeyQ')) { if (!this.panel || this.panel.type === 'phone' || this.panel.type === 'onlineJoin') { if (this.panel?.type === 'onlineJoin') this.closePanel(); else this.toggleOnline(); } return; }
-    if (code === 'Escape' && this.camMode && !this.panel) { this.stopCamera(); return; }
+    if (code === K.online && !this.input.keys.has(K.cover)) { if (!this.panel || this.panel.type === 'phone' || this.panel.type === 'onlineJoin') { if (this.panel?.type === 'onlineJoin') this.closePanel(); else this.toggleOnline(); } return; }
+    if (code === K.pause && this.camMode && !this.panel) { this.stopCamera(); return; }
     // F1 — «Как играть?»: вся справка и обучение живут здесь, а не поверх игры
-    if (code === 'F1') { if (this.panel?.type === 'help') this.closePanel(); else this.openPanel({ type: 'help' }); return; }
-    if (code === 'Escape') { if (this.panel) this.closePanel(); else this.openPanel({ type: 'settings' }); return; }
-    if (this.panel && this.panel.type !== 'map') { if (code === 'KeyI' && this.panel.type === 'inventory') this.closePanel(); return; }
-    if (code === 'KeyV') { this.toggleFirstPerson(); return; }
-    if (code === 'KeyI') this.togglePanel({ type: 'inventory' });
-    else if (code === 'KeyM') this.togglePanel({ type: 'map', mode: 'waypoint' });
-    else if (code === 'BracketRight') this.togglePanel({ type: 'promo' });
+    if (code === K.help) { if (this.panel?.type === 'help') this.closePanel(); else this.openPanel({ type: 'help' }); return; }
+    if (code === K.pause) { if (this.panel) this.closePanel(); else this.openPanel({ type: 'settings' }); return; }
+    if (this.panel && this.panel.type !== 'map') { if (code === K.inventory && this.panel.type === 'inventory') this.closePanel(); return; }
+    if (code === K.camera) { this.toggleFirstPerson(); return; }
+    if (code === K.inventory) this.togglePanel({ type: 'inventory' });
+    else if (code === K.map) this.togglePanel({ type: 'map', mode: 'waypoint' });
+    else if (code === K.promo) this.togglePanel({ type: 'promo' });
   }
   togglePanel(p: Panel) { if (this.panel && this.panel.type === p.type) this.closePanel(); else this.openPanel(p); }
   openPanel(p: Panel) { this.panel = p; this.input?.releaseAll(); if (this.input) this.input.enabled = false; this.input?.unlock(); this.cb.onPanel(p); this.sound.click(); }
@@ -838,13 +833,13 @@ export class Game {
   private handleInput(dt: number) {
     const I = this.input;
     if (this.camMode) {
-      if (I.mouseClicked || I.pressed('Space') || I.vPressed('shutter')) this.takePhoto();
-      if (I.pressed('KeyV')) this.switchCamera();
+      if (I.mouseClicked || I.pressed(K.jump) || I.vPressed('shutter')) this.takePhoto();
+      if (I.pressed(K.camera)) this.switchCamera();
       const cs = this.settings.sensitivity * (this.mobile ? 0.006 : 0.0028);
       if (I.lookDX || I.lookDY) { this.camYaw -= I.lookDX * cs; this.camPitch = clamp(this.camPitch + I.lookDY * cs, -0.6, 0.9); }
       return;
     }
-    const qHeld = I.down('KeyQ') || I.vDown('qmod');
+    const qHeld = I.down(K.cover) || I.vDown('qmod');
     const v = this.inVeh;
     // оружие
     if (!qHeld) {
@@ -867,31 +862,31 @@ export class Game {
         if (I.vPressed('gearUp')) { if (this.settings.transmission === 'manual') v.gear = Math.min(6, v.gear + 1); else v.autoMode = 'D'; this.sound.gear(); }
         if (I.vPressed('gearDown')) { if (this.settings.transmission === 'manual') v.gear = Math.max(0, v.gear - 1); else v.autoMode = 'N'; this.sound.gear(); }
       }
-      if (I.pressed('KeyH') || I.vPressed('lights')) { v.model.setLights(!v.model.lightsOn); v.lightsUserOff = !v.model.lightsOn; }
-      if (I.pressed('KeyK') || I.vPressed('race')) this.startRace();
-      if (I.pressed('KeyN') || I.vPressed('horn')) {
+      if (I.pressed(K.lights) || I.vPressed('lights')) { v.model.setLights(!v.model.lightsOn); v.lightsUserOff = !v.model.lightsOn; }
+      if (I.pressed(K.race) || I.vPressed('race')) this.startRace();
+      if (I.pressed(K.horn) || I.vPressed('horn')) {
         this.sound.horn();
         this.peds.panic(v.x, v.z, 22);
       }
-      if (I.pressed('KeyO') || I.vPressed('hazard')) {
+      if (I.pressed(K.hazard) || I.vPressed('hazard')) {
         v.model.setHazard(!v.model.hazards);
         this.toast(v.model.hazards ? 'Аварийка включена' : 'Аварийка выключена');
         this.sound.click();
       }
-      if (I.pressed('KeyZ') || I.vPressed('autopilot')) this.toggleAutopilot();
+      if (I.pressed(K.autopilot) || I.vPressed('autopilot')) this.toggleAutopilot();
     }
     // E — универсальная клавиша действия: сесть/выйти из транспорта ИЛИ контекстное действие.
     // Если на это нажатие произошёл вход/выход — контекст не дёргаем, чтобы не было двойных срабатываний.
-    const wantAct = I.pressed('KeyE') || I.vPressed('enter');
+    const wantAct = I.pressed(K.interact) || I.vPressed('enter');
     const vehBefore = this.inVeh, rideBefore = this.rideRemote;
     if (wantAct) { if (this.inVeh) this.exitVehicle(); else if (this.rideRemote) this.exitRemoteRide(); else this.tryEnterVehicle(); }
     const switched = this.inVeh !== vehBefore || this.rideRemote !== rideBefore;
-    const eKey = ((!switched && I.pressed('KeyE')) && !(v && v.isHeli)) || I.vPressed('interact');
+    const eKey = ((!switched && I.pressed(K.interact)) && !(v && v.isHeli)) || I.vPressed('interact');
     if (eKey && this.prompt) this.prompt.act();
-    if ((I.pressed('KeyR') || I.vPressed('work')) && this.prompt?.r) this.prompt.r();
-    else if (I.pressed('KeyR') && !this.lying) this.cycleWeapon();
-    // эмоции переехали на F (см. globalKey — работает даже при открытой панели)
-    if ((I.pressed('KeyL') || I.vPressed('rob')) && this.prompt?.l) this.prompt.l();
+    if ((I.pressed(K.work) || I.vPressed('work')) && this.prompt?.r) this.prompt.r();
+    else if (I.pressed(K.work) && !this.lying) this.cycleWeapon();
+    // эмоции открываются из телефона и по / (отдельной клавиши больше нет)
+    if ((I.pressed(K.rob) || I.vPressed('rob')) && this.prompt?.l) this.prompt.l();
     if (I.vPressed('phone')) this.togglePanel({ type: 'phone' });
     if (I.vPressed('inventory')) this.togglePanel({ type: 'inventory' });
     if (I.vPressed('map')) this.togglePanel({ type: 'map', mode: 'waypoint' });
@@ -909,7 +904,7 @@ export class Game {
     const I = this.input; const cb = this.combat;
     if (!cb.driveBy) { cb.updateFx(0); return; }
     const panelOpen = !!this.panel;
-    cb.update(dt, { attack: !panelOpen && (I.mouseClicked || I.vPressed('attack') || I.vDown('fire')), hold: !panelOpen && (I.mouseDown || I.vDown('fire')), alt: I.rmb || I.vDown('aim'), reload: I.pressed('KeyG') || I.vPressed('reload'), moving: true, moveDir: null });
+    cb.update(dt, { attack: !panelOpen && (I.mouseClicked || I.vPressed('attack') || I.vDown('fire')), hold: !panelOpen && (I.mouseDown || I.vDown('fire')), alt: I.rmb || I.vDown('aim'), reload: I.pressed(K.reload) || I.vPressed('reload'), moving: true, moveDir: null });
     if (this.player.item !== this.weapon) this.player.setItem(this.weapon);
     if (cb.aiming || performance.now() - cb.lastShotT < 1200) {
       const rel = clamp(angleDiff(v.heading, this.camYaw), -1.9, 1.9);
@@ -969,11 +964,11 @@ export class Game {
     const mv = I.move();
     if (this.wallJumpT > 0) this.wallJumpT = Math.max(0, this.wallJumpT - dt);
     // Q — встать спиной к стене / выйти из укрытия (как в GTA V)
-    if (I.pressed('KeyQ') || I.vPressed('qmod')) {
+    if (I.pressed(K.cover) || I.vPressed('qmod')) {
       if (this.coverOn) this.exitCover();
       else if (!this.panel && !this.carrying && !this.crouch) this.enterCover();
     }
-    if (I.pressed('ControlLeft') || I.vPressed('crouch')) { this.crouch = !this.crouch; } // C отдан чату — присед на Ctrl
+    if (I.pressed(K.crouch) || I.vPressed('crouch')) { this.crouch = !this.crouch; } // присед — C
     let run = (I.down('ShiftLeft') || I.vDown('run')) && !this.carrying;
     if (run && this.crouch && (I.down('ShiftLeft'))) this.crouch = false;
     if (this.crouch) run = false;
@@ -1032,7 +1027,7 @@ export class Game {
     // прыжок и гравитация
     const ground = this.activeCol.groundAt(this.px, this.pz, this.py, 0.45, 0.25);
     const onGround = this.py <= ground + 0.05;
-    if (onGround && (I.pressed('Space') || I.vPressed('jump'))) {
+    if (onGround && (I.pressed(K.jump) || I.vPressed('jump'))) {
       if (this.coverOn) {
         // отскок из укрытия: прыжок с шагом от стены (Пробел)
         const out = this.wall ? { x: this.wall.nx, z: this.wall.nz } : { x: Math.sin(this.pa), z: Math.cos(this.pa) };
@@ -1048,8 +1043,8 @@ export class Game {
     if (this.py <= ground) { this.py = ground; this.pvy = 0; }
     if (inWater) {
       const pool = !this.interior ? this.poolAt(this.px, this.pz) : null;
-      // держимся у поверхности; нажатый присед (Ctrl / кнопка) уводит ко дну
-      const diveKey = I.down('ControlLeft') || I.vDown('crouch');
+      // держимся у поверхности; зажатый присед (C / кнопка) уводит ко дну
+      const diveKey = I.down(K.crouch) || I.down('ControlLeft') || I.vDown('crouch');
       this.diveT = clamp(this.diveT + (diveKey ? dt * 1.9 : -dt * 1.5), 0, 1);
       const surf = this.waterSurfaceAt(this.px, this.pz) - this.py - 0.16;
       const bottom = surf - Math.max(0, Math.min(depth, 3.6) - 0.5);
@@ -1059,7 +1054,7 @@ export class Game {
       this.dip += (target - this.dip) * Math.min(1, dt * 5);
       if (!this.swimHinted && !pool && depth > 1.6) {
         this.swimHinted = true;
-        this.toast('🏊 Глубоко! Зажмите Ctrl (кнопка «присед») — нырнуть ко дну');
+        this.toast('🏊 Глубоко! Зажмите C (кнопка «присед») — нырнуть ко дну');
       }
     } else if (wading) {
       // бредём по дну: ступни стоят на грунте под водой
@@ -1073,7 +1068,7 @@ export class Game {
     // бой
     const attack = (I.mouseClicked || I.vPressed('attack') || (cb.gunOut && I.vDown('fire'))) && !this.carrying;
     const alt = I.rmb || I.vDown('block');
-    const reload = I.pressed('KeyG') || I.vPressed('reload');
+    const reload = I.pressed(K.reload) || I.vPressed('reload');
     if (I.vPressed('aim')) cb.mobileAim = !cb.mobileAim;
     cb.update(dt, { attack, hold: (I.mouseDown || I.vDown('fire')) && !this.carrying, alt, reload, moving: mag > 0.05, moveDir: mag > 0.05 ? Math.atan2(dx, dz) : null });
     if (cb.aiming || (cb.gunOut && performance.now() - cb.lastShotT < 900)) this.pa += angleDiff(this.pa, this.camYaw) * Math.min(1, dt * 18);
@@ -1247,7 +1242,7 @@ export class Game {
   exitVehicle(force = false) {
     this.cruise = 0;
     this.driftAssist = false;
-    this.radio.stop();
+    // музыка не глохнет при выходе из машины: радио играет и пешком (U)
     const v = this.inVeh; if (!v) return;
     if (!force) {
       if (v.isHeli && !heliLanded(v, this.col)) { this.toast('Сначала посадите вертолёт'); return; }
@@ -1292,10 +1287,10 @@ export class Game {
       return;
     }
     const mv = I.move();
-    let throttle = Math.max(0, Math.max(mv.y, I.vDown('gas') ? 1 : 0, I.down('KeyW') || I.down('ArrowUp') ? 1 : 0));
+    let throttle = Math.max(0, Math.max(mv.y, I.vDown('gas') ? 1 : 0, I.down(K.forward) || I.down('ArrowUp') ? 1 : 0));
     const brake = Math.max(0, Math.max(-mv.y, I.vDown('brake') ? 1 : 0));
     // круиз-контроль: J или кнопка в спидометре — держим скорость сами
-    if ((I.pressed('KeyJ') || I.vPressed('cruise')) && !v.isHeli && !v.isScooter) {
+    if ((I.pressed(K.cruise) || I.vPressed('cruise')) && !v.isHeli && !v.isScooter) {
       this.cruise = this.cruise > 0 ? 0 : Math.max(4.5, Math.abs(v.speed));
       this.toast(this.cruise > 0 ? `Круиз-контроль: ${Math.round(this.cruise * 3.6)} км/ч` : 'Круиз-контроль выключен');
       this.sound.gear();
@@ -1308,8 +1303,8 @@ export class Game {
     }
     const steer = clamp(mv.x + (I.vDown('steerR') ? 1 : 0) - (I.vDown('steerL') ? 1 : 0), -1, 1);
     let up = 0;
-    if (v.isHeli) { if (I.down('KeyQ') || I.vDown('up')) up += 1; if (I.down('KeyE') || I.vDown('down')) up -= 1; }
-    const wheelie = (I.down('KeyX') || I.vDown('wheelie')) && v.canStunt;
+    if (v.isHeli) { if (I.down(K.heliUp) || I.vDown('up')) up += 1; if (I.down(K.heliDown) || I.vDown('down')) up -= 1; }
+    const wheelie = (I.down(K.wheelie) || I.vDown('wheelie')) && v.canStunt;
     let res: DriveResult = { impact: 0, nx: 0, nz: 0 };
     if (this.autopilot && v.ai) {
       if (brake > 0.5 || Math.abs(steer) > 0.5) { this.setAutopilot(false); this.toast('Автопилот отключён'); }
@@ -1321,14 +1316,14 @@ export class Game {
         v.gear = v.speed < 0.5 ? 1 : Math.min(6, 1 + Math.floor(v.speed / (v.spec.maxSpeed / 6)));
       }
     }
-    // гидравлика: PageUp/PageDown — высота подвески, U — прыжок кузова
+    // гидравлика: PageUp/PageDown — высота подвески, Y — прыжок кузова (U занят музыкой)
     if (v.canHydro) {
-      if (I.pressed('KeyU') || I.vPressed('hydroJump')) { v.hydroJump(); this.sound.gear(); }
+      if (I.pressed(K.hydroJump) || I.vPressed('hydroJump')) { v.hydroJump(); this.sound.gear(); }
       if (I.pressed('PageUp') || I.vPressed('hydroUp')) this.hydroUp();
       if (I.pressed('PageDown') || I.vPressed('hydroDown')) this.hydroDown();
     }
     v.updateHydro(dt);
-    const hbKey = I.down('Space') || I.vDown('handbrake');
+    const hbKey = I.down(K.handbrake) || I.vDown('handbrake');
     const assistHb = this.driftAssist && Math.abs(v.speed) > 8 && Math.abs(steer) > 0.15;
     const buzzWobble = this.buzzT > 0 ? Math.sin(performance.now() / 260) * 0.05 * Math.min(1, this.buzzT / 20) : 0;
     const steerIn = clamp((this.driftAssist ? steer * 1.25 : steer) + buzzWobble, -1, 1);

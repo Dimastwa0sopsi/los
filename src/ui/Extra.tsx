@@ -86,7 +86,7 @@ export function Passport({ g, close }: { g: Game; close: () => void }) {
 export function EmotePanel({ g, close, dance }: { g: Game; close: () => void; dance?: boolean }) {
   const list = dance ? EMOTES.filter((e) => e.dance) : EMOTES;
   return (
-    <Modal title={dance ? '🕺 Танцы (/ — закрыть)' : '💃 Анимации (F)'} onClose={close}>
+    <Modal title={dance ? '🕺 Танцы (/ — закрыть)' : '💃 Анимации и эмоции'} onClose={close}>
       <div className="em-grid">
         {list.map((e, i) => <button key={e.id} className={`em ${e.dance ? 'dance' : ''}`} onClick={() => g.playEmote(e.id)}><span>{e.icon}</span><b>{e.name}</b><small>{dance ? '/d' : '/e'} {i + 1}</small></button>)}
       </div>
