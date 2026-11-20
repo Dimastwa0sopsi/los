@@ -344,6 +344,13 @@ export class Game {
     this.last = performance.now();
     this.loop();
     this.weatherSay();
+    // вместо россыпи подсказок в бою — одно сообщение и вся справка в «Как играть?»
+    try {
+      if (!localStorage.getItem('los.help.once')) {
+        localStorage.setItem('los.help.once', '1');
+        this.pushLocal({ name: 'Система', text: 'Справка «Как играть?»: F1 на ПК или меню ☰ → «Как играть?» на телефоне. Там управление, машины, деньги и дом.', color: '#93c5fd', kind: 'cmd' });
+      }
+    } catch { /* localStorage может быть недоступен */ }
     this.cb.onReady();
   }
   private setupScene() {

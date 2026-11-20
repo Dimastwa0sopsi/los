@@ -1105,3 +1105,5 @@ button.tb-card:hover { background: rgba(255,255,255,.09); } button.tb-card:activ
 .hx-sp-pill small { font-size: 10px; color: var(--mut); }
 .hx-sp-pill em { font-style: normal; font-weight: 900; color: #b9a8ff; font-size: 15px; }
 .hx-sp-pill span { font-size: 10.5px; color: var(--mut); }
+/* в портрете пилюля спидометра уходит над кнопкой действия, чтобы не задевать мини-карту */
+@media (orientation: portrait) { .hx-sp-pill { top: auto; bottom: calc(296px + var(--safe-b)); } }

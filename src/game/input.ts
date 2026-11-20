@@ -18,7 +18,7 @@ export class Input {
     const on = (t: EventTarget, n: string, f: EventListener, o?: AddEventListenerOptions) => { t.addEventListener(n, f, o); this.handlers.push([t, n, f, o]); };
     on(window, 'keydown', ((e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
-      if (e.code === 'Tab' || e.code === 'Space' || e.code.startsWith('Arrow') || e.code === 'ControlLeft' || e.code === 'BracketRight' || e.code === 'Backquote') e.preventDefault();
+      if (e.code === 'Tab' || e.code === 'Space' || e.code === 'F1' || e.code.startsWith('Arrow') || e.code === 'ControlLeft' || e.code === 'BracketRight' || e.code === 'Backquote') e.preventDefault();
       if (!this.keys.has(e.code)) this.pressedOnce.add(e.code);
       this.keys.add(e.code);
       if (!e.repeat) this.onKey?.(e.code);
