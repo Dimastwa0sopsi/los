@@ -13,7 +13,7 @@
 #   • поиск по кнопкам внутри раздела, быстрые суммы (выдать/забрать/установить
 #     любую сумму), история последних действий, проверка туннеля.
 #
-#  Токен админки — losgorod-admin (как в серверной ячейке).
+#  Секретный токен админки берётся из cfg.json серверной ячейки.
 #  Адрес сервера берётся из MyDrive/los-gorod/cfg.json (LAST_URL) или вводится
 #  в поле сверху — в любой момент, без перезапуска ячейки.
 # ════════════════════════════════════════════════════════════════════════════
@@ -21,7 +21,13 @@ import json, os, sys, threading, time, urllib.error, urllib.parse, urllib.reques
 
 CFG_F = '/content/drive/MyDrive/los-gorod/cfg.json'
 APP_SERVER = '/content/drive/MyDrive/los-gorod/app/server'
-ADMIN_TOKEN = 'losgorod-admin'
+# Для старых отдельно запущенных серверов оставлена совместимость; новый
+# сервер создаёт личный токен в cfg.json и не использует общий пароль.
+try:
+    with open(CFG_F, encoding='utf-8') as _cfg_file:
+        ADMIN_TOKEN = str(json.load(_cfg_file).get('ADMIN_TOKEN') or 'losgorod-admin')
+except (OSError, ValueError, TypeError):
+    ADMIN_TOKEN = 'losgorod-admin'
 RAW_LIB = 'https://raw.githubusercontent.com/Dimastwa0sopsi/los/main/server/admin_lib.py'
 
 

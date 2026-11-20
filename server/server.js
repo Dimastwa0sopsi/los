@@ -30,7 +30,7 @@ const BUILD = (() => {
   catch { return 'dev'; }
 })();
 /** версия протокола сервера: клиент показывает её в диагностике */
-const SERVER_VERSION = '0.6.1';
+const SERVER_VERSION = '0.6.2';
 const db = new Database(process.env.DB_FILE || 'game.db');
 db.pragma('journal_mode = WAL');
 // база лежит на Google Drive: записи бывают медленными — ждём блокировку, а не падаем
@@ -1285,7 +1285,7 @@ server.on('error', (e) => {
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Los-Gorod server on :${PORT}, db=${db.name}`);
-  console.log(`Админ-панель — ячейка colab_admin.py в Colab · токен: ${ADMIN_TOKEN}`);
+  console.log('Админ-панель — ячейка colab_admin.py в Colab');
   console.log(`Постоянная ссылка на игру: ${GAME_SITE}`);
   // если задан GH_TOKEN — сами обновляем адрес туннеля в live.json, чтобы
   // игроки всегда заходили по одной и той же ссылке

@@ -20,7 +20,7 @@ const solidAt = (it: Interior, x: number, z: number, y0: number, y1: number) =>
   it.colliders.some((c) => x > c.x0 && x < c.x1 && z > c.z0 && z < c.z1 && c.y1 > y0 + 0.12 && c.y0 < y1);
 
 /** волна от спавна по свободным клеткам: какие точки достижимы пешком */
-function reachable(it: Interior) {
+function reachable(it: Interior, clearance = 0) {
   const b = it.bounds;
   const nx = Math.ceil((b.x1 - b.x0) / CELL), nz = Math.ceil((b.z1 - b.z0) / CELL);
   const sx = Math.floor((it.spawn.x - b.x0) / CELL), sz = Math.floor((it.spawn.z - b.z0) / CELL);
@@ -28,7 +28,7 @@ function reachable(it: Interior) {
   const key = (i: number, j: number) => j * nx + i;
   const free = (i: number, j: number) => {
     const x = b.x0 + (i + 0.5) * CELL, z = b.z0 + (j + 0.5) * CELL;
-    return !solidAt(it, x, z, 0, 1.8);
+    return !it.colliders.some(c => c.y1 > 0.12 && c.y0 < 1.8 && x > c.x0 - clearance && x < c.x1 + clearance && z > c.z0 - clearance && z < c.z1 + clearance);
   };
   const q: [number, number][] = [[sx, sz]];
   if (free(sx, sz)) seen[key(sx, sz)] = 1;
@@ -55,6 +55,7 @@ for (const kind of KINDS) {
 
   const b = it.bounds;
   const R = reachable(it);
+  const walkableRoute = reachable(it, 0.35);
   const inside = (x: number, z: number) => x > b.x0 + 0.05 && x < b.x1 - 0.05 && z > b.z0 + 0.05 && z < b.z1 - 0.05;
 
   if (!inside(it.spawn.x, it.spawn.z)) problems.push('спавн вне границ');
@@ -69,7 +70,16 @@ for (const kind of KINDS) {
   const area = (b.x1 - b.x0) * (b.z1 - b.z0);
   const needFix = Math.max(1, Math.floor(area / 40));
   if (it.stats.fixtures < needFix) problems.push(`мало светильников: ${it.stats.fixtures} на ${Math.round(area)} м²`);
-  if (it.stats.signs < 4) problems.push(`мало вывесок: ${it.stats.signs}`);
+  const residential = ['apt_eco', 'apt_mid', 'apt_lux', 'house_city', 'house_village'].includes(kind);
+  if (!residential && it.stats.signs < 1) problems.push('нет навигационных вывесок');
+  if (it.stats.windows !== (kind === 'office' ? 1 : 0)) problems.push(`неверное число окон: ${it.stats.windows}`);
+  let blueSky = 0;
+  it.group.traverse(o => { if (o.userData.matKey === 'c:#bce5f7') blueSky++; });
+  if ((kind === 'office') !== (blueSky > 0)) problems.push('голубое окно должно быть только в офисе');
+  if (residential) {
+    for (const action of ['bed', 'fridge', 'homepc']) if (!it.acts.some(a => a.action === action)) problems.push('нет действия ' + action);
+    if (kind.startsWith('house_') && (!it.acts.some(a => a.action === 'basement') || !it.doorSpots.hatch)) problems.push('нет люка в подвал');
+  }
   if (it.stats.doors < 1) problems.push('нет дверей');
   if (it.stats.meshes > 400) problems.push(`слишком много объектов: ${it.stats.meshes}`);
   const exit = it.acts.find((a) => a.action === 'exit');
@@ -78,16 +88,21 @@ for (const kind of KINDS) {
   // достижимы ли выход и все точки действий: точка считается доступной, если
   // игрок может подойти к ней хотя бы на радиус взаимодействия (мебель занимает
   // сам центр — это нормально, подходить надо рядом)
-  const at = (x: number, z: number, r = 2.2) => {
+  const at = (x: number, z: number, r = 2.2, route = R) => {
     let best = -1;
-    for (let j = 0; j < R.nz; j++) for (let i = 0; i < R.nx; i++) {
-      if (R.seen[R.key(i, j)] !== 1) continue;
+    for (let j = 0; j < route.nz; j++) for (let i = 0; i < route.nx; i++) {
+      if (route.seen[route.key(i, j)] !== 1) continue;
       const cx = b.x0 + (i + 0.5) * CELL, cz = b.z0 + (j + 0.5) * CELL;
       const d = Math.hypot(cx - x, cz - z);
       if (d < r && (best < 0 || d < best)) best = d;
     }
     return best >= 0;
   };
+  {
+    for (const a of it.acts) if (!at(a.x, a.z, a.r, walkableRoute)) problems.push('узкий проход к: ' + a.action + ' «' + a.label + '»');
+    if (it.doorSpots.hatch && solidAt(it, it.doorSpots.hatch.x, it.doorSpots.hatch.z, 0, 1.8)) problems.push('возврат из подвала внутри мебели');
+    if (it.bed && solidAt(it, it.bed.x + 1.2, it.bed.z, 0, 1.8)) problems.push('нельзя встать с кровати');
+  }
   if (exit && !at(exit.x, exit.z, 2.4)) problems.push('выход недостижим');
   const deadActs = it.acts.filter((a) => a.action !== 'exit' && !at(a.x, a.z)).map((a) => a.label.slice(0, 26));
   if (deadActs.length) problems.push(`недостижимо: ${deadActs.join(', ')}`);

@@ -83,7 +83,14 @@ if not token:
 if not token:
     die('❌', 'Без authtoken туннель не поднять.',
         '\n   Возьмите токен: dashboard.ngrok.com → Your Authtoken.')
-cfg = {'NGROK_AUTHTOKEN': token, 'STATIC_DOMAIN': dom}
+# Старая общедоступная строка больше не подходит: её знает любой игрок.
+admin_token = str(saved.get('ADMIN_TOKEN', '')).strip()
+if not admin_token or admin_token == 'losgorod-admin':
+    admin_token = getpass.getpass('Придумайте новый секретный админ-токен (минимум 12 символов): ').strip()
+    if len(admin_token) < 12 or admin_token == 'losgorod-admin':
+        die('❌', 'Нужен новый секретный админ-токен длиной не менее 12 символов.',
+            '\n   Запустите ячейку снова и не передавайте токен игрокам.')
+cfg = {'NGROK_AUTHTOKEN': token, 'STATIC_DOMAIN': dom, 'ADMIN_TOKEN': admin_token}
 json.dump(cfg, open(CFG_F, 'w'))
 
 # ── свежий код игры (подтягивается при каждом Run) ─────────────────────────
@@ -209,7 +216,7 @@ def kill_server():
 
 def start_server():
     lf = open(LOG_F, 'ab')
-    env = dict(os.environ, PORT=str(PORT), ADMIN_TOKEN='losgorod-admin',
+    env = dict(os.environ, PORT=str(PORT), ADMIN_TOKEN=admin_token,
                DB_FILE=LG + '/data/game.db', PUBLIC_URL=state.get('url_web', ''))
     lf.write(f'\n===== {time.strftime("%d.%m.%Y %H:%M:%S")} старт =====\n'.encode())
     lf.flush()

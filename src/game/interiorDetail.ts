@@ -262,6 +262,23 @@ export function dressInterior(ib: IB, kind: string, o: DressInfo): void {
   const wood = new Set(['house_village', 'house_city', 'vshop', 'vpharmacy', 'fishshop', 'bar', 'barber', 'vadmin', 'mine', 'greenhouse', 'truckoffice', 'vguntruck', 'basement', 'ozgim']);
   const industrial = new Set(['service', 'fire', 'checkpoint', 'truckoffice', 'mine', 'basement', 'vguntruck']);
 
+  // Палитра и отделка соответствуют назначению места, а не одной схеме для всех.
+  const accents: Record<string, string> = {
+    shop24: '#b45309', vshop: '#92400e', supermarket: '#15803d', gas: '#475569',
+    cafe: '#a16207', mallfood: '#b45309', pharmacy: '#0f766e', vpharmacy: '#0f766e',
+    gunshop: '#475569', vguntruck: '#57534e', clothes: '#be185d', barber: '#be123c',
+    police: '#1e3a8a', hospital: '#0e7490', cityhall: '#a16207', bank: '#0f766e',
+    fishshop: '#0e7490', dealer: '#334155', service: '#b91c1c', mall: '#7c3aed',
+    hall: '#64748b', vadmin: '#1e3a8a', checkpoint: '#57534e', fire: '#b91c1c',
+    basement: '#78350f', truckoffice: '#57534e', office: '#38a4ce', scootershop: '#0ea5e9',
+    greenhouse: '#4d7c0f', bar: '#7c3aed', ozgim: '#0ea5e9', mine: '#57534e', casino: '#b45309',
+  };
+  const accent = accents[kind];
+  if (accent && !ib.residential) {
+    // Неброский цветной цоколь снаружи центрального прохода, не мешает действиям.
+    for (const side of [-1, 1]) ib.f('c:' + accent, side * (W / 2 - 0.18), 0.14, 0, 0.06, 0.12, D - 0.7, false);
+  }
+
   /* ─── общая архитектура: потолок, пол, вход ─── */
   cornice(ib, W, D, H, wood.has(kind) ? '#c8a97a' : '#e7e5e4');
   if (W > 8 && D > 8) floorBorder(ib, W, D, wood.has(kind) ? '#78350f' : '#94a3b8');
@@ -271,14 +288,14 @@ export function dressInterior(ib: IB, kind: string, o: DressInfo): void {
   if (industrial.has(kind)) for (let x = -W / 2 + 1.6; x < W / 2 - 1; x += 4.2) ib.f('c:#57534e', x, H - 0.5, 0, 0.3, 0.4, D - 1.2, false);
   doorMat(ib, D, wood.has(kind) ? '#7c2d12' : '#166534');
   // в узких фургонах и будках стены заняты оборудованием — общие мелочи не лепим
-  if (W > 5.5) {
+  if (!ib.residential && W > 5.5) {
     coatHooks(ib, -W / 2 + 0.12, D / 2 - 2.4, Math.PI / 2, 4);
     noticeBoard(ib, W / 2 - 0.12, D / 2 - 2.6, -Math.PI / 2, 1.4);
   }
-  if (W > 6.5) fireHose(ib, -W / 2 + 0.14, -D / 2 + 2.2, Math.PI / 2);
+  if (!ib.residential && W > 6.5) fireHose(ib, -W / 2 + 0.14, -D / 2 + 2.2, Math.PI / 2);
   // видимые светильники по сетке: в маленьких комнатах — 1–2, в залах — ряды
   const area = W * D;
-  if (area > 70) lampGrid(ib, W, D, H, area > 500 ? 6.2 : 4.6, !wood.has(kind));
+  if (!ib.residential && area > 70) lampGrid(ib, W, D, H, area > 500 ? 6.2 : 4.6, !wood.has(kind));
 
   /* ─── по типу помещения ─── */
   switch (kind) {

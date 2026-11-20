@@ -656,38 +656,6 @@ export function generateLayout(): WorldLayout {
       addProp({ t: 'bench', x: bpCx + Math.cos(a) * 13.5, z: bpCz + Math.sin(a) * 13.5, r: -a }, { w: 1.8, d: 0.6, h: 0.5 });
       addProp({ t: 'trash', x: bpCx + Math.cos(a + 0.09) * 13.5, z: bpCz + Math.sin(a + 0.09) * 13.5 }, { w: 0.4, d: 0.4, h: 0.9 });
     }
-    // ---- аттракционы: у каждого своя площадка сбора, к ней ведёт дорожка ----
-    const addRide = (o: { id: string; kind: 'ferris' | 'carousel' | 'tower' | 'coaster'; name: string; x: number; z: number; w: number; h: number; bx: number; bz: number; price: number }) => {
-      parkRides.push({ id: o.id, kind: o.kind, name: o.name, x: o.x, z: o.z, w: o.w, h: o.h, board: { x: o.bx, z: o.bz }, price: o.price });
-    };
-    addRide({ id: 'ferris', kind: 'ferris', name: 'Колесо обозрения', x: bpX0 + 20, z: bpCz - 26, w: 3.4, h: 12, bx: bpX0 + 20, bz: bpCz - 15, price: 6 });
-    addRide({ id: 'carousel', kind: 'carousel', name: 'Карусель', x: bpX1 - 22, z: bpCz - 26, w: 9, h: 8, bx: bpX1 - 22, bz: bpCz - 16, price: 4 });
-    addRide({ id: 'tower', kind: 'tower', name: 'Башня падения', x: bpX0 + 20, z: bpCz + 24, w: 1.8, h: 22, bx: bpX0 + 26, bz: bpCz + 24, price: 7 });
-    addRide({ id: 'coaster', kind: 'coaster', name: 'Американские горки', x: bpCx + 4, z: bpZ1 - 12, w: 52, h: 9, bx: bpCx + 4, bz: bpZ1 - 20, price: 9 });
-    // таблички у площадок посадки: название, цена и «касса» — чтобы аттракцион
-    // читался с земли, а не был просто железом
-    const rideSign = (name: string, price: number, x: number, z: number, a: number) => {
-      addProp({ t: 'vsign', x, z, r: a, c: `${name} · $${price}` }, { w: 0.4, d: 0.4, h: 2.6 });
-    };
-    rideSign('Колесо обозрения', 6, bpX0 + 15.5, bpCz - 15, Math.PI / 2);
-    rideSign('Карусель', 4, bpX1 - 26.5, bpCz - 16, -Math.PI / 2);
-    rideSign('Башня падения', 7, bpX0 + 26, bpCz + 29.5, Math.PI);
-    rideSign('Американские горки', 9, bpCx + 4, bpZ1 - 21.5, 0);
-    // коллайдеры только под видимыми опорами (сами модели строит ParkRides)
-    for (const sz of [-1.6, 1.6]) colliders.push({ x0: bpX0 + 20 - 2.6, x1: bpX0 + 20 + 2.6, z0: bpCz - 26 + sz - 0.5, z1: bpCz - 26 + sz + 0.5, y0: 0, y1: 0.9 });
-    colliders.push({ x0: bpX0 + 20 - 0.7, x1: bpX0 + 20 + 0.7, z0: bpCz + 24 - 0.7, z1: bpCz + 24 + 0.7, y0: 0, y1: 22 });
-    // низкие оградки вокруг площадок сбора — видимые, а не «стены из воздуха»
-    const railRect = (x0: number, z0: number, x1: number, z1: number, gapX: number, gapW: number) => {
-      const seg = (ax: number, az: number, bx: number, bz: number) => {
-        addProp({ t: 'fence', x: (ax + bx) / 2, z: (az + bz) / 2, w: Math.max(0.12, Math.abs(bx - ax)), d: Math.max(0.12, Math.abs(bz - az)), h: 0.9, c: '#8b6b4a' }, { w: Math.max(0.14, Math.abs(bx - ax)), d: Math.max(0.14, Math.abs(bz - az)), h: 0.9 });
-      };
-      seg(x0, z0, x0, z1); seg(x1, z0, x1, z1); seg(x0, z1, x1, z1);
-      seg(x0, z0, gapX - gapW / 2, z0); seg(gapX + gapW / 2, z0, x1, z0);
-    };
-    railRect(bpX0 + 12, bpCz - 20, bpX0 + 28, bpCz - 12, bpX0 + 20, 4);
-    railRect(bpX1 - 30, bpCz - 21, bpX1 - 14, bpCz - 13, bpX1 - 22, 4);
-    railRect(bpX0 + 14, bpCz + 20, bpX0 + 26, bpCz + 28, bpX0 + 26, 4);
-    railRect(bpCx - 24, bpZ1 - 17, bpCx + 32, bpZ1 - 8, bpCx + 4, 4.5);
     // детская площадка у входа
     addProp({ t: 'swing', x: bpX1 - 26, z: bpZ0 + 12 }, { w: 3.2, d: 0.4, h: 2.2 });
     addProp({ t: 'slide', x: bpX1 - 19, z: bpZ0 + 11 }, { w: 1, d: 3.6, h: 2 });
@@ -1512,6 +1480,49 @@ export function generateLayout(): WorldLayout {
     for (let k = 0; k < 4; k++) addProp({ t: 'hay', x: 1608 + (k % 2) * 3, z: 1172 + Math.floor(k / 2) * 3 }, { w: 1.6, d: 1.6, h: 1.2 });
     addProp({ t: 'pallet', x: livestock.crate.x, z: livestock.crate.z + 1.2 });
   }
+  // ---------- Егоровка: две прямые улицы и зелёный бульвар между ними ----------
+  // Новые дома добавляются после существующих жилых зданий: их ID не меняются.
+  {
+    const name = 'Егоровка';
+    const access = roadSeg(cid(11, 0), [[660, -290]], 'village', 8);
+    const entry = access[access.length - 1];
+    const west = roadSeg(entry, [[680, -290]], 'village', 8).at(-1)!;
+    const east = roadSeg(west, [[880, -290]], 'village', 8).at(-1)!;
+    const northWest = roadSeg(west, [[680, -350]], 'village', 8).at(-1)!;
+    const northEast = roadSeg(northWest, [[880, -350]], 'village', 8).at(-1)!;
+    addEdge(northEast, east, 'village', 8);
+    villages.push({ name, sx: 680, sz: -290, ex: 880, ez: -290, signX: 726, signZ: -242, cx: 780, cz: -320 });
+    addProp({ t: 'vsign', x: 726, z: -242, r: 0, c: name }, { w: 0.4, d: 0.4, h: 2.4 });
+    for (let k = 0; k < 8; k++) for (const side of [-1, 1]) {
+      const hx = 700 + k * 24, hz = side < 0 ? -370 : -270;
+      const facing = side < 0 ? 's' : 'n';
+      const b = addBuilding({ kind: 'vhouse', name: 'Дом · ' + name, x: hx, z: hz, w: 12, d: 10, h: 7, door: doorFor(hx, hz, 12, 10, facing), facade: 'plaster', roof: 'gable', enter: true, village: name, price: 250000, forSale: true, color: '#713f36' });
+      b.cls = 'mid';
+      plotFence(b, 3, 1.2, '#53504d');
+      driveway(b.door, { z: side < 0 ? -354 : -286 }, 3.6);
+    }
+    // Прямые дорожки бульвара, деревья, скамейки и детская площадка.
+    path(690, -320, 870, -320, 3, '#b9b4ac');
+    for (const px of [720, 780, 840]) {
+      path(px, -346, px, -294, 2, '#b9b4ac');
+      addProp({ t: 'bench', x: px + 6, z: -315, r: 0 }, { w: 1.8, d: 0.6, h: 0.5 });
+      addProp({ t: 'lamp', x: px - 5, z: -325 }, { w: 0.3, d: 0.3, h: 6 });
+    }
+    for (let k = 0; k < 7; k++) for (const z of [-333, -307]) addProp({ t: 'tree', x: 696 + k * 27, z, h: 1, r: k }, { w: 0.55, d: 0.55, h: 3.2 });
+    addProp({ t: 'swing', x: 752, z: -328 }, { w: 3.2, d: 0.4, h: 2.2 });
+    addProp({ t: 'slide', x: 760, z: -328 }, { w: 1, d: 3.6, h: 2 });
+    // Действующие городские сервисы: те же виды зданий и интерьеры, что и в городе.
+    for (const [kind, title, x, z, w, d, color] of [
+      ['supermarket', 'Гипермаркет · Егоровка', 912, -275, 30, 18, '#b45309'],
+      ['pharmacy', 'Аптека · Егоровка', 912, -310, 14, 12, '#0f766e'],
+      ['gunshop', 'Оружейный · Егоровка', 912, -335, 14, 12, '#4b5320'],
+      ['bank', 'Банк · Егоровка', 912, -360, 16, 12, '#1e3a8a'],
+    ] as const) {
+      addBuilding({ kind, name: title, x, z, w, d, h: 6, door: doorFor(x, z, w, d, 'w'), facade: 'shop', roof: 'flat', enter: true, village: name, color });
+    }
+    roadSeg(east, [[890, -290], [890, -360]], 'village', 8);
+  }
+
   // пункты доставки дальнобойщика
   truckDests.push({ name: 'Завод «Сталь»', x: 1600, z: 560 }, { name: 'Агрохолдинг «Нива»', x: 1470, z: 1140 }, { name: 'Ферма «Зорька»', x: 1646, z: 1140 });
   for (const b of buildings) if (b.kind === 'vshop') truckDests.push({ name: 'Сельмаг · ' + (b.village ?? ''), x: b.door.x, z: b.door.z });
@@ -1711,6 +1722,7 @@ export function generateLayout(): WorldLayout {
     const a = rng.next() * Math.PI * 2;
     const rr = 42 + Math.sqrt(rng.next()) * 175;
     const x = vx + Math.cos(a) * rr, z = vz + Math.sin(a) * rr;
+    if (x > 675 && x < 885 && z > -355 && z < -285) continue; // бульвар Егоровки
     if (nearRoad(x, z, 5.5) || solidNear(x, z, 2.6)) continue;
     if (Math.abs(x - riverCenter(z)) < riverHalf + 8) continue;
     if (inRect(x, z, { x0: 360, x1: 640, z0: 1290, z1: 1500 }, 8)) continue;
@@ -1875,6 +1887,20 @@ export function generateLayout(): WorldLayout {
     addProp({ t: 'driveway', x: mx, z: mz + 13, r: 0 }, { w: 10, d: 14, h: 0.02 });            // грунтовый пятак у входа
     for (const fx of [-9.8, 9.8]) for (let fz = -7; fz <= 9; fz += 3.2) addProp({ t: 'fence', x: mx + fx, z: mz + fz, r: 0 }, { w: 2.4, d: 0.2, h: 1.5 });
     for (let fz = -7; fz <= 9; fz += 3.2) addProp({ t: 'fence', x: mx, z: mz - 7.6, r: Math.PI / 2 }, { w: 2.4, d: 0.2, h: 1.5 });
+  }
+
+  // Сохранения ссылаются на числовые ID зданий. Новые здания ставим после
+  // всех старых (включая казино и шахту), сохраняя старые индексы и теги.
+  {
+    const ordered = [...buildings.filter(b => b.village !== 'Егоровка'), ...buildings.filter(b => b.village === 'Егоровка')];
+    const ids = new Map<number, number>();
+    ordered.forEach((b, i) => ids.set(b.id, i));
+    for (const c of colliders) if (c.tag && /^b\d+$/.test(c.tag)) {
+      const mapped = ids.get(Number(c.tag.slice(1)));
+      if (mapped !== undefined) c.tag = 'b' + mapped;
+    }
+    ordered.forEach((b, i) => { b.id = i; });
+    buildings.splice(0, buildings.length, ...ordered);
   }
 
   void beachRoad; void wh; void clamp;
