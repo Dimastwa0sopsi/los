@@ -12,7 +12,7 @@ import { buildInterior, type InteriorKind, type Interior } from '../src/game/int
 
 const KINDS: InteriorKind[] = ['shop24', 'supermarket', 'cafe', 'pharmacy', 'gunshop', 'clothes', 'barber', 'police', 'hospital',
   'cityhall', 'bank', 'fishshop', 'dealer', 'service', 'mall', 'hall', 'apt_eco', 'apt_mid', 'apt_lux', 'house_city', 'house_village',
-  'vshop', 'vpharmacy', 'vguntruck', 'vadmin', 'checkpoint', 'fire', 'gas', 'mallfood', 'basement', 'truckoffice', 'office',
+  'vshop', 'vpharmacy', 'vguntruck', 'vadmin', 'checkpoint', 'fire', 'gas', 'mallfood', 'basement', 'banya', 'truckoffice', 'office',
   'scootershop', 'greenhouse', 'bar', 'ozgim', 'mine', 'casino'];
 
 const CELL = 0.3;
@@ -71,7 +71,7 @@ for (const kind of KINDS) {
   const needFix = Math.max(1, Math.floor(area / 40));
   if (it.stats.fixtures < needFix) problems.push(`мало светильников: ${it.stats.fixtures} на ${Math.round(area)} м²`);
   const residential = ['apt_eco', 'apt_mid', 'apt_lux', 'house_city', 'house_village'].includes(kind);
-  if (!residential && it.stats.signs < 1) problems.push('нет навигационных вывесок');
+  if (!residential && kind !== 'basement' && kind !== 'banya' && it.stats.signs < 1) problems.push('нет навигационных вывесок');
   if (it.stats.windows !== (kind === 'office' ? 1 : 0)) problems.push(`неверное число окон: ${it.stats.windows}`);
   let blueSky = 0;
   it.group.traverse(o => { if (o.userData.matKey === 'c:#bce5f7') blueSky++; });
@@ -103,6 +103,8 @@ for (const kind of KINDS) {
     if (it.doorSpots.hatch && solidAt(it, it.doorSpots.hatch.x, it.doorSpots.hatch.z, 0, 1.8)) problems.push('возврат из подвала внутри мебели');
     if (it.bed && solidAt(it, it.bed.x + 1.2, it.bed.z, 0, 1.8)) problems.push('нельзя встать с кровати');
   }
+  if (kind === 'banya' && !at((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2 - 2, 0.8, walkableRoute)) problems.push('парная недоступна');
+  if (kind === 'basement' && it.acts.some(a => a.action.startsWith('pot:'))) problems.push('в подвале остались горшки');
   if (exit && !at(exit.x, exit.z, 2.4)) problems.push('выход недостижим');
   const deadActs = it.acts.filter((a) => a.action !== 'exit' && !at(a.x, a.z)).map((a) => a.label.slice(0, 26));
   if (deadActs.length) problems.push(`недостижимо: ${deadActs.join(', ')}`);
@@ -139,5 +141,14 @@ for (const kind of KINDS) {
   else console.log(`  ✓ ${kind.padEnd(12)} ${size}, действий ${String(it.acts.length).padStart(2)}, светильников ${it.stats.fixtures}, вывесок ${String(it.stats.signs).padStart(2)}, объектов ${it.stats.meshes}`);
   it.dispose();
 }
+{
+  const shop = buildInterior('vshop', { name: 'Сельмаг · Ольховка' });
+  const exit = shop.acts.find(a => a.action === 'exit');
+  if (shop.bounds.x1 - shop.bounds.x0 !== 20 || !exit || !reachable(shop, 0.35).seen.some(v => v === 1)) {
+    console.log('  ✗ большой сельмаг Ольховки'); fail++;
+  } else console.log('  ✓ большой сельмаг Ольховки: отдельный просторный интерьер');
+  shop.dispose();
+}
+
 console.log(fail ? `\n✗ проблемных интерьеров: ${fail}` : '\n✓ все интерьеры проходимы и освещены');
 process.exit(fail ? 1 : 0);

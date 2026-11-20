@@ -30,6 +30,20 @@ try {
   const eg = L.buildings.filter(b => b.village === 'Егоровка');
   if (eg.filter(b => b.kind === 'vhouse' && b.price === 250000 && b.forSale).length !== 16) throw new Error('неверные дома Егоровки');
   for (const kind of ['supermarket', 'pharmacy', 'gunshop', 'bank']) if (!eg.some(b => b.kind === kind && b.enter)) throw new Error('в Егоровке нет сервиса ' + kind);
+  for (const [x, z] of [[566, -284], [790, 1868], [1062, 1608]])
+    if (L.pools.some(p => Math.abs(p.x - x) < 1 && Math.abs(p.z - z) < 1)) throw new Error('в деревне остался бассейн');
+  for (const v of L.villages) {
+    const bath = L.buildings.find(b => b.kind === 'banya' && b.village === v.name && b.enter);
+    if (!bath) throw new Error('нет доступной бани: ' + v.name);
+    if (L.colliders.some(c => c.tag !== 'b' + bath.id && c.y1 > 0.5 && bath.door.x > c.x0 - 0.35 && bath.door.x < c.x1 + 0.35 && bath.door.z > c.z0 - 0.35 && bath.door.z < c.z1 + 0.35)) throw new Error('вход в баню заблокирован: ' + v.name);
+  }
+  if (!L.buildings.some(b => b.kind === 'vshop' && b.village === 'Ольховка' && b.w >= 20)) throw new Error('нет большого сельмага Ольховки');
+  if (!L.props.some(p => p.t === 'fountain' && p.x > 680 && p.x < 880 && p.z < -290 && p.z > -350)) throw new Error('нет фонтана Егоровки');
+  const start = L.nodes.find(n => n.x === 560 && n.z === -262)!;
+  const finish = L.nodes.find(n => n.x === 680 && n.z === -290)!;
+  const visited = new Set([start.id]), queue = [start.id];
+  while (queue.length) for (const e of L.adj[queue.shift()!] || []) if (!visited.has(e.n)) { visited.add(e.n); queue.push(e.n); }
+  if (!visited.has(finish.id)) throw new Error('Егоровка не соединена с Сосновкой');
   if (L.parkRides.length) throw new Error('в парке остались аттракционы');
   for (const gone of ['Берёзово', 'Тихая Гавань', 'Лесной Край', 'Дубрава']) if (L.villages.some((v) => v.name === gone)) throw new Error('деревня ' + gone + ' не удалена');
   if (L.newCity || L.bridges.length) throw new Error('соседний город и мост должны быть убраны');

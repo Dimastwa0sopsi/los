@@ -22,7 +22,7 @@ export interface Interior {
 }
 export type EntrStyle = 'glass' | 'wood' | 'metal';
 export type InteriorKind = 'shop24' | 'supermarket' | 'cafe' | 'pharmacy' | 'gunshop' | 'clothes' | 'barber' | 'police' | 'hospital' | 'cityhall' | 'bank' | 'fishshop' |
-  'dealer' | 'service' | 'mall' | 'hall' | 'apt_eco' | 'apt_mid' | 'apt_lux' | 'house_city' | 'house_village' | 'vshop' | 'vpharmacy' | 'vguntruck' | 'vadmin' | 'checkpoint' | 'fire' | 'gas' | 'mallfood' | 'basement' | 'truckoffice' | 'office' | 'scootershop' | 'greenhouse' | 'bar' | 'ozgim' | 'mine' | 'casino';
+  'dealer' | 'service' | 'mall' | 'hall' | 'apt_eco' | 'apt_mid' | 'apt_lux' | 'house_city' | 'house_village' | 'vshop' | 'vpharmacy' | 'vguntruck' | 'vadmin' | 'checkpoint' | 'fire' | 'gas' | 'mallfood' | 'basement' | 'banya' | 'truckoffice' | 'office' | 'scootershop' | 'greenhouse' | 'bar' | 'ozgim' | 'mine' | 'casino';
 
 export const WALLS = {
   white: 'c:#f1efe9', beige: 'c:#e8dcc4', mint: 'c:#d1e7dd', grey: 'c:#d4d4d8', blue: 'c:#c7d2fe', wood: 'c:#b08060', dark: 'c:#3f3f46',
@@ -241,6 +241,10 @@ export class IB {
     this.f('c:' + c, x, 0.72, z, 1.1, 0.05, 1.1, false); this.f('c:#333', x, 0, z, 0.1, 0.72, 0.1); this.col(x - 0.55, z - 0.55, x + 0.55, z + 0.55, 0, 0.77);
     const ps = [[0, 0.85], [0, -0.85], [0.85, 0], [-0.85, 0]].slice(0, chairs);
     for (const [dx, dz] of ps) { this.f('c:#57534e', x + dx, 0.45, z + dz, 0.45, 0.05, 0.45, false); this.f('c:#57534e', x + dx * 1.25, 0.45, z + dz * 1.25, Math.abs(dx) > 0 ? 0.05 : 0.45, 0.5, Math.abs(dz) > 0 ? 0.05 : 0.45, false); this.col(x + dx - 0.22, z + dz - 0.22, x + dx + 0.22, z + dz + 0.22, 0, 0.5); }
+    if (this.residential) {
+      for (const dx of [-0.42, 0.42]) for (const dz of [-0.42, 0.42]) this.f('c:#5b3a29', x + dx, 0, z + dz, 0.09, 0.72, 0.09, false);
+      this.f('c:#e7d5bd', x, 0.77, z, 0.65, 0.012, 0.38, false);
+    }
     // салфетки и вазочка
     this.cyl('c:#f1f5f9', x, 0.77, z, 0.07, 0.12); this.cyl('c:#0f766e', x + 0.3, 0.77, z - 0.25, 0.05, 0.18);
   }
@@ -342,12 +346,17 @@ export class IB {
     const hx = x + Math.sin(rot) * -(d / 2 - 0.25), hz = z + Math.cos(rot) * -(d / 2 - 0.25);
     this.f('c:#ffffff', hx, 0.57, hz, w * 0.7, 0.12, 0.4, false, rot);
     this.f('c:#4b3621', x + Math.sin(rot) * -(d / 2), 0, z + Math.cos(rot) * -(d / 2), rot ? 0.1 : w, 1.1, rot ? w : 0.1, true);
+    if (this.residential) {
+      this.f('c:#e8d6bb', x, 0.58, z + 0.3, w - 0.14, 0.06, 0.85, false, rot);
+      this.f('c:#8b6b55', hx, 0.55, hz, w - 0.12, 0.4, 0.08, false, rot);
+    }
     this.bed = { x: this.ox + x, z: this.oz + z, y: 0.6, a: rot + Math.PI };
     this.act(x + Math.cos(rot) * (w / 2 + 0.5), z - Math.sin(rot) * (w / 2 + 0.5), 1.4, 'Лечь на кровать', 'bed');
   }
   fridgeAt(x: number, z: number, ry: number) {
     this.f('c:#e5e7eb', x, 0, z, 0.7, 1.9, 0.7, true, ry);
     this.f('c:#9ca3af', x + Math.sin(ry) * 0.36 + Math.cos(ry) * 0.25, 0.9, z + Math.cos(ry) * 0.36, ry ? 0.03 : 0.04, 0.5, ry ? 0.04 : 0.03, false);
+    if (this.residential) this.f('c:#94a3b8', x, 1.22, z + 0.36, 0.6, 0.025, 0.025, false);
     this.act(x + Math.sin(ry) * 1.0, z + Math.cos(ry) * 1.0, 1.3, 'Холодильник', 'fridge');
   }
   kitchen(x: number, z: number, len: number, ry: number) {
@@ -387,7 +396,8 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
     // ---------------- ПРОДУКТОВЫЙ МАГАЗИН ----------------
     case 'shop24': case 'vshop': case 'gas': {
       const village = kind === 'vshop';
-      S(14, 11, 3.6); ib.room(W, D, H, 'tex:floortile', village ? WALLS.wood : WALLS.white, 'Выйти на улицу', village ? 'wood' : 'glass');
+      if (village && venue.includes('Ольховка')) S(20, 15, 3.6); else S(14, 11, 3.6);
+      ib.room(W, D, H, 'tex:floortile', village ? WALLS.wood : WALLS.white, 'Выйти на улицу', village ? 'wood' : 'glass');
       // вход: корзины, коврик, объявление
       ib.f('c:#334155', -5.6, 0, D / 2 - 1.6, 0.9, 0.5, 0.7);
       ib.f('c:#dc2626', -5.6, 0.5, D / 2 - 1.6, 0.7, 0.1, 0.5, false);
@@ -1103,20 +1113,30 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
     }
     case 'basement': {
       S(9, 8, 2.6); ib.room(W, D, H, 'tex:concrete', 'tex:brickwall', 'Подняться в дом');
-      ib.f('c:#57534e', 0, 0, D / 2 - 0.6, 0.7, 2.4, 0.12, false);
-      for (let k = 0; k < 6; k++) ib.f('c:#78716c', 0, 0.3 + k * 0.38, D / 2 - 0.5, 0.65, 0.05, 0.25, false);
-      ib.f('c:#78350f', 3.4, 0, 0.4, 0.6, 1.5, 2.6, true); // стеллаж
-      for (let k = 0; k < 8; k++) ib.f('c:' + ['#166534', '#a16207', '#7c2d12'][k % 3], 3.4, 0.3 + (k % 4) * 0.3, -0.6 + Math.floor(k / 4) * 1.2, 0.4, 0.22, 0.8, false);
+      ib.f('c:#78350f', 3.5, 0, -0.5, 0.6, 1.8, 2.8, true);
       for (let k = 0; k < 6; k++) {
-        const x = -2.6 + (k % 3) * 2.6, z = -1.9 + Math.floor(k / 3) * 2.0;
-        ib.cyl('c:#3f2a1d', x, 0, z, 0.38, 0.5, true); ib.cyl('c:#2b1d12', x, 0.5, z, 0.34, 0.02);
-        ib.f('glow:#d946ef', x, H - 0.35, z, 0.9, 0.05, 0.25, false); ib.f('c:#1f2937', x, H - 0.3, z, 1.0, 0.06, 0.32, false);
-        ib.act(x, z + 0.7, 0.9, `Горшок ${k + 1}`, 'pot:' + k);
-        ib.pots.push({ x, z });
+        const z = -1.4 + (k % 3) * 0.9, y = 0.25 + Math.floor(k / 3) * 0.75;
+        ib.f('c:#b08968', 3.45, y, z, 0.45, 0.45, 0.65, false);
       }
-      ib.f('c:#1f2937', W / 2 - 0.4, 0, -D / 2 + 0.6, 0.6, 1.2, 0.8); ib.f('glow:#22c55e', W / 2 - 0.4, 1.0, -D / 2 + 0.95, 0.2, 0.06, 0.02, false);
-      for (let i = 0; i < 3; i++) ib.cyl('c:#111827', -3.0 + i * 0.8, 0, 2.2, 0.12, 1.2); // вентиляция
-      ib.light(0, H - 0.3, -1, 1.2, 0xe879f9, 10); ib.light(0, H - 0.3, 1.5, 0.7, 0xfff1d6, 8);
+      ib.light(0, H - 0.3, 0, 0.8, 0xfff1d6, 9);
+      break;
+    }
+    case 'banya': {
+      S(10, 12, 3); ib.room(W, D, H, 'tex:woodfloor', WALLS.panel, 'Выйти из бани', 'wood');
+      // Вход с юга: диван слева, проход в парную справа.
+      ib.wall(-5, 1, 5, 1, H, WALLS.panel, [[-2.5, 1.7]]);
+      ib.sofa(3, 3.8, 2.4, 0, '#735342');
+      // Справа от входа в парную печь, слева два крана, дальше лавки.
+      ib.f('c:#44403c', -4, 0, -0.3, 1.1, 1.1, 1.1);
+      ib.f('c:#78716c', -4, 1.1, -0.3, 0.9, 0.25, 0.9, false);
+      for (const x of [3.7, 2.8]) {
+        ib.f('chrome', x, 1.1, 0.82, 0.18, 0.12, 0.35, false);
+        ib.f('c:#94a3b8', x, 0.65, 0.55, 0.55, 0.18, 0.5, false);
+      }
+      for (const x of [-3.8, 3.8]) ib.f('c:#b88958', x, 0.45, -3.7, 1.1, 0.14, 3.0, true);
+      ib.light(0, H - 0.3, 3, 0.8, 0xffdba8, 8);
+      ib.light(0, H - 0.3, -3, 0.8, 0xffc88a, 8);
+      ib.lamp(-3, H - 0.3, -3, false);
       break;
     }
     // ---------------- ОФИС «ЛОС-ТЕХ» ----------------
@@ -1322,6 +1342,15 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
       ib.tv(right - 3.25, 1.35, 1.35, Math.PI / 2);
       ib.rug(right - 2.25, 1.35, 2.5, 2.7, village ? '#a16207' : '#94a3b8');
       ib.plant(right - 0.55, front - 0.7);
+      // Обновлённая домашняя мебель: фасады, ручки, детали и мягкий текстиль.
+      for (let i = 0; i < 3; i++) {
+        const x = kitchenX - kitchenW / 2 + (i + 0.5) * kitchenW / 3;
+        ib.f('c:#c6a987', x, 0.08, back + 0.72, kitchenW / 3 - 0.04, 0.68, 0.025, false);
+        ib.f('c:#57534e', x, 0.65, back + 0.74, 0.18, 0.035, 0.025, false);
+      }
+      ib.f('c:#f5efe5', left + 1.65, 0.59, back + 2.1, 1.35, 0.06, 0.6, false);
+      ib.f('c:#d6b99a', right - 1.22, 0.48, 1.35, 0.65, 0.08, 1.4, false);
+      ib.f('c:#e7e5e4', bathX - 0.5, 1.22, back + 1.66, 0.6, 0.025, 0.025, false);
       ib.f('c:#a8a29e', -1.9, 0, front - 0.65, 0.65, 0.5, 0.45); // обувница
       ib.f('c:#78350f', -1.4, 1.3, front - 0.16, 0.8, 0.08, 0.07, false); // крючки
       for (const dx of [-0.25, 0, 0.25]) ib.f('chrome', -1.4 + dx, 1.18, front - 0.12, 0.05, 0.12, 0.05, false);
@@ -1433,8 +1462,8 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
       break;
     }
   }
-  dressInterior(ib, kind, { W, D, H, venue, seed });
-  ib.common(W, D, H, kind);
+  if (kind !== 'basement' && kind !== 'banya') dressInterior(ib, kind, { W, D, H, venue, seed });
+  if (kind !== 'basement' && kind !== 'banya') ib.common(W, D, H, kind);
   const spawnZ = D / 2 - 1.6;
   return ib.finish({ x: 0, z: spawnZ, a: Math.PI }, { x0: -W / 2, x1: W / 2, z0: -D / 2, z1: D / 2, h: H });
 }
@@ -1445,7 +1474,7 @@ export function interiorForBuilding(kind: string, cls?: string): InteriorKind | 
     police: 'police', hospital: 'hospital', cityhall: 'cityhall', bank: 'bank', dealer: 'dealer', service: 'service', mall: 'mall', apartment: 'hall',
     house: 'house_city', vhouse: 'house_village', vshop: 'vshop', vpharmacy: 'vpharmacy', vguntruck: 'vguntruck', vadmin: 'vadmin',
     checkpoint: 'checkpoint', fire: 'fire', gas: 'gas', depot: 'truckoffice', office: 'office', scootershop: 'scootershop', fishshop: 'fishshop',
-    greenhouse: 'greenhouse', bar: 'bar', ozgim: 'ozgim', mine: 'mine', casino: 'casino',
+    banya: 'banya', greenhouse: 'greenhouse', bar: 'bar', ozgim: 'ozgim', mine: 'mine', casino: 'casino',
   };
   void cls;
   return m[kind] ?? null;
