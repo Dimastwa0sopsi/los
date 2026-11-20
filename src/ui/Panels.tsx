@@ -11,8 +11,9 @@ import { repairCost, sellPrice, demand, carValue, type MarketOffer } from '../ga
 
 const $ = (n: number) => '$' + Math.round(n).toLocaleString('ru');
 
-/** Казино «Жар-Птица»: дуэльная игра «Бомба» 3×3 — дилер прячет 3 бомбы, игрок открывает клетки */
-function CasinoPanel({ g, close }: { g: Game; close: () => void }) {
+/** Казино: дуэльная игра «Бомба» 3×3 — дилер прячет 3 бомбы, игрок открывает клетки.
+ *  Название берём у здания: в городе «Золотой Лось», за городом «Жар-Птица». */
+function CasinoPanel({ g, close, name }: { g: Game; close: () => void; name?: string }) {
   const [, tick] = useState(0); const r = () => tick((x) => x + 1);
   const [bet, setBet] = useState(30000);
   const [phase, setPhase] = useState<'idle' | 'play' | 'boom' | 'cash'>('idle');
@@ -31,7 +32,7 @@ function CasinoPanel({ g, close }: { g: Game; close: () => void }) {
   const cashout = () => { if (phase !== 'play') return; setPhase('cash'); g.casinoPayout(Math.floor(bet * mult), `🪙 Забрали ×${mult}`); r(); };
   const presets = [30000, 100000, 250000, 500000, 1000000];
   return (
-    <Modal title="Казино «Жар-Птица» · 💣 Бомба" onClose={close}>
+    <Modal title={`${name || 'Казино «Жар-Птица»'} · 💣 Бомба`} onClose={close}>
       <p className="text-sm opacity-80">Баланс: <b>{$(g.getState().money)}</b></p>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 74px)', gap: 8, justifyContent: 'center', margin: '14px 0' }}>
         {Array.from({ length: 9 }, (_, i) => {
@@ -145,7 +146,7 @@ export function GamePanel({ g, panel, close }: { g: Game; panel: Panel; close: (
     case 'inventory': return <Modal title="🎒 Инвентарь" onClose={close} wide><InventoryGrid g={g} /></Modal>;
     case 'bar': return <BarMenu g={g} close={close} />;
     case 'ozgim': return <Ozgim g={g} close={close} />;
-    case 'casino': return <CasinoPanel g={g} close={close} />;
+    case 'casino': return <CasinoPanel g={g} close={close} name={panel.name} />;
     case 'promo': return <Promo g={g} close={close} />;
     case 'svc': return <SvcPanel g={g} kind={panel.kind} close={close} />;
     default: return null;

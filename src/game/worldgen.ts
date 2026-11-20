@@ -79,7 +79,8 @@ const SIGN: Record<string, string> = {
   barber: 'Парикмахерская', mall: 'ТЦ «Орбита»', dealer: 'Автосалон «Драйв»', market: 'Авторынок', service: 'Автосервис и тюнинг', gas: 'АЗС',
   police: 'Полиция', hospital: 'Больница', fire: 'Пожарная часть', cityhall: 'Мэрия', bank: 'Банк', vshop: 'Сельмаг', vadmin: 'Администрация',
   checkpoint: 'Проходная завода', vpharmacy: 'Аптека', vguntruck: 'Оружейный грузовик', office: 'Бизнес-центр «ЛосТех»', scootershop: 'Электросамокаты «Вжух Store»', farm: 'Агрохолдинг «Нива»', warehouse: 'Склад деталей', fishshop: 'Рыболовный магазин «Поплавок»',
-  mine: 'Шахта «Чёрная Жила»', casino: 'Казино «Жар-Птица»',
+  mine: 'Шахта «Чёрная Жила»', casino: 'Казино «Жар-Птица»', casino2: 'Казино «Золотой Лось»',
+  bar: 'Бар',
 };
 
 export function generateLayout(): WorldLayout {
@@ -154,18 +155,20 @@ export function generateLayout(): WorldLayout {
   };
 
   // ---------- Блоки города ----------
-  const parkSet = new Set(['3,3', '14,13', '4,14', '12,3', '8,15', '16,7']);
+  // квартал 14,13 отдан под городское казино №2, остальные пять — парки
+  const parkSet = new Set(['3,3', '4,14', '12,3', '8,15', '16,7']);
   type Spec = { kind: BKind; i: number; j: number; q: number | 'full'; name?: string };
   const specials: Spec[] = [];
-  const S = (kind: BKind, i: number, j: number, q: number | 'full') => { assertBlock(i, j, kind); specials.push({ kind, i, j, q }); };
+  const S = (kind: BKind, i: number, j: number, q: number | 'full', name?: string) => { assertBlock(i, j, kind); specials.push({ kind, i, j, q, name }); };
   S('parking', 6, 13, 'full'); S('parking', 13, 5, 'full'); S('parkade', 11, 7, 'full'); S('garages', 1, 5, 'full'); S('garages', 16, 11, 'full'); S('storage', 17, 12, 'full');
   S('office', 10, 10, 0); S('scootershop', 7, 7, 1);
   S('mall', 10, 9, 'full'); S('cityhall', 8, 8, 'full'); S('dealer', 15, 9, 'full'); S('market', 2, 15, 'full'); S('market', 16, 14, 'full');
+  S('casino', 14, 13, 'full', SIGN.casino2);   // второе казино — в городе, рядом с авторынком
   S('bank', 9, 8, 0); S('police', 6, 9, 1); S('police', 14, 4, 2); S('hospital', 11, 12, 0); S('hospital', 3, 6, 3); S('fire', 7, 12, 1);
   S('gunshop', 3, 10, 0); S('gunshop', 14, 12, 1); S('gunshop', 10, 3, 2);
   S('service', 5, 3, 0); S('service', 12, 15, 1); S('service', 16, 2, 3);
   S('clothes', 7, 6, 2); S('clothes', 11, 14, 0); S('barber', 8, 11, 3);
-  S('bar', 12, 9, 3); S('bar', 4, 5, 1); S('ozgim', 9, 12, 2); S('ozgim', 15, 13, 0);
+  S('bar', 12, 9, 3, 'Бар «Огонёк»'); S('bar', 4, 5, 1, 'Бар «Тихий омут»'); S('ozgim', 9, 12, 2); S('ozgim', 15, 13, 0);
   S('cafe', 6, 7, 0); S('cafe', 9, 5, 1); S('cafe', 13, 8, 2); S('cafe', 4, 9, 1); S('cafe', 10, 16, 0);
   S('pharmacy', 7, 10, 2); S('pharmacy', 12, 6, 1); S('pharmacy', 5, 15, 0);
   S('shop24', 2, 2, 0); S('shop24', 6, 4, 1); S('shop24', 10, 7, 3); S('shop24', 13, 11, 0); S('shop24', 4, 12, 2); S('shop24', 15, 15, 1); S('shop24', 1, 9, 2); S('shop24', 9, 13, 1);
@@ -190,6 +193,28 @@ export function generateLayout(): WorldLayout {
       if (i % 4 !== 1) continue; // заметно меньше точек вдоль шоссе
       if (fullB.has(`${i},${bj}`) || parkSet.has(`${i},${bj}`)) continue;
       for (const q of qs) { if (taken.has(`${i},${bj},${q}`)) continue; const [k, nm] = cycle[ci++ % cycle.length]; S(k, i, bj, q); specials[specials.length - 1].name = nm; taken.add(`${i},${bj},${q}`); }
+    }
+  }
+  // ---------- бары: всего четыре, в разных концах города ----------
+  // Два заданы вручную выше. Ещё два ставим автоматически на свободные четверти:
+  // так они не наезжают на другие постройки и получают свой вход с улицы.
+  {
+    const usedKeys = new Set(specials.map((s) => (s.q === 'full' ? `${s.i},${s.j}` : `${s.i},${s.j},${s.q}`)));
+    const fullBlocks = new Set(specials.filter((s) => s.q === 'full').map((s) => `${s.i},${s.j}`));
+    const barBlocks = new Set(specials.filter((s) => s.kind === 'bar').map((s) => `${s.i},${s.j}`));
+    const names = ['Бар «Три ключа»', 'Бар «Ночная смена»'];
+    // кандидаты — только обычные и деловые кварталы (частный сектор бары не принимает)
+    const cand: [number, number][] = [[2, 9], [15, 9], [9, 3], [9, 15], [2, 6], [16, 12], [12, 4], [5, 16], [7, 2], [14, 8], [11, 5], [3, 8]];
+    let nb = 0;
+    for (const [ci, cj] of cand) {
+      if (nb >= names.length) break;
+      const kb = `${ci},${cj}`;
+      if (parkSet.has(kb) || fullBlocks.has(kb) || barBlocks.has(kb)) continue;
+      for (const q of [1, 2, 0, 3]) {
+        const k = `${ci},${cj},${q}`;
+        if (usedKeys.has(k)) continue;
+        S('bar', ci, cj, q, names[nb]); usedKeys.add(k); barBlocks.add(kb); nb++; break;
+      }
     }
   }
   const specAt = new Map<string, Spec>();
@@ -405,6 +430,18 @@ export function generateLayout(): WorldLayout {
         addBuilding({ kind, name: SIGN.cityhall, x: cx, z: cz + 2, w: 30, d: 22, h: 18, door: doorFor(cx, cz + 2, 30, 22, 'n'), facade: 'civic', roof: 'flat', enter: true });
         addProp({ t: 'fountain', x: cx, z: iz0 + 3 }, { w: 5, d: 5, h: 0.7 });
         spawn = { x: cx + 6, z: iz0 + 2.5, a: Math.PI };
+      } else if (kind === 'casino') {
+        // казино №2 прямо в городе: неон, фонтан и площадь перед входом
+        addBuilding({ kind: 'casino', name: full.name ?? SIGN.casino2, x: cx, z: cz - 2, w: 18, d: 14, h: 9, door: doorFor(cx, cz - 2, 18, 14, 's'), facade: 'glass', roof: 'flat', enter: true, color: '#7c3aed' });
+        addProp({ t: 'pave', x: cx, z: cz + 9, w: 26, d: 16, c: 'sidewalk' });
+        addProp({ t: 'driveway', x: cx, z: cz + 13, r: 0 }, { w: 12, d: 8, h: 0.02 });
+        addProp({ t: 'fountain', x: cx, z: iz1 - 5.5 });
+        for (const sx of [-1, 1]) {
+          addProp({ t: 'palm', x: cx + sx * 11.5, z: cz + 5.5, h: 1.05 });
+          addProp({ t: 'lamp', x: cx + sx * 7.5, z: cz + 7.5, r: 0 }, { w: 0.3, d: 0.3, h: 6 });
+          addProp({ t: 'vsign', x: cx + sx * 9.5, z: cz + 7, r: 0, c: sx < 0 ? '♠ КАЗИНО' : '♦ 24/7' }, { w: 0.4, d: 0.4, h: 2.6 });
+        }
+        for (let k = 0; k < 4; k++) addProp({ t: 'bench', x: cx - 9 + k * 6, z: iz1 - 2.5, r: Math.PI }, { w: 1.8, d: 0.6, h: 0.5 });
       } else if (kind === 'dealer') {
         addBuilding({ kind, name: SIGN.dealer, x: cx, z: iz0 + 8, w: 34, d: 14, h: 8, door: doorFor(cx, iz0 + 8, 34, 14, 's'), facade: 'glass', roof: 'flat', enter: true });
         dealerLot = { x: cx - 8, z: iz1 - 6, a: Math.PI / 2 };
@@ -1270,6 +1307,29 @@ export function generateLayout(): WorldLayout {
   for (const b of buildings) if (b.kind === 'vshop') truckDests.push({ name: 'Сельмаг · ' + (b.village ?? ''), x: b.door.x, z: b.door.z });
   for (const b of buildings) if (b.kind === 'mall' || (b.kind === 'supermarket' && b.name.startsWith('Гипер'))) truckDests.push({ name: b.name, x: b.door.x, z: b.door.z });
   // ---------- Сегменты дорог для проверки свободных полос ----------
+  // ---------- чистка сети: одна дорога на одну линию ----------
+  // При генерации деревень и подъездов поверх асфальта иногда ложился дубль-просёлок:
+  // два полотна на одной линии давали мерцание и «две дороги на одной». Оставляем
+  // приоритетное покрытие (шоссе → авеню → город → промзона → деревня → грунт).
+  {
+    const RANK: Record<RoadKind, number> = { highway: 6, avenue: 5, city: 4, industrial: 3, village: 2, dirt: 1 };
+    const keyOf = (e: { a: number; b: number }) => {
+      const A = nodes[e.a], B = nodes[e.b];
+      const k1 = Math.round(A.x) + ',' + Math.round(A.z), k2 = Math.round(B.x) + ',' + Math.round(B.z);
+      return k1 < k2 ? k1 + '|' + k2 : k2 + '|' + k1;
+    };
+    const best = new Map<string, { id: number; a: number; b: number; kind: RoadKind; w: number }>();
+    for (const e of edges) {
+      const k = keyOf(e), p = best.get(k);
+      if (!p || RANK[e.kind] > RANK[p.kind] || (RANK[e.kind] === RANK[p.kind] && e.w > p.w)) best.set(k, e);
+    }
+    const keep = new Set(best.values());
+    const pruned = edges.filter((e) => keep.has(e));
+    if (pruned.length !== edges.length) {
+      edges.length = 0;
+      for (const e of pruned) { e.id = edges.length; edges.push(e); }
+    }
+  }
   const roadSegments = edges.map((e) => ({ ax: nodes[e.a].x, az: nodes[e.a].z, bx: nodes[e.b].x, bz: nodes[e.b].z, w: e.w, kind: e.kind }));
   // припаркованные машины у бордюров городских улиц (можно угнать)
   {
@@ -1364,6 +1424,45 @@ export function generateLayout(): WorldLayout {
       if (solidNear(x, z, 1.5) || nearRoad(x, z, 0.5)) continue;
       scooterDocks.push({ x, z, a: Math.atan2(nxx, nzz) });
       addProp({ t: 'scooterdock', x: x + tx * 1.7 * sgn, z: z + tz * 1.7 * sgn, r: Math.atan2(tx, tz) }, { w: 0.3, d: 0.3, h: 2 });
+    }
+  }
+  // 🛴 самокаты в деревнях: стойки у сельмага и у администрации
+  for (const b of buildings) {
+    if (b.kind !== 'vshop' && b.kind !== 'vadmin') continue;
+    const ox = b.door.x - b.x, oz = b.door.z - b.z;
+    const dl = Math.hypot(ox, oz) || 1;
+    const nxx = ox / dl, nzz = oz / dl;              // наружу от фасада
+    const tx = -nzz, tz = nxx;                       // вдоль фасада
+    let placed = 0;
+    for (const out of [2.0, 3.4, 4.8]) {
+      for (const sgn of [0, -1, 1]) {
+        if (placed >= 2) break;
+        const x = b.door.x + nxx * out + tx * 3.6 * sgn;
+        const z = b.door.z + nzz * out + tz * 3.6 * sgn;
+        if (solidNear(x, z, 1.1) || nearRoad(x, z, 0.4)) continue;
+        if (scooterDocks.some((d) => Math.hypot(d.x - x, d.z - z) < 8.5)) continue;
+        scooterDocks.push({ x, z, a: Math.atan2(nxx, nzz) });
+        addProp({ t: 'scooterdock', x: x - tx * 1.7 * (sgn || 1), z: z - tz * 1.7 * (sgn || 1), r: Math.atan2(tx, tz) }, { w: 0.3, d: 0.3, h: 2 });
+        placed++;
+      }
+    }
+  }
+  // в каждой деревне — хотя бы одна стойка: ставим у обочины деревенской улицы
+  for (const v of villages) {
+    if (scooterDocks.some((d) => Math.hypot(d.x - (v.sx + v.ex) / 2, d.z - (v.sz + v.ez) / 2) < 140)) continue;
+    const ex = v.ex - v.sx, ez = v.ez - v.sz, el = Math.hypot(ex, ez) || 1;
+    const nx = -ez / el, nz = ex / el;                       // поперёк улицы
+    let done = false;
+    for (const along of [0.5, 0.35, 0.65, 0.2, 0.8]) {
+      if (done) break;
+      for (const side of [-1, 1]) {
+        const x = v.sx + ex * along + nx * 9.5 * side, z = v.sz + ez * along + nz * 9.5 * side;
+        if (solidNear(x, z, 1.1) || nearRoad(x, z, 0.4)) continue;
+        if (Math.abs(x - riverCenter(z)) < riverHalf + 2) continue;
+        scooterDocks.push({ x, z, a: Math.atan2(nx * side, nz * side) });
+        addProp({ t: 'scooterdock', x: x + nx * 1.9 * side, z: z + nz * 1.9 * side, r: Math.atan2(nx, nz) }, { w: 0.3, d: 0.3, h: 2 });
+        done = true; break;
+      }
     }
   }
   // станция аренды самокатов прямо у входа в мэрию (центр города)

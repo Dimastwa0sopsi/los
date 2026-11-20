@@ -267,6 +267,8 @@ class IB {
 export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?: boolean[]; units?: number; name?: string } = {}): Interior {
   const ib = new IB();
   const seed = opts.seed ?? 1;
+  /** имя заведения с вывески: у баров и казино оно своё у каждого здания */
+  const venue = (opts.name ?? '').replace(/\s+/g, ' ').trim();
   let W = 12, D = 10, H = 3.4;
   const S = (w: number, d: number, h = 3.4) => { W = w; D = d; H = h; };
   switch (kind) {
@@ -876,7 +878,7 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
       // неон, зеркальный шар, лампы
       ib.cyl('c:#9ca3af', 0, H - 0.4, 2.4, 0.04, 0.5);
       ib.cyl('chrome', 0, H - 0.9, 2.4, 0.62, 0.6);
-      ib.plane('sign:КЛУБ-БАР «ОГОНЁК» · ТАНЦЫ ДО УТРА|#f472b6', 0, H - 1.6, -D / 2 + 0.2, 7.4, 0.7, 0);
+      ib.plane(`sign:${(venue || 'КЛУБ-БАР «ОГОНЁК»').toUpperCase()} · ТАНЦЫ ДО УТРА|#f472b6`, 0, H - 1.6, -D / 2 + 0.2, 7.4, 0.7, 0);
       // световые столбы вдоль танцпола
       for (let i = 0; i < 6; i++) ib.f('glow:' + ['#a855f7', '#22d3ee', '#f472b6', '#facc15'][i % 4], -5.0 + i * 2.0, 0.06, 2.6, 0.1, H - 1.5, 0.1, false);
       // лазерные лучи из углов в центр пола
@@ -1355,7 +1357,7 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
       // касса обмена фишек и барная стойка у юго-западного угла
       ib.counter(-7.4, D / 2 - 2.6, 4.6, 'Касса: обменяйте выигрыш на наличные', 'counter');
       // вывеска и неон над входом
-      ib.plane('sign:КАЗИНО «ЖАР-ПТИЦА» · ×5 ДЖЕКПОТ|#f59e0b', 0, H - 1.2, -D / 2 + 0.2, 8.4, 0.9, 0);
+      ib.plane(`sign:${(venue || 'КАЗИНО «ЖАР-ПТИЦА»').toUpperCase()} · ×5 ДЖЕКПОТ|#f59e0b`, 0, H - 1.2, -D / 2 + 0.2, 8.4, 0.9, 0);
       ib.f('glow:#f59e0b', 0, H - 0.7, -D / 2 + 0.16, 9.0, 0.16, 0.06, false);
       // охрана у входа и дилер за столом
       ib.npc(-3.2, D / 2 - 1.6, Math.PI, 'security'); ib.npc(3.2, D / 2 - 1.6, Math.PI, 'security');
