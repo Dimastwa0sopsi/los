@@ -106,6 +106,7 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
     title: 'Общение и камера', tiles: [
       { ico: '💬', label: 'Чат', on: () => g.chatFocus?.() },
       { ico: '💃', label: 'Эмоции', on: () => g.openPanel({ type: 'emotes' }) },
+      { ico: '🕺', label: 'Танцы', on: () => g.openPanel({ type: 'emotes', dance: true }) },
       { ico: hud.firstPerson ? '👁️' : '🎥', label: hud.firstPerson ? 'От 3-го лица' : 'От 1-го лица', on: () => g.toggleFirstPerson() },
     ],
   }];

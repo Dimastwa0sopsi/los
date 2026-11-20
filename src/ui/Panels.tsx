@@ -4,7 +4,7 @@ import { Modal } from './MenuScreens';
 import { Tablet } from './Tablet';
 import { InventoryGrid } from './InventoryGrid';
 import { PcPanel, OfficeHr, Livestock } from './Work';
-import { BAR_DRINKS, DRESSES, ITEMS, VEHICLES, KIOSK_TYPES, PAINT_COLORS, NEON_COLORS, LIGHT_COLORS, HAIR_STYLES, HAIR_COLORS, TOPS, BOTTOMS, CLOTH_COLORS, SKINS, EYE_COLORS, BROWS, NOSES, LIP_SHAPES, LIP_COLORS, type Tuning, type Look, TUNE_PRICES, TUNE_CATALOG, TUNE_CATS, randomPlate, type TuneCat } from '../game/data';
+import { BAR_DRINKS, DRESSES, ITEMS, VEHICLES, KIOSK_TYPES, PAINT_COLORS, NEON_COLORS, LIGHT_COLORS, HAIR_STYLES, HAIR_COLORS, TOPS, BOTTOMS, CLOTH_COLORS, SKINS, EYE_COLORS, BROWS, NOSES, LIP_SHAPES, LIP_COLORS, type Tuning, type Look, TUNE_PRICES, TUNE_CATALOG, TUNE_CATS, randomPlate, HYDRO_PRICE, type TuneCat } from '../game/data';
 import { CarPreview } from './CarPreview';
 import { LookPreview } from './LookPreview';
 import { repairCost, sellPrice, demand, carValue, type MarketOffer } from '../game/state';
@@ -638,6 +638,17 @@ function SvcPanel({ g, kind, close }: { g: Game; kind: import('../game/game').Sv
     // запчасти
     return (<>
       <p className="lg-money-line">Запчасти ставятся из инвентаря (I) — подойдите к своей машине</p>
+      <div className="lg-card mt-2 mb-2">
+        <b>🛠 Гидравлическая подвеска</b>
+        <small>{car
+          ? !car.owned ? 'ставится только на свою машину'
+            : car.owned.hydro ? 'уже установлена — PageUp/PageDown высота, U прыжок'
+            : car.hydroCapable ? 'три положения высоты и прыжок кузова' : 'на этот кузов не встаёт'
+          : 'подъедьте на машине'}</small>
+        {car && car.owned && !car.owned.hydro && car.hydroCapable
+          ? <button className="lg-btn lg-btn-main" onClick={act(() => g.installHydro())}>Установить — {$(HYDRO_PRICE)}</button>
+          : <button className="lg-btn" disabled>{(car && car.owned && car.owned.hydro) ? 'Установлено ✓' : 'Недоступно'}</button>}
+      </div>
       <div className="lg-list">{SVC_PARTS.map((id) => { const it = ITEMS[id]; return (
         <div className="lg-row" key={id}><span className="lg-ico">{it.icon}</span><div className="flex-1"><b>{it.name}</b><small>{it.fuel ? `+${it.fuel} л в бак` : it.part === 'wheel' ? 'замена колеса' : it.part === 'glass' ? 'вклейка стёкол' : 'кузовная деталь'}</small></div>
           <button className="lg-btn sm" onClick={act(() => g.buy(id))}>{$(it.price)}</button></div>); })}</div>

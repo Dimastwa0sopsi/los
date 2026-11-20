@@ -58,11 +58,13 @@ export class Vehicle {
   /** промо-машина: никогда не ломается (состояние и бак всегда полные) */
   get unbreakable() { return !!this.spec.unbreakable; }
   get isScooter() { return this.spec.body === 'scooter'; }
-  /** кому ставим гидравлику: легковым и внедорожникам — не вертолётам, мото, автобусам и комбайнам */
-  get canHydro() {
+  /** на какой кузов вообще ставится гидравлика: легковые и внедорожники — не мото, автобусы, комбайны */
+  get hydroCapable() {
     const b = this.spec.body;
     return !this.isHeli && !this.isRide && !this.spec.stunt && b !== 'combine' && b !== 'bus' && b !== 'semi';
   }
+  /** гидравлика работает только если комплект куплен и стоит именно на этой машине */
+  get canHydro() { return this.hydroCapable && !!this.owned?.hydro; }
   /** текущий подъём кузова, м */
   get hydroOffset() { return this.canHydro ? this.hydro * 0.26 + this.hydroHop : 0; }
   /** шаг подвески: вверх / вниз по трём положениям */

@@ -83,13 +83,14 @@ export function Passport({ g, close }: { g: Game; close: () => void }) {
   );
 }
 
-export function EmotePanel({ g, close }: { g: Game; close: () => void }) {
+export function EmotePanel({ g, close, dance }: { g: Game; close: () => void; dance?: boolean }) {
+  const list = dance ? EMOTES.filter((e) => e.dance) : EMOTES;
   return (
-    <Modal title="💃 Анимации (B)" onClose={close}>
+    <Modal title={dance ? '🕺 Танцы (/ — закрыть)' : '💃 Анимации (F)'} onClose={close}>
       <div className="em-grid">
-        {EMOTES.map((e, i) => <button key={e.id} className={`em ${e.dance ? 'dance' : ''}`} onClick={() => g.playEmote(e.id)}><span>{e.icon}</span><b>{e.name}</b><small>/e {i + 1}</small></button>)}
+        {list.map((e, i) => <button key={e.id} className={`em ${e.dance ? 'dance' : ''}`} onClick={() => g.playEmote(e.id)}><span>{e.icon}</span><b>{e.name}</b><small>/e {i + 1}</small></button>)}
       </div>
-      <p className="tb-note mt-2">Анимация прерывается при движении. Танцы видят другие игроки.</p>
+      <p className="tb-note mt-2">{dance ? 'Танцы видят другие игроки. / — открыть или закрыть, движение прерывает танец.' : 'Анимация прерывается при движении. Танцы видят другие игроки.'}</p>
     </Modal>
   );
 }

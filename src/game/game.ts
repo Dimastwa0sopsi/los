@@ -20,7 +20,7 @@ import { Weather } from './weather';
 import { Radio } from './radio';
 import { allMaterials, disposeTextures, mat, GFX, getTex } from './textures';
 import { T, M } from './geom';
-import { LIMITED, limitedAvailable, CROPS, EMOTES, SCOOTER_RATE, WEAPONS, WEAPON_ORDER, AMMO_NAMES, ITEMS, VEHICLES, TRAFFIC_TYPES, TRAFFIC_WEIGHTS, KIOSK_TYPES, KIOSK_PERIOD, KIOSK_MAX_PERIODS, SHOP_ITEMS, normalizePlate, type ShopKind, type Look, type Tuning, defaultTuning, TUNE_PRICES, TUNE_CATALOG, HAIR_STYLES, TOPS, BOTTOMS, BAR_DRINKS } from './data';
+import { LIMITED, limitedAvailable, CROPS, EMOTES, SCOOTER_RATE, HYDRO_PRICE, WEAPONS, WEAPON_ORDER, AMMO_NAMES, ITEMS, VEHICLES, TRAFFIC_TYPES, TRAFFIC_WEIGHTS, KIOSK_TYPES, KIOSK_PERIOD, KIOSK_MAX_PERIODS, SHOP_ITEMS, normalizePlate, type ShopKind, type Look, type Tuning, defaultTuning, TUNE_PRICES, TUNE_CATALOG, HAIR_STYLES, TOPS, BOTTOMS, BAR_DRINKS } from './data';
 import { type GameState, newState, loadState, saveState, type OwnedVehicle, marketOffers, sellPrice, repairCost, carValue, uid, type MarketOffer } from './state';
 
 export interface HudState {
@@ -47,7 +47,7 @@ export type Panel =
   | { type: 'shop'; kind: ShopKind; title: string; items: string[] } | { type: 'kiosk'; id: number } | { type: 'market'; sellUid?: string }
   | { type: 'tuning'; uid: string } | { type: 'clothes' } | { type: 'barber' } | { type: 'hospital' } | { type: 'police'; title: string }
   | { type: 'property'; b: number; unit: number } | { type: 'garage'; id: number } | { type: 'vadmin'; village: string } | { type: 'factory' } | { type: 'bank' }
-  | { type: 'pc'; mode: 'office' | 'home' } | { type: 'officehr' } | { type: 'livestock' } | { type: 'dealer'; scooter?: boolean } | { type: 'trucker' } | { type: 'emotes' } | { type: 'passport' } | { type: 'trade' } | { type: 'tradeInvite' } | { type: 'plant'; key: string; basement: boolean } | { type: 'quest' } | { type: 'editor'; fresh: boolean } | { type: 'listing'; uid: string; slot: number } | { type: 'info'; title: string; text: string } | { type: 'map'; mode: 'waypoint' | 'taxi' | 'autopilot' } | { type: 'phone'; tab?: string } | { type: 'onlineJoin' } | { type: 'inventory' } | { type: 'promo' } | { type: 'settings' } | { type: 'farm' } | { type: 'radio' } | { type: 'bar' } | { type: 'ozgim' } | { type: 'casino' } | { type: 'svc'; kind: SvcKind };
+  | { type: 'pc'; mode: 'office' | 'home' } | { type: 'officehr' } | { type: 'livestock' } | { type: 'dealer'; scooter?: boolean } | { type: 'trucker' } | { type: 'emotes'; dance?: boolean } | { type: 'passport' } | { type: 'trade' } | { type: 'tradeInvite' } | { type: 'plant'; key: string; basement: boolean } | { type: 'quest' } | { type: 'editor'; fresh: boolean } | { type: 'listing'; uid: string; slot: number } | { type: 'info'; title: string; text: string } | { type: 'map'; mode: 'waypoint' | 'taxi' | 'autopilot' } | { type: 'phone'; tab?: string } | { type: 'onlineJoin' } | { type: 'inventory' } | { type: 'promo' } | { type: 'settings' } | { type: 'farm' } | { type: 'radio' } | { type: 'bar' } | { type: 'ozgim' } | { type: 'casino' } | { type: 'svc'; kind: SvcKind };
 /** городские услуги: мойка, шиномонтаж, доставка, парковка, автомат, ломбард, садок, стоянка, запчасти */
 export type SvcKind = 'wash' | 'tire' | 'food' | 'park' | 'slot' | 'pawn' | 'fish' | 'impound' | 'parts' | 'charge';
 interface Prompt { text: string; keys: string[]; act: () => void; r?: () => void; l?: () => void }
@@ -624,6 +624,12 @@ export class Game {
     if (code === 'Tab') { this.togglePanel({ type: 'phone' }); return; }
     // Enter или C — чат
     if ((code === 'Enter' || code === 'KeyC') && !this.panel && !this.camMode) { this.input.releaseAll(); this.input.unlock(); this.chatFocus?.(); return; }
+    // / — танцы: быстрый доступ к 12 танцам (F — все анимации)
+    if (code === 'Slash' && !this.camMode) {
+      if (this.panel?.type === 'emotes' && this.panel.dance) { this.closePanel(); return; }
+      if (!this.panel && !this.inVeh) { this.openPanel({ type: 'emotes', dance: true }); return; }
+      if (!this.panel && this.inVeh) { this.toast('🕺 Танцевать можно пешком — выйдите из машины'); return; }
+    }
     // F — эмоции (открывает и закрывает колесо анимаций)
     if (code === 'KeyF' && !this.camMode) {
       if (this.panel?.type === 'emotes') { this.closePanel(); return; }
@@ -1036,8 +1042,8 @@ export class Game {
       // держимся у поверхности; нажатый присед (Ctrl / кнопка) уводит ко дну
       const diveKey = I.down('ControlLeft') || I.vDown('crouch');
       this.diveT = clamp(this.diveT + (diveKey ? dt * 1.9 : -dt * 1.5), 0, 1);
-      const surf = pool ? -0.62 : -0.16;
-      const bottom = pool ? -0.62 : -(Math.min(depth, 3.6) - 0.5);
+      const surf = this.waterSurfaceAt(this.px, this.pz) - this.py - 0.16;
+      const bottom = surf - Math.max(0, Math.min(depth, 3.6) - 0.5);
       const target = surf + (bottom - surf) * this.diveT + Math.sin(performance.now() / 700) * 0.02;
       this.pvy = 0; this.crouch = false;
       if (mag > 0.05) this.state.energy = Math.max(0, this.state.energy - dt * (pool ? 0.08 : 0.12) * (1 + this.diveT * 1.6));
@@ -1180,6 +1186,26 @@ export class Game {
     this.emote = null;
   }
   // ================= ГИДРАВЛИКА =================
+  /** почему гидравлика не работает — говорим по делу, а не «её нет» */
+  private hydroDenied(v: Vehicle) {
+    if (!v.hydroCapable) this.toast('🛠 На этот кузов гидравлику не ставят — только легковые и внедорожники');
+    else if (!v.owned) this.toast('🛠 Гидравлика ставится только на свою машину');
+    else this.toast('🛠 Комплекта нет — купить в автомагазине ($' + HYDRO_PRICE.toLocaleString('ru') + ')');
+  }
+  /** покупка и установка комплекта гидравлики в автомагазине */
+  installHydro() {
+    const v = this.svcCar();
+    if (!v) { this.toast('🔧 Подъедьте к автомагазину на своей машине'); return; }
+    if (!v.owned) { this.toast('🔧 Гидравлику ставят только на свою машину'); return; }
+    if (!v.hydroCapable) { this.toast('🔧 На этот кузов комплект не встаёт: нужны легковая или внедорожник'); return; }
+    if (v.owned.hydro) { this.toast('🔧 Комплект уже стоит на этой машине'); return; }
+    if (!this.pay(HYDRO_PRICE)) return;
+    v.owned.hydro = true;
+    v.hydroTarget = 0; v.hydro = 0;
+    this.toast('🛠 Гидравлика установлена: PageUp/PageDown — высота, U — прыжок кузова');
+    this.hydroTipped = true;
+    this.sound.gear(); this.save();
+  }
   private hydroHint() {
     const v = this.inVeh; if (!v) return;
     const pct = Math.round(v.hydroTarget * 100);
@@ -1188,19 +1214,19 @@ export class Game {
   /** поднять подвеску на шаг (из HUD и с телефона) */
   hydroUp() {
     const v = this.inVeh; if (!v) return;
-    if (!v.canHydro) { this.toast('Гидравлики нет: она ставится на легковые и внедорожники'); return; }
+    if (!v.canHydro) { this.hydroDenied(v); return; }
     v.hydroStep(1); this.hydroHint(); this.sound.click();
   }
   /** опустить подвеску на шаг */
   hydroDown() {
     const v = this.inVeh; if (!v) return;
-    if (!v.canHydro) { this.toast('Гидравлики нет: она ставится на легковые и внедорожники'); return; }
+    if (!v.canHydro) { this.hydroDenied(v); return; }
     v.hydroStep(-1); this.hydroHint(); this.sound.click();
   }
   /** прыжок кузова на пружинах */
   hydroJump() {
     const v = this.inVeh; if (!v) return;
-    if (!v.canHydro) { this.toast('Гидравлики нет: она ставится на легковые и внедорожники'); return; }
+    if (!v.canHydro) { this.hydroDenied(v); return; }
     v.hydroJump(); this.sound.gear();
   }
   /** кнопка «дрифт» на телефоне: ручник держится сам, руль острее */
@@ -2092,11 +2118,17 @@ export class Game {
     if (this.interior) return 0;
     const b = this.L.bridges.find((r) => x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1);
     if (b) return 0;                           // на мосту — твёрдый настил
-    if (this.poolAt(x, z)) return 1.35;        // бассейн или пруд во дворе
+    if (this.poolAt(x, z)) return 1.5;         // бассейн или пруд во дворе (чаша 1.5 м)
     return this.L.river.depth(x, z);
   }
   isWater(x: number, z: number) {
     return this.waterDepthAt(x, z) > 0.12;
+  }
+  /** уровень поверхности воды: у бассейна — своя отметка, у реки — общая */
+  waterSurfaceAt(x: number, z: number) {
+    const pool = this.poolAt(x, z);
+    if (pool) return (pool.rim ?? 0.34) - 0.14;
+    return this.L.waterY;
   }
   /** бассейн/пруд под точкой (внутри чаши, не на бортике) */
   poolAt(x: number, z: number) {
@@ -2233,7 +2265,7 @@ export class Game {
       if (Math.max(dx, dz) < 1.6 && Math.hypot(px - pool.x, pz - pool.z) < 9) {
         return {
           text: 'E — нырнуть в бассейн', keys: ['E'], act: () => {
-            this.px = pool.x; this.pz = pool.z - pool.d * 0.12; this.dip = -0.62;
+            this.px = pool.x; this.pz = pool.z - pool.d * 0.12; this.dip = 0; this.py = 0; this.diveT = 0;
             this.toast('🏊 Вода прохладная — плывём');
             this.sound.door();
           },
@@ -4272,6 +4304,24 @@ export class Game {
         return;
       }
       if (act === 'heal') { this.state.health = 100; this.state.energy = Math.max(this.state.energy, 60); this.toast('❤️ Администратор вылечил вас'); return; }
+      if (act === 'feed') {
+        this.state.health = 100; this.state.food = 100; this.state.water = 100; this.state.energy = 100;
+        this.toast('🍗 Администратор накормил и напоил вас'); this.sound.eat(); this.save(); return;
+      }
+      if (act === 'starve') {
+        this.state.food = Math.min(this.state.food, 4); this.state.water = Math.min(this.state.water, 4);
+        this.state.energy = Math.min(this.state.energy, 8);
+        this.toast('🥵 Администратор истощил вас: голод и жажда на нуле'); this.save(); return;
+      }
+      if (act === 'repair') {
+        const v = this.inVeh;
+        if (!v) { this.toast('🔧 Админ: чинить нечего — вы не в машине'); return; }
+        v.model.repairAll();
+        v.condition = 1; v.fuel = 100; v.dirt = 0; v.model.setDirt(0);
+        if (v.owned) { v.owned.condition = 1; v.owned.fuel = 100; v.owned.missing = []; v.owned.dirt = 0; }
+        this.toast('🔧 Администратор починил вашу машину: кузов, колёса, стёкла и бак');
+        this.sound.gear(); this.save(); return;
+      }
       if (act === 'kill') { this.damagePlayer(this.state.health + 1, 'Администратор обнулил здоровье'); return; }
       if (act === 'freeze') { this.admFreeze = true; this.toast('🧊 Вас заморозил администратор'); return; }
       if (act === 'unfreeze') { this.admFreeze = false; this.toast('🔥 Заморозка снята'); return; }

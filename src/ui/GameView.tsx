@@ -116,7 +116,7 @@ export function GameView({ settings, newGame, gender, nick = '', mode = 'solo', 
       {game && panel && panel.type === 'trade' && <TradePanel g={game} />}
       {game && panel && panel.type === 'tradeInvite' && <TradeInvite g={game} close={close} />}
       {game && panel && panel.type === 'passport' && <Passport g={game} close={close} />}
-      {game && panel && panel.type === 'emotes' && <EmotePanel g={game} close={close} />}
+      {game && panel && panel.type === 'emotes' && <EmotePanel g={game} close={close} dance={panel.dance} />}
       {game && panel && panel.type === 'plant' && <PlantPanel g={game} k={panel.key} basement={panel.basement} close={close} />}
       {game && panel && panel.type === 'editor' && <CharacterEditor g={game} fresh={panel.fresh} />}
       {game && panel && panel.type === 'listing' && <ListingPanel g={game} uid={panel.uid} slot={panel.slot} close={close} />}
