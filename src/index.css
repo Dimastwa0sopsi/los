@@ -686,6 +686,37 @@ button.tb-card:hover { background: rgba(255,255,255,.09); } button.tb-card:activ
 .mui-btn.ctx-big .mui-ico { font-size: 34px; }
 .mui-ctx-label { max-width: 150px; text-align: center; font-size: 10px; line-height: 1.25; color: #fde68a; text-shadow: 0 1px 3px rgba(0,0,0,.8); }
 
+/* кнопки-«дуги» в две колонки: в один столбик на телефоне они уходили за край экрана */
+.mui-arc.col { grid-template-columns: repeat(2, 42px); align-content: end; }
+
+/* портрет: раскладка сжимается, чтобы группы кнопок не наезжали друг на друга */
+@media (orientation: portrait) {
+  .mui-stick { width: 124px; height: 124px; }
+  .mui-stick .knob { width: 54px; height: 54px; margin: -27px 0 0 -27px; }
+  .mui-stick .ring { inset: 22px; }
+  .mui-move { left: calc(12px + var(--safe-l)); bottom: calc(96px + var(--safe-b)); }
+  .mui-run { left: calc(14px + var(--safe-l)); bottom: calc(230px + var(--safe-b)); }
+  .mui-right { right: calc(10px + var(--safe-r)); bottom: calc(10px + var(--safe-b)); gap: 8px; }
+  .mui-ctx { bottom: calc(226px + var(--safe-b)); }
+  .mui-btn.ctx-big { width: 68px; height: 68px; }
+  .mui-btn.ctx-big .mui-ico { font-size: 27px; }
+  .mui-ctx-label { max-width: 96px; font-size: 9px; }
+  .mui-arc.col { grid-template-columns: repeat(2, 36px); }
+  .mui-arc.col .mui-btn { width: 36px; height: 36px; border-radius: 12px; }
+  .mui-btn.pedal { width: 70px; height: 88px; border-radius: 22px; }
+  .mui-dpad { grid-template-columns: repeat(3, 46px); grid-template-rows: repeat(3, 46px); }
+  .mui-dpad .mui-btn.dpadk { width: 46px; height: 46px; }
+  .mui-sheet { max-height: 64vh; }
+}
+
+/* подсказка повернуть телефон */
+.mui-rot { position: absolute; left: 50%; top: calc(70px + var(--safe-t)); transform: translateX(-50%);
+  display: flex; gap: 10px; align-items: center; max-width: min(430px, 92vw); padding: 9px 12px; border-radius: 14px;
+  background: rgba(12,14,20,.9); border: 1px solid rgba(250,204,21,.45); box-shadow: 0 10px 30px rgba(0,0,0,.5); color: #fff; }
+.mui-rot span { font-size: 24px; }
+.mui-rot b { font-size: 12px; display: block; }
+.mui-rot small { font-size: 10px; color: var(--mut); line-height: 1.25; }
+
 /* HUD на телефоне: компактная раскладка */
 .hx.mob .hx-map { top: calc(8px + var(--safe-t)); left: calc(8px + var(--safe-l)); gap: 5px; }
 .hx.mob .hx-mini canvas { border-radius: 16px; border: 1px solid rgba(255,255,255,.16); }

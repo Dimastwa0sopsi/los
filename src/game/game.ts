@@ -47,7 +47,7 @@ export type Panel =
   | { type: 'shop'; kind: ShopKind; title: string; items: string[] } | { type: 'kiosk'; id: number } | { type: 'market'; sellUid?: string }
   | { type: 'tuning'; uid: string } | { type: 'clothes' } | { type: 'barber' } | { type: 'hospital' } | { type: 'police'; title: string }
   | { type: 'property'; b: number; unit: number } | { type: 'garage'; id: number } | { type: 'vadmin'; village: string } | { type: 'factory' } | { type: 'bank' }
-  | { type: 'pc'; mode: 'office' | 'home' } | { type: 'officehr' } | { type: 'livestock' } | { type: 'dealer'; scooter?: boolean } | { type: 'trucker' } | { type: 'emotes'; dance?: boolean } | { type: 'passport' } | { type: 'trade' } | { type: 'tradeInvite' } | { type: 'plant'; key: string; basement: boolean } | { type: 'quest' } | { type: 'editor'; fresh: boolean } | { type: 'listing'; uid: string; slot: number } | { type: 'info'; title: string; text: string } | { type: 'map'; mode: 'waypoint' | 'taxi' | 'autopilot' } | { type: 'phone'; tab?: string } | { type: 'onlineJoin' } | { type: 'inventory' } | { type: 'promo' } | { type: 'settings' } | { type: 'farm' } | { type: 'radio' } | { type: 'bar' } | { type: 'ozgim' } | { type: 'casino' } | { type: 'svc'; kind: SvcKind };
+  | { type: 'pc'; mode: 'office' | 'home' } | { type: 'officehr' } | { type: 'livestock' } | { type: 'dealer'; scooter?: boolean } | { type: 'trucker' } | { type: 'emotes'; dance?: boolean } | { type: 'passport' } | { type: 'trade' } | { type: 'tradeInvite' } | { type: 'plant'; key: string; basement: boolean } | { type: 'quest' } | { type: 'editor'; fresh: boolean } | { type: 'listing'; uid: string; slot: number } | { type: 'info'; title: string; text: string } | { type: 'map'; mode: 'waypoint' | 'taxi' | 'autopilot' } | { type: 'phone'; tab?: string } | { type: 'onlineJoin' } | { type: 'inventory' } | { type: 'promo' } | { type: 'settings' } | { type: 'farm' } | { type: 'radio' } | { type: 'bar' } | { type: 'ozgim' } | { type: 'casino'; name?: string } | { type: 'svc'; kind: SvcKind };
 /** городские услуги: мойка, шиномонтаж, доставка, парковка, автомат, ломбард, садок, стоянка, запчасти */
 export type SvcKind = 'wash' | 'tire' | 'food' | 'park' | 'slot' | 'pawn' | 'fish' | 'impound' | 'parts' | 'charge';
 interface Prompt { text: string; keys: string[]; act: () => void; r?: () => void; l?: () => void }
@@ -564,7 +564,7 @@ export class Game {
     }
     let owned: boolean[] | undefined;
     if (b.kind === 'apartment') owned = [0, 1, 2, 3].map((u) => this.state.properties.includes(`${b.id}:${u}`));
-    const it = buildInterior(kind, { seed: b.id, owned });
+    const it = buildInterior(kind, { seed: b.id, owned, name: b.name });
     this.setInterior(it, kind);
     this.state.location = { b: b.id };
     if (!silent) this.sound.door();
@@ -2354,7 +2354,7 @@ export class Game {
     if (action === 'mine_uniform') return { text: 'E — ' + label, keys: ['E'], act: () => this.mineHire() };
     if (action === 'mine_down') return { text: 'E — Спуститься в забой · L — наверх', keys: ['E', 'L'], act: () => this.mineLift(true), l: () => this.mineLift(false) };
     if (action === 'mine') return { text: 'E — ' + label, keys: ['E'], act: () => this.mineSwing() };
-    if (action === 'gamble') return { text: 'E — ' + label, keys: ['E'], act: () => this.openPanel({ type: 'casino' }) };
+    if (action === 'gamble') return { text: 'E — ' + label, keys: ['E'], act: () => this.openPanel({ type: 'casino', name: b.name }) };
     if (action === 'mine_cart') return { text: 'E — ' + label + (this.state.mineCoal ? ` (в забое: ${this.state.mineCoal} т)` : ''), keys: ['E'], act: () => this.mineLoadCart() };
     if (action === 'water') return { text: 'E — умыться и напиться из крана', keys: ['E'], act: () => { this.state.water = Math.min(100, this.state.water + 20); this.toast('💧 Вода из крана (+20)'); } };
     if (action.startsWith('pot:')) return this.plantPrompt(`${b.id}:pot:${action.slice(4)}`, true, this.interiorKind === 'greenhouse');
@@ -2425,7 +2425,7 @@ export class Game {
   // ================= РАБОТА =================
   /** диско-свет в баре: меняет цвет и яркость ламп, гости пускаются в пляс */
   toggleDisco() {
-    if (this.interiorKind !== 'bar') { this.toast('Диско-свет есть только в баре «Огонёк»'); return; }
+    if (this.interiorKind !== 'bar') { this.toast('Диско-свет есть только в барах'); return; }
     this.discoOn = !this.discoOn;
     const lights: THREE.Light[] = this.interior?.lights ?? [];
     const palette = [0xa855f7, 0x22d3ee, 0xf472b6, 0xfacc15];

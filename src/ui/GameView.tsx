@@ -30,6 +30,18 @@ export function GameView({ settings, newGame, gender, nick = '', mode = 'solo', 
   const [netErr, setNetErr] = useState<string | null>(null);
   const lastProg = useRef(Date.now());
   const mobile = resolveMobile(settings);
+  // Страховка: если браузер «прикинулся» ПК (планшет в режиме desktop, эмулятор),
+  // но игрок реально тычет пальцем — включаем сенсорное управление сами.
+  useEffect(() => {
+    if (mobile || settings.control !== 'auto') return;
+    const onTouch = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch') return;
+      window.removeEventListener('pointerdown', onTouch, true);
+      onSettings({ ...settings, control: 'mobile' });
+    };
+    window.addEventListener('pointerdown', onTouch, true);
+    return () => window.removeEventListener('pointerdown', onTouch, true);
+  }, [mobile, settings, onSettings]);
   useEffect(() => {
     const el = host.current!;
     let alive = true;

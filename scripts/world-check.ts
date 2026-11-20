@@ -110,6 +110,25 @@ try {
   console.log(`  электросамокаты: стоек ${L.scooterDocks.length} (у «Вжух Store» ${nearShop.length})`);
   if (L.scooterDocks.length < 8) throw new Error('мало станций электросамокатов');
   if (nearShop.length < 1) throw new Error('у магазина самокатов нет стоек аренды');
+  // самокаты в деревнях: у каждой деревни своя стойка
+  const noDockVillage = L.villages.filter((v) => {
+    const cx = (v.sx + v.ex) / 2, cz = (v.sz + v.ez) / 2;
+    return !L.scooterDocks.some((d) => Math.hypot(d.x - cx, d.z - cz) < 170);
+  });
+  console.log(`  самокаты в деревнях: ${L.villages.length - noDockVillage.length} из ${L.villages.length}`);
+  if (noDockVillage.length) throw new Error('в деревне нет стойки самокатов: ' + noDockVillage.map((v) => v.name).join(', '));
+  // казино: одно за городом, одно в городе — у каждого свой вход
+  const casinos = L.buildings.filter((b) => b.kind === 'casino');
+  const inCity = casinos.filter((b) => b.x > 0 && b.x < 1080 && b.z > 0 && b.z < 1080);
+  console.log(`  казино: ${casinos.length} (в городе ${inCity.length}): ${casinos.map((b) => b.name).join(' · ')}`);
+  if (casinos.length < 2) throw new Error('нужно второе казино в городе');
+  if (!inCity.length) throw new Error('казино в городе нет');
+  // бары: четыре разных заведения
+  const bars = L.buildings.filter((b) => b.kind === 'bar');
+  const barNames = new Set(bars.map((b) => b.name));
+  console.log(`  бары: ${bars.length}, названий ${barNames.size}: ${[...barNames].join(' · ')}`);
+  if (bars.length < 4) throw new Error(`баров ${bars.length}, нужно 4`);
+  if (barNames.size < 4) throw new Error('у баров одинаковые названия');
 } catch (e) {
   console.error('✗ генерация мира упала:', (e as Error).message);
   process.exit(1);

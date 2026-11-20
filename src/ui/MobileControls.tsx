@@ -4,23 +4,58 @@ import type { Game, HudState } from '../game/game';
 /** вибро-отклик на касание (если телефон поддерживает) */
 const buzz = (ms = 8) => { try { navigator.vibrate?.(ms); } catch { /* нет поддержки — молча */ } };
 
+/**
+ * Реестр нажатий по pointerId. Одна кнопка может держаться, палец — уезжать
+ * куда угодно: отпускание ловим на window, поэтому «залипших» газа и огня нет.
+ */
+const presses = new Map<number, () => void>();
+let bound = false;
+function bindGlobalRelease() {
+  if (bound || typeof window === 'undefined') return;
+  bound = true;
+  const fire = (e: Event) => { const id = (e as PointerEvent).pointerId; const f = presses.get(id); if (!f) return; presses.delete(id); try { f(); } catch { /* */ } };
+  const all = () => { for (const [, f] of presses) { try { f(); } catch { /* */ } } presses.clear(); };
+  // capture-фаза: срабатывает даже если палец ушёл с кнопки или её перекрыли
+  window.addEventListener('pointerup', fire, true);
+  window.addEventListener('pointercancel', fire, true);
+  window.addEventListener('blur', all);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) all(); });
+}
+const releaseAll = () => { for (const [, f] of presses) { try { f(); } catch { /* */ } } presses.clear(); };
+
 /** круглая «стеклянная» кнопка: hold — держать (газ/огонь), иначе тап */
-function Btn({ g, name, ico, sub, hold = true, cls = '', onTap, active }: {
-  g: Game; name?: string; ico: string; sub?: string; hold?: boolean; cls?: string; onTap?: () => void; active?: boolean;
+function Btn({ g, name, ico, sub, hold = true, cls = '', onTap, active, label }: {
+  g: Game; name?: string; ico: string; sub?: string; hold?: boolean; cls?: string; onTap?: () => void; active?: boolean; label?: string;
 }) {
   const [on, setOn] = useState(false);
   const down = (e: React.PointerEvent) => {
     e.preventDefault(); e.stopPropagation();
+    if (onTap) {
+      // кнопки меню работают даже когда ввод приостановлен (например, открыт чат)
+      buzz(6); setOn(true); setTimeout(() => setOn(false), 120); onTap();
+      return;
+    }
     if (!g.input.enabled) return;
-    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
     buzz(6);
-    if (onTap) onTap(); else if (name) { if (hold) g.input.setV(name, true); else g.input.tapV(name); }
+    if (name) {
+      if (hold) {
+        g.input.setV(name, true);
+        presses.set(e.pointerId, () => { g.input.setV(name, false); setOn(false); });
+      } else {
+        g.input.tapV(name);
+        setTimeout(() => setOn(false), 130);
+      }
+    }
     setOn(true);
   };
-  const up = (e: React.PointerEvent) => { e.preventDefault(); if (name && hold) g.input.setV(name, false); setOn(false); };
+  const up = (e: React.PointerEvent) => {
+    const f = presses.get(e.pointerId);
+    if (f) { presses.delete(e.pointerId); f(); }
+    setOn(false);
+  };
   return (
     <button className={`mui-btn ${cls} ${on || active ? 'on' : ''}`} onPointerDown={down} onPointerUp={up}
-      onPointerCancel={up} onLostPointerCapture={up} onContextMenu={(e) => e.preventDefault()}>
+      onPointerCancel={up} onContextMenu={(e) => e.preventDefault()} aria-label={label ?? sub ?? name}>
       <span className="mui-ico">{ico}</span>
       {sub && <small>{sub}</small>}
     </button>
@@ -40,17 +75,21 @@ function Dpad({ g }: { g: Game }) {
   };
   const press = (d: string, on: boolean) => (e: React.PointerEvent) => {
     e.preventDefault(); e.stopPropagation();
-    const el = e.currentTarget as HTMLElement;
     if (on) {
       if (!g.input.enabled) return;
-      try { el.setPointerCapture(e.pointerId); } catch { /* */ }
-      buzz(5); dirs.current.add(d);
-    } else { dirs.current.delete(d); try { el.releasePointerCapture(e.pointerId); } catch { /* */ } }
+      buzz(5);
+      bindGlobalRelease();
+      dirs.current.add(d);
+      presses.set(e.pointerId, () => { dirs.current.delete(d); apply(); });
+    } else {
+      dirs.current.delete(d);
+      presses.delete(e.pointerId);
+    }
     apply();
   };
   const Key = ({ d, ico }: { d: string; ico: string }) => (
-    <button className={`mui-btn mini dpadk ${dirs.current.has(d) ? 'on' : ''}`}
-      onPointerDown={press(d, true)} onPointerUp={press(d, false)} onPointerCancel={press(d, false)} onLostPointerCapture={press(d, false)}>
+    <button className={`mui-btn mini dpadk ${dirs.current.has(d) ? 'on' : ''}`} aria-label={d}
+      onPointerDown={press(d, true)} onPointerUp={press(d, false)} onPointerCancel={press(d, false)}>
       <span className="mui-ico">{ico}</span>
     </button>
   );
@@ -67,14 +106,27 @@ function Dpad({ g }: { g: Game }) {
 type Tile = { ico: string; label: string; on: () => void };
 type Group = { title: string; tiles: Tile[] };
 
+/** подсказка «поверните телефон» — один раз, запоминаем в localStorage */
+const ROT_KEY = 'los.rotate.hint';
+
 export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
   const stickRef = useRef<HTMLDivElement>(null);
   const [knob, setKnob] = useState({ x: 0, y: 0 });
   const stickId = useRef<number | null>(null);
   const [run, setRun] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [rot, setRot] = useState(() => {
+    try {
+      if (localStorage.getItem(ROT_KEY)) return false;
+      return window.innerHeight > window.innerWidth;   // портрет — предложим повернуть
+    } catch { return false; }
+  });
   const look = useRef(new Map<number, { x: number; y: number }>());
   const v = hud.vehicle;
+
+  useEffect(() => { bindGlobalRelease(); return releaseAll; }, []);
+
+  const hideRot = () => { setRot(false); try { localStorage.setItem(ROT_KEY, '1'); } catch { /* */ } };
 
   const resetStick = () => { stickId.current = null; g.input.joy.x = 0; g.input.joy.y = 0; setKnob({ x: 0, y: 0 }); };
   useEffect(() => resetStick, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -91,8 +143,18 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
     setKnob({ x: dx * 46, y: dy * 46 });
   };
   const stickEnd = (e: React.PointerEvent) => { if (stickId.current !== e.pointerId) return; resetStick(); };
+  const stickDown = (e: React.PointerEvent) => {
+    e.preventDefault(); e.stopPropagation();
+    if (!g.input.enabled) return;
+    bindGlobalRelease();
+    stickId.current = e.pointerId;
+    buzz(8);
+    presses.set(e.pointerId, () => { if (stickId.current === e.pointerId) resetStick(); });
+    stickMove(e);
+  };
 
   // ---------- меню-шторка: сгруппированные плитки ----------
+  const setS = <K extends keyof Game['settings']>(k: K, val: Game['settings'][K]) => g.setSettings({ ...g.settings, [k]: val });
   const groups: Group[] = [{
     title: 'Игра', tiles: [
       { ico: '🎒', label: 'Инвентарь', on: () => g.openPanel({ type: 'inventory' }) },
@@ -100,6 +162,7 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
       { ico: '🪪', label: 'Паспорт', on: () => g.openPanel({ type: 'passport' }) },
       { ico: '📜', label: 'Сюжет', on: () => g.openPanel({ type: 'quest' }) },
       { ico: '🎟️', label: 'Промокод', on: () => g.openPanel({ type: 'promo' }) },
+      { ico: '📱', label: 'Телефон', on: () => g.openPanel({ type: 'phone' }) },
       { ico: '⚙️', label: 'Настройки', on: () => g.openPanel({ type: 'settings' }) },
     ],
   }, {
@@ -108,6 +171,27 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
       { ico: '💃', label: 'Эмоции', on: () => g.openPanel({ type: 'emotes' }) },
       { ico: '🕺', label: 'Танцы', on: () => g.openPanel({ type: 'emotes', dance: true }) },
       { ico: hud.firstPerson ? '👁️' : '🎥', label: hud.firstPerson ? 'От 3-го лица' : 'От 1-го лица', on: () => g.toggleFirstPerson() },
+    ],
+  }, {
+    title: 'Управление', tiles: [
+      {
+        ico: g.settings.moveStyle === 'pad' ? '🕹' : '✛',
+        label: g.settings.moveStyle === 'pad' ? 'Крестовина → джойстик' : 'Джойстик → крестовина',
+        on: () => setS('moveStyle', g.settings.moveStyle === 'pad' ? 'joy' : 'pad'),
+      },
+      {
+        ico: '🔲', label: 'Во весь экран',
+        on: () => {
+          try {
+            if (document.fullscreenElement) void document.exitFullscreen?.();
+            else void document.documentElement.requestFullscreen?.({ navigationUI: 'hide' });
+          } catch { /* браузер не разрешает — молча */ }
+        },
+      },
+      {
+        ico: '🖥', label: 'Это не телефон',
+        on: () => { setS('control', 'pc'); g.toast('Управление: ПК (мышь и клавиатура). Вернуть — Настройки → Управление'); },
+      },
     ],
   }];
   if (v && !v.passenger) groups.push({
@@ -131,7 +215,13 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
     <div className="mui">
       {/* обзор: свайп по правой части, щипок двумя пальцами — зум */}
       <div className="mui-look"
-        onPointerDown={(e) => { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); look.current.set(e.pointerId, { x: e.clientX, y: e.clientY }); }}
+        onPointerDown={(e) => {
+          const el = e.currentTarget as HTMLElement;
+          try { el.setPointerCapture(e.pointerId); } catch { /* не критично */ }
+          bindGlobalRelease();
+          look.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          presses.set(e.pointerId, () => look.current.delete(e.pointerId));
+        }}
         onPointerMove={(e) => {
           const m = look.current; const p = m.get(e.pointerId); if (!p) return;
           if (m.size >= 2) {
@@ -141,14 +231,23 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
           } else { g.input.lookDX += e.clientX - p.x; g.input.lookDY += e.clientY - p.y; }
           m.set(e.pointerId, { x: e.clientX, y: e.clientY });
         }}
-        onPointerUp={(e) => look.current.delete(e.pointerId)} onPointerCancel={(e) => look.current.delete(e.pointerId)} />
+        onPointerUp={(e) => { look.current.delete(e.pointerId); presses.delete(e.pointerId); }}
+        onPointerCancel={(e) => { look.current.delete(e.pointerId); presses.delete(e.pointerId); }} />
 
       {/* верх справа: системные кнопки (слева — мини-карта HUD) */}
       <div className="mui-top">
-        <Btn g={g} ico="📱" hold={false} onTap={() => { buzz(); g.openPanel({ type: 'phone' }); }} cls="glass" />
-        <Btn g={g} ico="💬" hold={false} onTap={() => { buzz(); g.chatFocus?.(); }} cls="glass" />
-        <Btn g={g} ico={menu ? '✕' : '☰'} hold={false} onTap={() => { setMenu(!menu); buzz(10); }} cls={`glass ${menu ? 'on' : ''}`} />
+        <Btn g={g} ico="📱" hold={false} onTap={() => { buzz(); g.openPanel({ type: 'phone' }); }} cls="glass" label="Телефон" />
+        <Btn g={g} ico="💬" hold={false} onTap={() => { buzz(); g.chatFocus?.(); }} cls="glass" label="Чат" />
+        <Btn g={g} ico={menu ? '✕' : '☰'} hold={false} onTap={() => { setMenu(!menu); buzz(10); }} cls={`glass ${menu ? 'on' : ''}`} label="Меню" />
       </div>
+
+      {/* портрет: подсказка повернуть телефон (один раз) */}
+      {rot && (
+        <div className="mui-rot" onPointerDown={() => hideRot()}>
+          <span>📱↻</span>
+          <div><b>Поверните телефон горизонтально</b><small>Кнопок станет заметно больше и они не будут мешать друг другу · нажмите, чтобы скрыть</small></div>
+        </div>
+      )}
 
       {/* шторка: группы плиток */}
       {menu && (
@@ -180,14 +279,8 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
       ) : (
         <div className="mui-move">
           <div className={`mui-stick ${knob.x || knob.y ? 'active' : ''}`} ref={stickRef}
-            onPointerDown={(e) => {
-              e.preventDefault(); e.stopPropagation();
-              if (!g.input.enabled) return;
-              stickId.current = e.pointerId;
-              (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-              buzz(8); stickMove(e);
-            }}
-            onPointerMove={stickMove} onPointerUp={stickEnd} onPointerCancel={stickEnd} onLostPointerCapture={stickEnd}>
+            onPointerDown={stickDown}
+            onPointerMove={stickMove} onPointerUp={stickEnd} onPointerCancel={stickEnd}>
             <span className="ring" />
             <span className="knob" style={{ transform: `translate(${knob.x}px, ${knob.y}px)` }} />
           </div>
@@ -225,10 +318,13 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
                 {hud.gun && <Btn g={g} name="aim" ico="🎯" hold={false} cls="mini" active={hud.gun.aiming} />}
                 <Btn g={g} ico="↯" sub="дрифт" hold={false} onTap={() => g.toggleDrift()} cls="mini blue" active={hud.driftAssist} />
                 {v.canHydro && <Btn g={g} ico="⏫" sub="гидро" hold={false} onTap={() => g.hydroJump()} cls="mini pink" />}
+                {!v.heli && <Btn g={g} name="handbrake" ico="🅿" sub="ручник" cls="mini" />}
                 {!v.heli && <Btn g={g} name="lights" ico="💡" hold={false} cls="mini" />}
                 {!v.heli && <Btn g={g} name="horn" ico="📣" hold={false} cls="mini" />}
+                {!v.heli && <Btn g={g} name="hazard" ico="⚠" hold={false} cls="mini" />}
                 {!v.heli && <Btn g={g} name="gearUp" ico="＋" hold={false} cls="mini" />}
                 {!v.heli && <Btn g={g} name="gearDown" ico="－" hold={false} cls="mini" />}
+                {v.moto && <Btn g={g} name="wheelie" ico="🏍" sub="вили" cls="mini" />}
                 {v.canAuto && <Btn g={g} name="autopilot" ico="🤖" hold={false} cls="mini" />}
                 <Btn g={g} name="enter" ico="🚪" sub="выйти" hold={false} cls="mini grey" />
               </div>
@@ -244,7 +340,7 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
           <div className="mui-arc col top">
             {hud.gun
               ? <><Btn g={g} name="aim" ico="🎯" hold={false} cls="mid" active={hud.gun.aiming} /><Btn g={g} name="reload" ico="⟳" hold={false} cls="mini" /></>
-              : <><Btn g={g} name="jump" ico="⤒" hold={false} cls="mid blue" /><Btn g={g} name="block" ico="🛡" hold={true} cls="mini grey" /></>}
+              : <><Btn g={g} name="jump" ico="⤒" hold={false} cls="mid blue" /><Btn g={g} name="block" ico="🛡" hold cls="mini grey" /></>}
             <Btn g={g} name="crouch" ico={hud.crouch ? '🧍' : '🧎'} hold={false} cls="mini" active={hud.crouch} />
             <Btn g={g} name="weapon" ico="⇄" sub={hud.weapon === 'none' ? undefined : ''} hold={false} cls="mini" />
             <Btn g={g} name="qmod" ico={hud.cover ? '🚪' : '🧱'} hold={false} cls="mini" active={hud.cover} />
