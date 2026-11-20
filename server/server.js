@@ -30,9 +30,12 @@ const BUILD = (() => {
   catch { return 'dev'; }
 })();
 /** версия протокола сервера: клиент показывает её в диагностике */
-const SERVER_VERSION = '0.5.1';
+const SERVER_VERSION = '0.6.1';
 const db = new Database(process.env.DB_FILE || 'game.db');
 db.pragma('journal_mode = WAL');
+// база лежит на Google Drive: записи бывают медленными — ждём блокировку, а не падаем
+db.pragma('busy_timeout = 8000');
+db.pragma('synchronous = NORMAL');
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS players (
@@ -217,6 +220,12 @@ function adminState() {
     items: ITEMS.length,
     itemActions: ITEM_ACTIONS.length,
     inventories: INVENTORY.size,
+    // панель показывает это в шапке: без этих полей аптайм был «?», а техработы не видны
+    server: {
+      version: SERVER_VERSION, build: BUILD, uptime: Math.round(process.uptime()),
+      maintenance: MAINTENANCE, mute: GLOBAL_MUTE, frozen: FROZEN.size,
+      online: active.size, db: db.name, port: PORT, node: process.version,
+    },
   };
 }
 
@@ -1126,6 +1135,17 @@ const server = http.createServer(async (req, res) => {
   json(res, 404, { ok: false, error: 'not found' });
 });
 
+// падение не должно выглядеть как «сервер просто исчез»: пишем причину и выходим
+// с кодом 1 — Colab-ячейка сторожа перезапускает процесс, а лог остаётся читаемым
+process.on('uncaughtException', (e) => {
+  console.error('[fatal] необработанная ошибка:', e && e.stack ? e.stack : e);
+  process.exit(1);
+});
+process.on('unhandledRejection', (e) => {
+  console.error('[fatal] необработанный Promise:', e && e.stack ? e.stack : e);
+  process.exit(1);
+});
+
 const wss = new WebSocket.Server({ server });
 
 wss.on('connection', (ws) => {
@@ -1252,6 +1272,15 @@ wss.on('connection', (ws) => {
       console.log(`[logout] ${ws.playerId} (онлайн: ${active.size})`);
     }
   });
+});
+
+server.on('error', (e) => {
+  if (e && e.code === 'EADDRINUSE') {
+    console.error(`[fatal] порт ${PORT} уже занят другой программой — освободите его и запустите снова`);
+    process.exit(3);
+  }
+  console.error('[fatal] сервер не смог открыть порт:', e && e.message ? e.message : e);
+  process.exit(4);
 });
 
 server.listen(PORT, '0.0.0.0', () => {

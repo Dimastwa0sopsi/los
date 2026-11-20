@@ -25,6 +25,7 @@ LG       = '/content/drive/MyDrive/los-gorod'   # код, node, база и на
 CFG_F    = LG + '/cfg.json'
 PORT     = 7860
 NODE_VER = 'v20.18.1'
+PYN      = '7.2.3'          # версия pyngrok, с которой дружит Colab
 REPO     = 'https://github.com/Dimastwa0sopsi/los.git'
 
 def say(icon, *m): print(f'{icon} \033[1m{" ".join(map(str, m))}\033[0m')
@@ -132,72 +133,96 @@ json.dump({'name': 'los-server', 'private': True, 'type': 'commonjs',
            'dependencies': {'better-sqlite3': '^12.0.0', 'ws': '^8.18.0'}},
           open(APP + '/server/package.json', 'w'))
 say('📦', 'Проверяю зависимости сервера (npm)…')
-if not run('npm install --no-audit --no-fund --loglevel=error', cwd=APP + '/server',
-           timeout=600, quiet=True) or not os.path.isdir(APP + '/server/node_modules'):
-    out = run('npm install --no-audit --no-fund', cwd=APP + '/server', timeout=600, quiet=True)
+# ставим всегда: если всё уже стоит, npm отвечает «up to date» за пару секунд
+run('npm install --no-audit --no-fund --loglevel=error', cwd=APP + '/server', timeout=900, quiet=True)
+if not os.path.isdir(APP + '/server/node_modules'):
+    out = run('npm install --no-audit --no-fund', cwd=APP + '/server', timeout=900, quiet=True)
     if not os.path.isdir(APP + '/server/node_modules'):
         say('❌', 'npm не поставил зависимости:'); print(out[-3000:])
         die('👉', 'Обычно это кончившееся место на Drive — освободите ~500 МБ и запустите снова.')
 
-# ── глушим старый сервер и освобождаем порт ────────────────────────────────
-run('pkill -f "node .*server\\.js" || true', quiet=True)
-run(f'fuser -k {PORT}/tcp || true', quiet=True)
-time.sleep(1)
+# ── логика ячейки (чистые функции, проверяются npm run check:admin) ─────────
+sys.path.insert(0, APP + '/server')
+try:
+    import colab_logic as CL
+except ImportError:
+    die('⛔', 'В репозитории нет server/colab_logic.py — код не обновился.',
+        '\n   Drive → los-gorod → удалите папку app и запустите ячейку снова.')
 
-# ── туннель ngrok ──────────────────────────────────────────────────────────
-say('🌐', 'Туннель ngrok…')
-run(f'"{sys.executable}" -m pip uninstall -y pyngrok', quiet=True)
-run(f'"{sys.executable}" -m pip install -q --force-reinstall "pyngrok==7.2.3"', quiet=True)
-for _m in [k for k in list(sys.modules) if k == 'pyngrok' or k.startswith('pyngrok.')]:
-    del sys.modules[_m]
-from pyngrok import conf, ngrok
-import pyngrok as _pg
+
+# ── зависимости: проверяем, что они реально грузятся ───────────────────────
+def deps_ok():
+    """ws и better-sqlite3 должны импортироваться — иначе сервер упадёт на старте."""
+    return CL.deps_ok_output(run(CL.deps_cmd(bin_node), cwd=APP + '/server', quiet=True))
+
+
+if not deps_ok():
+    say('🔧', 'Зависимости сервера не грузятся — переустанавливаю с нуля…')
+    shutil.rmtree(APP + '/server/node_modules', ignore_errors=True)
+    run('npm cache verify || true', quiet=True)
+    run('npm install --no-audit --no-fund --loglevel=error', cwd=APP + '/server', timeout=900, quiet=True)
+    if not deps_ok():
+        say('❌', 'better-sqlite3/ws так и не встали. Последние строки npm:')
+        print(run('npm install --no-audit --no-fund', cwd=APP + '/server', timeout=900, quiet=True)[-2500:])
+        say('👉', 'Обычно помогает: Runtime → Restart, затем Run all.',
+            '\n   Если повторяется — на Drive кончилось место (нужно ~500 МБ).')
+        raise SystemExit(1)
+say('✅', 'Зависимости сервера на месте (ws, better-sqlite3)')
+
+# ── ngrok: библиотека (переустанавливаем, если сломалась после рестарта) ────
+say('🌐', 'Готовлю ngrok…')
+
+
+def _load_pyngrok():
+    """Свежий импорт: после Runtime → Restart старые модули остаются битыми."""
+    for name in [k for k in list(sys.modules) if k == 'pyngrok' or k.startswith('pyngrok.')]:
+        del sys.modules[name]
+    from pyngrok import conf as _conf, ngrok as _ngrok
+    import pyngrok as _pkg
+    return _conf, _ngrok, _pkg
+
+
+try:
+    ngconf, ngrok, _pg = _load_pyngrok()
+    if getattr(_pg, '__version__', '') != PYN:
+        raise RuntimeError('нужна другая версия')
+except Exception:                                        # noqa: BLE001
+    say('📦', f'Ставлю pyngrok {PYN}…')
+    run(f'"{sys.executable}" -m pip install -q "pyngrok=={PYN}"', timeout=300, quiet=True)
+    ngconf, ngrok, _pg = _load_pyngrok()
 say('📦', 'pyngrok', getattr(_pg, '__version__', '?'))
-conf.get_default().auth_token = token
-try:
-    ngrok.kill()                     # снять зависший агент от прошлого Run
-except Exception:
-    pass
-try:
-    t = ngrok.connect(PORT, 'http', **({'domain': dom} if dom else {}))
-except Exception as e:
-    msg = str(e)
-    say('❌', 'ngrok не поднялся:', msg)
-    if 'ERR_NGROK_3200' in msg or 'not found' in msg.lower():
-        say('👉', f'Домен {dom or "(не задан)"} не привязан к этому аккаунту:',
-            'ngrok → Domains → New Domain, и он должен принадлежать владельцу authtoken.')
-    elif 'ERR_NGROK_108' in msg or 'simultaneously' in msg.lower():
-        say('👉', 'Тот же authtoken уже держит сессию: перезапустите Colab (Runtime → Restart) и Run all.')
-    elif 'ERR_NGROK_105' in msg or 'authentication' in msg.lower():
-        say('👉', 'Неверный authtoken — скопируйте заново из dashboard.ngrok.com.')
-    else:
-        say('👉', 'Проверьте интернет Colab и лимит бесплатного плана ngrok, затем Run all.')
-    die('⛔', 'Сервер не запущен: без туннеля игроки не подключатся.')
+ngconf.get_default().auth_token = token
 
-url_ws  = str(t.public_url).replace('https://', 'wss://').replace('http://', 'ws://')
-url_web = url_ws.replace('wss://', 'https://').replace('ws://', 'http://')
-cfg['LAST_URL'] = url_web
-json.dump(cfg, open(CFG_F, 'w'))      # адрес для админ-панели (colab_admin.py)
-say('✅', 'Туннель:', url_web)
-
-# ── старт сервера: база на Drive ⇒ прогресс вечен ──────────────────────────
-env = dict(os.environ, PORT=str(PORT), ADMIN_TOKEN='losgorod-admin',
-           DB_FILE=LG + '/data/game.db', PUBLIC_URL=url_web)
+# ── порт, сервер, туннель: всё с самовосстановлением ───────────────────────
 LOG_F = LG + '/server.log'
+proc = None
+tunnel = None
+url_ws, url_web = '', ''
+state = {'restarts': 0, 'stop': False, 'last_pub': 0.0, 'heals': 0}
+
+
+def kill_server():
+    run('pkill -f "server[.]js" || true', quiet=True)
+    run(f'fuser -k {PORT}/tcp || true', quiet=True)
+    time.sleep(1)
+
 
 def start_server():
-    lf = open(LOG_F, 'wb')
+    lf = open(LOG_F, 'ab')
+    env = dict(os.environ, PORT=str(PORT), ADMIN_TOKEN='losgorod-admin',
+               DB_FILE=LG + '/data/game.db', PUBLIC_URL=state.get('url_web', ''))
+    lf.write(f'\n===== {time.strftime("%d.%m.%Y %H:%M:%S")} старт =====\n'.encode())
+    lf.flush()
     return subprocess.Popen([bin_node, 'server.js'], cwd=APP + '/server', env=env,
                             stdout=lf, stderr=subprocess.STDOUT, start_new_session=True)
 
-proc = start_server()
-state = {'restarts': 0, 'stop': False}
 
 def tail_log(n=40):
     try:
         return open(LOG_F, encoding='utf-8', errors='replace').read()[-4000:]
     except Exception:
         return '(лог недоступен)'
+
 
 def wait_up(attempts=90, pause=0.5):
     """Ждём /health. Возвращаем (жив?, последний код ответа)."""
@@ -207,74 +232,164 @@ def wait_up(attempts=90, pause=0.5):
         code, body = json_get(f'http://127.0.0.1:{PORT}/health', timeout=2)
         if code == 200 and body and body.get('ok'):
             return True, code
-        if proc.poll() is not None:
+        if proc is not None and proc.poll() is not None:
             return False, code
     return False, code
 
+
+def explain_start_failure(code):
+    log = tail_log()
+    verdict = CL.classify_start_failure(code, log)
+    say('❌', 'Сервер не поднялся:', verdict['title'], f"(код /health: {code or 'нет связи'})")
+    print(log)
+    for h in verdict['hints']:
+        say('👉', h)
+
+
+def public_probe():
+    """Что видит интернет: (код, тело) у /version через туннель."""
+    return json_get(state['url_web'] + '/version', timeout=8,
+                    headers={'ngrok-skip-browser-warning': '1'})
+
+
+def public_ok():
+    code, body = public_probe()
+    return code == 200 and isinstance(body, dict) and body.get('server') == 'los-gorod', code
+
+
+def start_tunnel():
+    """Поднять ngrok по плану: постоянный домен → случайный адрес."""
+    say('🌐', 'Туннель ngrok…')
+    try:
+        ngrok.kill()
+    except Exception:
+        pass
+    last = ''
+    for step in CL.tunnel_plan(dom):
+        try:
+            kwargs = {k: v for k, v in step.items() if k != 'try'}
+            t = ngrok.connect(PORT, 'http', **kwargs)
+            if step.get('try'):
+                say('✅', 'Туннель на постоянном домене')
+            else:
+                say('⚠️', 'Постоянный домен не отдался — работаем на случайном адресе (после рестарта он сменится)')
+            return t
+        except Exception as e:                            # noqa: BLE001
+            last = str(e)
+            say('⚠️', 'ngrok не пустил:', last[:180])
+            time.sleep(3)
+    say('👉', CL.tunnel_hint(last))
+    return None
+
+
+def apply_tunnel(t):
+    """Запомнить адрес туннеля в cfg и в состоянии ячейки."""
+    state['url_ws'] = str(t.public_url).replace('https://', 'wss://').replace('http://', 'ws://')
+    state['url_web'] = state['url_ws'].replace('wss://', 'https://').replace('ws://', 'http://')
+    cfg['LAST_URL'] = state['url_web']
+    try:
+        json.dump(cfg, open(CFG_F, 'w'))
+    except Exception:                                     # noqa: BLE001
+        pass
+    say('✅', 'Туннель:', state['url_web'])
+
+
+def heal(max_rounds=3):
+    """Снаружи 404/молчание → перезапускаем сервер, при нужде и туннель."""
+    global proc, tunnel
+    for i in range(1, max_rounds + 1):
+        ok, code = public_ok()
+        if ok:
+            return True
+        say('🔁', f'Снаружи {CL.public_verdict(code, None)["title"].lower()} — лечу, попытка {i}/{max_rounds}')
+        kill_server()
+        proc = start_server()
+        up, hcode = wait_up(attempts=60)
+        if not up:
+            explain_start_failure(hcode)
+            return False
+        # если после перезапуска сервера всё ещё 404 — перепривязываем туннель
+        ok, code = public_ok()
+        if ok:
+            return True
+        tunnel = start_tunnel()
+        if not tunnel:
+            return False
+        apply_tunnel(tunnel)
+        time.sleep(2)
+    return public_ok()[0]
+
+
+# 1) глушим прошлый запуск и освобождаем порт
+kill_server()
+
+# 2) туннель
+tunnel = start_tunnel()
+if not tunnel:
+    die('⛔', 'Сервер не запущен: без туннеля игроки не подключатся.')
+apply_tunnel(tunnel)
+url_ws, url_web = state['url_ws'], state['url_web']
+
+# 3) сервер
+say('🚀', 'Запускаю игровой сервер…')
+proc = start_server()
 alive, code = wait_up()
 if not alive:
-    say('❌', 'Сервер не поднялся', f'(код ответа /health: {code or "нет связи"})', '· лог:')
-    print(tail_log())
-    if code == 404:
-        say('👉', 'Порт 7860 отвечает, но не игровым сервером — обычно занят старой программой.',
-            'Выполните Runtime → Restart и Run all.')
-    elif 'better-sqlite3' in tail_log():
-        say('👉', 'Не собрался better-sqlite3: rm -rf', APP + '/server/node_modules и Run all.')
-    die('⛔', 'Порт занят или Node-сервер падает при старте.')
+    explain_start_failure(code)
+    die('⛔', 'Сервер не отвечает на /health — смотрите причину выше.')
 
 code, ver = json_get(f'http://127.0.0.1:{PORT}/version', timeout=3)
 if code == 200 and ver:
-    say('✅', 'Сервер отвечает:', f"версия {ver.get('version', '?')}", '· сборка', ver.get('build', '?')[:12])
+    say('✅', 'Сервер отвечает:', f"версия {ver.get('version', '?')}", '· сборка', str(ver.get('build', '?'))[:12])
 else:
-    say('ℹ️', 'Сервер отвечает на /health, но не на /version — ок, старый server.js.',
-        'Всё равно работает.')
+    say('ℹ️', 'Сервер отвечает на /health, но не на /version — старый server.js, всё равно работает.')
 
-# ── сторож: упавший сервер поднимаем сами (до 3 раз) ───────────────────────
+# 4) проверка из интернета + лечение
+say('🔎', 'Проверяю адрес из интернета:', url_web + '/version')
+pub_ok = False
+for i in range(10):
+    pub_ok, pcode = public_ok()
+    if pub_ok:
+        break
+    time.sleep(2)
+if not pub_ok:
+    pub_ok = heal()
+
+
 def watchdog():
-    global proc
+    """Сторож: поднимает упавший Node и чинит туннель, если снаружи 404."""
+    global proc, tunnel
     while not state['stop']:
-        time.sleep(10)
+        time.sleep(15)
         if state['stop']:
             return
-        if proc.poll() is None:
+        if proc.poll() is not None:
+            if state['restarts'] >= 5:
+                say('⚠️', 'Сервер падал 5 раз — больше не перезапускаю. Лог:', LOG_F)
+                continue
+            state['restarts'] += 1
+            say('🔁', f"Сервер упал (код {proc.returncode}) — перезапуск {state['restarts']}/5")
+            print(tail_log()[-1200:])
+            proc = start_server()
+            time.sleep(2)
+            up, _ = wait_up(attempts=40)
+            say('✅' if up else '⚠️', 'Сервер снова на связи' if up else 'Перезапуск не помог, лог: ' + LOG_F)
+            state['last_pub'] = 0
             continue
-        if state['restarts'] >= 3:
-            say('⚠️', 'Сервер падал 3 раза — больше не перезапускаю. Лог:', LOG_F)
-            return
-        state['restarts'] += 1
-        say('🔁', f"Сервер упал (код {proc.returncode}) — перезапуск {state['restarts']}/3…")
-        proc = start_server()
-        time.sleep(2)
-        up, _ = wait_up(attempts=40)
-        say('✅' if up else '⚠️', 'Сервер снова на связи' if up else 'Перезапуск не помог, лог: ' + LOG_F)
+        # раз в две минуты сверяем, что снаружи действительно наш сервер
+        if time.time() - state['last_pub'] > 120:
+            state['last_pub'] = time.time()
+            ok, pcode = public_ok()
+            if not ok:
+                state['heals'] += 1
+                say('⚠️', f'Снаружи сервер не отвечает (код {pcode or "нет связи"}) — лечу ({state["heals"]}).')
+                if heal(max_rounds=2):
+                    say('✅', 'Из интернета снова видно сервер:', state['url_web'])
+
 
 threading.Thread(target=watchdog, daemon=True).start()
 
-# ── проверка ИЗ ИНТЕРНЕТА: туннель реально ведёт на наш сервер ─────────────
-say('🔎', 'Проверяю адрес из интернета:', url_web + '/version')
-pub = (0, None)
-for i in range(15):
-    pub = json_get(url_web + '/version', timeout=6, headers={'ngrok-skip-browser-warning': '1'})
-    if pub[0] == 200 and isinstance(pub[1], dict) and pub[1].get('server') == 'los-gorod':
-        break
-    time.sleep(2)
-
-pub_ok = pub[0] == 200 and isinstance(pub[1], dict) and pub[1].get('server') == 'los-gorod'
-if pub_ok:
-    say('✅', 'Туннель ведёт на игровой сервер:', f"версия {pub[1].get('version', '?')}",
-        '· сборка', str(pub[1].get('build', '?'))[:12])
-else:
-    say('⚠️', 'Снаружи', url_web + '/version', 'ответил кодом', pub[0] or 'нет связи')
-    if pub[0] == 404:
-        say('👉', 'ngrok отдаёт 404: туннель поднят, но за ним не наш порт',
-            f'{PORT}. Проверьте, что сервер выше в логе не падал.')
-    elif pub[0] == 0:
-        say('👉', 'Туннель не отвечает: домен не привязан или ngrok заблокирован.',
-            'Проверьте домен в ngrok → Domains.')
-    else:
-        say('👉', 'Ответ не от нашего сервера (обычно страница-заглушка ngrok).',
-            'Откройте /version в браузере и посмотрите, что там.')
-
+# ── итоговая панель ────────────────────────────────────────────────────────
 link = f'https://dimastwa0sopsi.github.io/los/?srv={url_ws}/'
 bar = '═' * 70
 print('\n\033[92m' + bar)
@@ -285,9 +400,11 @@ print('  Адрес сервера :', url_ws)
 print('  Версия игры   : v' + str(APP_VER), '· сборка', APP_BUILD or '?')
 print('  Сейвы         :', LG + '/data/game.db (Google Drive)')
 print('  Лог сервера   :', LOG_F)
-print('  Домен         :', ('постоянный ✓ — ссылка не изменится никогда' if dom
+print('  Домен         :', ('постоянный ✓ — ссылка не изменится' if url_web.startswith('https://' + dom) and dom
                             else 'случайный ⚠ после рестарта адрес станет другим'))
 print('\033[92m' + bar + '\033[0m')
-print('  Следующий раз: просто Run all. Та же ссылка, тот же мир, тот же прогресс.')
-print('  Если в игре «нет связи» — откройте', url_web + '/version',
-      'в браузере:\n  JSON ⇒ сервер жив, страница ngrok/404 ⇒ перезапустите эту ячейку.\n')
+if pub_ok:
+    print('  Следующий раз: просто Run all. Та же ссылка, тот же мир, тот же прогресс.\n')
+else:
+    print('  Что делать: откройте', url_web + '/version', 'в браузере.')
+    print('   JSON ⇒ сервер жив (проверьте адрес в игре); страница ngrok/404 ⇒ Run all ещё раз.\n')
