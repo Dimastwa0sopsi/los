@@ -760,7 +760,7 @@ def show_panel():
     money_cap = W.BoundedIntText(value=int(m0.get('cap', 1_000_000)), min=1000, max=2_147_483_647,
                                  step=100_000, description='Потолок $', layout=L(width='260px'))
     money_neg = W.Checkbox(value=bool(m0.get('allowNegative')), description='Разрешить минус')
-    money_strict = W.Checkbox(value=bool(m0.get('strict', True)), description='Защита от накрутки клиентом')
+    money_strict = W.Checkbox(value=bool(m0.get('strict', True)), description='Устаревшая настройка (не действует)', disabled=True)
     money_box = W.HTML()
 
     def draw_money(_b=None):

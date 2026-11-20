@@ -153,7 +153,7 @@ interface Msg {
   money?: number; player?: ServerPlayer;
   players?: PlayersListEntry[] | Record<string, LegacyPlayer | PlayersListEntry>;
   x?: number; z?: number; rot?: number;
-  act?: string;
+  act?: string; reason?: string;
   /** 🎁 выдача предметов из панели Colab: режим, id предмета, количество */
   mode?: string; item?: string; qty?: number;
   /** авторизация онлайна: токен устройства и пароль-подсказка */
@@ -280,6 +280,7 @@ export class NetClient {
   me: ServerPlayer | null = null;
   /** был ли уже login_success в этой сессии (повторный приходит при смене денег) */
   private loggedOnce = false;
+  private authenticated = false;
   /** текст бана, если сервер нас выкинул */
   kicked: string | null = null;
   onChange: (() => void) | null = null;
@@ -331,7 +332,7 @@ export class NetClient {
   connect() {
     if (this.want && this.ws) return;
     this.want = true; this.dead = false; this.everConnected = false; this.retry = 0; this.kicked = null;
-    this.loggedOnce = false;
+    this.loggedOnce = false; this.authenticated = false; this.lastSaveMoney = NaN;
     this.open();
   }
   private open() {
@@ -357,7 +358,7 @@ export class NetClient {
     ws.onclose = () => {
       if (this.ws !== ws) return;
       window.clearTimeout(this.connectTimer);
-      this.ws = null; this.id = null;
+      this.ws = null; this.id = null; this.authenticated = false; this.lastSaveMoney = NaN;
       if (this.dead || !this.want) { this.status = 'offline'; this.onChange?.(); return; }
       this.fail();
     };
@@ -377,7 +378,7 @@ export class NetClient {
   /** мягкий отказ: показываем причину, но не запрещаем повторную попытку входа */
   private softFail(text: string) {
     this.want = false; this.dead = false; this.status = 'offline';
-    const ws = this.ws; this.ws = null; this.id = null;
+    const ws = this.ws; this.ws = null; this.id = null; this.authenticated = false; this.lastSaveMoney = NaN;
     try { ws?.close(); } catch { /* */ }
     this.players.clear();
     this.kicked = text;
@@ -391,7 +392,7 @@ export class NetClient {
   private die(text: string | null) {
     this.dead = true; this.want = false;
     window.clearTimeout(this.retryTimer); window.clearTimeout(this.connectTimer);
-    const ws = this.ws; this.ws = null; this.id = null; this.status = 'offline';
+    const ws = this.ws; this.ws = null; this.id = null; this.status = 'offline'; this.authenticated = false; this.lastSaveMoney = NaN;
     try { ws?.close(); } catch { /* */ }
     this.players.clear();
     if (text) { this.kicked = text; this.sys('Вы отключены сервером'); this.onError?.(text); }
@@ -482,6 +483,7 @@ export class NetClient {
     if (tok) { this.token = tok; setOnlineToken(this.nick, tok); }
     if (typeof this.me.money === 'number') this.money = this.me.money;
     this.rejoin = 0;
+    this.authenticated = true; this.lastSaveMoney = NaN;
     const first = !this.loggedOnce;
     this.loggedOnce = true;
     if (first) this.sys(`Вы вошли как ${this.nick}`);
@@ -517,7 +519,6 @@ export class NetClient {
         if (money !== undefined) ex.money = money;
         if (plate) ex.number = plate;
         ex.seenT = now;
-        if (id === this.id && money !== undefined) { this.me = { ...(this.me ?? {}), money: money }; this.onLogin?.(this.me, false); }
         return;
       }
       this.players.set(id, {
@@ -623,9 +624,8 @@ export class NetClient {
   sendSave(money: number) {
     const m = Math.max(0, Math.round(money));
     this.money = m;
-    if (m === this.lastSaveMoney) return;
-    this.lastSaveMoney = m;
-    this.send({ type: 'save', money: m });
+    if (!this.authenticated || !this.ws || this.ws.readyState !== WebSocket.OPEN || m === this.lastSaveMoney) return;
+    try { this.ws.send(JSON.stringify({ type: 'save', money: m })); this.lastSaveMoney = m; } catch { /* повторим при следующем обновлении */ }
   }
   /** {type:'move', x, z, rot} — вызывается 15 раз в секунду из игрового цикла */
   sendMove(x: number, z: number, rot = 0) {
@@ -687,7 +687,7 @@ export class NetClient {
   close() {
     this.want = false; this.dead = true;
     window.clearTimeout(this.retryTimer); window.clearTimeout(this.connectTimer);
-    const ws = this.ws; this.ws = null; this.id = null; this.status = 'offline';
+    const ws = this.ws; this.ws = null; this.id = null; this.status = 'offline'; this.authenticated = false; this.lastSaveMoney = NaN;
     try { ws?.close(); } catch { /* */ }
     this.players.clear();
   }

@@ -257,7 +257,7 @@ export class Game {
   discoOn = false;
   /** остаток «опьянения» в секундах: руль чуть плавает */
   buzzT = 0;
-  online = false; net: NetClient | null = null; remotes = new Map<number, Remote>();
+  online = false; private onlineInitialMoney: number | null = null; net: NetClient | null = null; remotes = new Map<number, Remote>();
   private netT = 0; private netMoveT = 0; private netN = 0; private lastSpeed = 0;
   sky: THREE.Mesh | null = null; stars: THREE.Points | null = null; clouds: THREE.Group | null = null; private skyMat: THREE.ShaderMaterial | null = null;
   minimap: HTMLCanvasElement | null = null; private miniT = 0;
@@ -4514,8 +4514,10 @@ export class Game {
     if (!this.state) return;
     // деньги онлайна берём только с сервера: локальный соло-кошелёк в онлайн не переносится,
     // а новый ник получает чистый стартовый капитал
-    if (typeof p.money === 'number' && isFinite(p.money)) {
-      const m = Math.max(0, Math.round(p.money));
+    if (first && typeof p.money === 'number' && isFinite(p.money)) {
+      const delta = this.onlineInitialMoney === null ? 0 : this.state.money - this.onlineInitialMoney;
+      const m = Math.max(0, Math.min(2147483647, Math.round(p.money + delta)));
+      this.onlineInitialMoney = null;
       if (m !== this.state.money) this.lastMoney = -1; // HUD покажет баланс с сервера без «+$»
       this.state.money = m;
       this.state.serverMoney = m;
@@ -4577,8 +4579,7 @@ export class Game {
     const home = st.spawnHome && st.properties.includes(st.spawnHome) ? st.spawnHome : st.properties[0];
     if (home) { const [hb, hu] = home.split(':').map(Number); const bd = this.L.buildings[hb]; if (bd) st.location = bd.kind === 'apartment' ? { b: hb, unit: hu } : { b: hb }; }
     this.swapState(st, true);
-    st.money = 0;                        // до ответа сервера баланс неизвестен — не показываем локальный
-    saveState(st, true, clean);
+    this.onlineInitialMoney = st.money; // сохраняем изменения, произошедшие до ответа сервера
     this.net = new NetClient(clean, gender);
     this.net.onEvent = (from, ev) => this.handleNetEvent(from, ev);
     this.peds.onlineMode = false; this.removeQuestPeds();
@@ -4626,7 +4627,7 @@ export class Game {
       }
       if (act === 'money') {
         const v = Number(m.money);
-        if (isFinite(v)) { this.state.money = Math.max(0, Math.round(v)); this.toast(`💵 Баланс: $${this.state.money.toLocaleString('ru-RU')}`); this.sound.coin(); }
+        if (m.reason === 'admin' && isFinite(v)) { this.state.money = Math.max(0, Math.round(v)); this.lastMoney = -1; this.save(); this.toast(`💵 Администратор изменил баланс: $${this.state.money.toLocaleString('ru-RU')}`); this.sound.coin(); }
         return;
       }
       if (act === 'heal') { this.state.health = 100; this.state.energy = Math.max(this.state.energy, 60); this.toast('❤️ Администратор вылечил вас'); return; }
@@ -4691,7 +4692,7 @@ export class Game {
     if (!this.online) return;
     this.admFreeze = false;
     if (this.rideRemote) this.exitRemoteRide(true);
-    this.net?.close(); this.net = null; this.pendingBuy = null; this.socialInvite = null; this.socialSent = null;
+    this.net?.close(); this.net = null; this.onlineInitialMoney = null; this.pendingBuy = null; this.socialInvite = null; this.socialSent = null;
     for (const r of this.remotes.values()) this.disposeRemote(r);
     this.remotes.clear(); this.peds.clearPuppets(); this.removeCarPuppets(); this.peds.onlineMode = false; this.trade = null; this.tradeInvite = null;
     const solo = loadState(false) ?? newState(this.state.look.gender, this.L.playerSpawn);

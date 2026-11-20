@@ -505,28 +505,16 @@ function setMoney(name, value) {
   const v = money(value);
   q.money.run(v, name);
   const on = liveOf(name);
-  if (on) { on.row.money = v; send(on.ws, { type: 'adm', act: 'money', money: v }); }
+  if (on) { on.row.money = v; send(on.ws, { type: 'adm', act: 'money', reason: 'admin', money: v }); }
   pushPlayers();
   return v;
 }
-/** окно заработка: не больше $25 000 за 10 с и $150 000 за час от клиента */
-const EARN_WINDOW = 10_000, EARN_LIMIT = 25_000, EARN_HOUR = 3_600_000, EARN_HOUR_LIMIT = 150_000;
-function acceptClientMoney(row, money) {
-  const next = Math.max(0, Math.min(2147483647, Math.round(money)));
+// Баланс игры сейчас рассчитывается на клиенте: крупные продажи и награды нельзя
+// надёжно отличить от накрутки по одному лишь изменению числа. Не откатываем
+// легальные операции произвольными лимитами; сервер проверяет диапазон значения.
+function acceptClientMoney(row, value) {
+  const next = money(value);
   if (next === row.money) return;
-  const gain = next - row.money;
-  if (gain <= 0) {                                   // траты принимаем сразу
-    q.money.run(next, row.name); row.money = next; pushPlayers(); return;
-  }
-  const now = Date.now();
-  const w = row.earnWin && now - row.earnWin.t < EARN_WINDOW ? row.earnWin : { t: now, sum: 0 };
-  const h = row.earnHour && now - row.earnHour.t < EARN_HOUR ? row.earnHour : { t: now, sum: 0 };
-  if (w.sum + gain > EARN_LIMIT || h.sum + gain > EARN_HOUR_LIMIT) {
-    adminLog(`🚫 ${row.name}: попытка накрутки +$${fmt(gain)} отклонена (клиент прислал $${fmt(next)})`);
-    send(active.get(row.id)?.ws, { type: 'adm', act: 'money', money: row.money });
-    return;
-  }
-  w.sum += gain; h.sum += gain; row.earnWin = w; row.earnHour = h;
   q.money.run(next, row.name); row.money = next; pushPlayers();
 }
 function addMoney(name, delta) {
@@ -901,7 +889,7 @@ function moneySettingsRows() {
     `Шаг кнопок: $${fmt(c.step)}`,
     `Потолок за операцию: $${fmt(c.cap)}`,
     `Отрицательный баланс: ${c.allowNegative ? 'разрешён' : 'запрещён'}`,
-    `Защита от накрутки клиентом: ${c.strict ? 'включена' : 'выключена'}`,
+    'Баланс рассчитывается клиентом; защита от накрутки не включена',
   ];
 }
 function giveMoneyCustom(a, all) {
@@ -1238,10 +1226,9 @@ wss.on('connection', (ws) => {
     }
 
     if (m.type === 'save') {
-      // Деньги в онлайне — серверные. Клиент присылает локальный баланс после
-      // заработка; принимаем только правдоподобные изменения, иначе откатываем.
+      // Клиент присылает баланс после операций; сохраняем и траты, и доходы.
       const money = Number(m.money);
-      if (isFinite(money) && moneyCfg().strict) acceptClientMoney(row, money);
+      if (isFinite(money)) acceptClientMoney(row, money);
       return;
     }
 
