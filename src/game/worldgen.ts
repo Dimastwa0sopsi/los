@@ -289,8 +289,7 @@ export function generateLayout(): WorldLayout {
     colliders.push({ x0: x - w / 2 - t, x1: x + w / 2 + t, z0: z + d / 2, z1: z + d / 2 + t, y0: 0, y1: rim, tag: 'poolrim' });
     colliders.push({ x0: x - w / 2 - t, x1: x - w / 2, z0: z - d / 2, z1: z + d / 2, y0: 0, y1: rim, tag: 'poolrim' });
     colliders.push({ x0: x + w / 2, x1: x + w / 2 + t, z0: z - d / 2, z1: z + d / 2, y0: 0, y1: rim, tag: 'poolrim' });
-    // ступеньки в воду с южной стороны
-    for (let k = 0; k < 3; k++) addProp({ t: 'poolstep', x: x + w * 0.3, z: z + d / 2 - 0.35 - k * 0.35, w: 1.2, h: rim - k * 0.11 });
+    // ступеньки рисуются внутри чаши (см. worldMesh: case 'pool') — они реально уходят под воду
     // лежак, зонт и полотенце — только у больших бассейнов
     if (w >= 9) {
       addProp({ t: 'lounger', x: x - w / 2 - 1.4, z: z - d / 4, r: 0 });
@@ -1350,6 +1349,21 @@ export function generateLayout(): WorldLayout {
         scooterDocks.push({ x, z, a: 0 }); addProp({ t: 'scooterdock', x: x - 1.9, z, r: 0 }, { w: 0.3, d: 0.3, h: 2 });
         break;
       }
+    }
+  }
+  // 🛴 самокаты у магазина «Вжух Store»: две стойки по бокам от входа
+  for (const b of buildings) {
+    if (b.kind !== 'scootershop') continue;
+    const ox = b.door.x - b.x, oz = b.door.z - b.z;
+    const dl = Math.hypot(ox, oz) || 1;
+    const nxx = ox / dl, nzz = oz / dl;              // наружу от фасада
+    const tx = -nzz, tz = nxx;                       // вдоль фасада
+    for (const sgn of [-1, 1]) {
+      const x = b.door.x + nxx * 1.0 + tx * 4.2 * sgn;   // у самой витрины, не на проезжей части
+      const z = b.door.z + nzz * 1.0 + tz * 4.2 * sgn;
+      if (solidNear(x, z, 1.5) || nearRoad(x, z, 0.5)) continue;
+      scooterDocks.push({ x, z, a: Math.atan2(nxx, nzz) });
+      addProp({ t: 'scooterdock', x: x + tx * 1.7 * sgn, z: z + tz * 1.7 * sgn, r: Math.atan2(tx, tz) }, { w: 0.3, d: 0.3, h: 2 });
     }
   }
   // станция аренды самокатов прямо у входа в мэрию (центр города)

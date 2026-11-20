@@ -292,6 +292,24 @@ export function getTex(key: string): THREE.Texture {
       }
       t = toTex(c); break;
     }
+    case 'pooltile': {
+      // плитка бассейна: светлая мозаика 25×25 см со швами и лёгким переливом
+      const [c, g] = canvas(256, 256);
+      g.fillStyle = '#dfeaf2'; g.fillRect(0, 0, 256, 256);
+      const r = new RNG(52);
+      const TW = 32;                                     // 8 плиток в тайле
+      for (let ty = 0; ty < 256; ty += TW) for (let tx = 0; tx < 256; tx += TW) {
+        const k = r.range(0.86, 1);
+        const b2 = r.chance(0.18) ? 30 : 0;              // редкие тёмные вставки-мозаика
+        g.fillStyle = `rgb(${Math.round((168 - b2) * k)},${Math.round((206 - b2) * k)},${Math.round((224 - b2) * k)})`;
+        g.fillRect(tx + 1, ty + 1, TW - 2, TW - 2);
+        g.fillStyle = 'rgba(255,255,255,0.35)';
+        g.fillRect(tx + 2, ty + 2, TW - 4, 2);
+      }
+      g.strokeStyle = 'rgba(120,150,168,0.55)'; g.lineWidth = 1.2;
+      for (let i = 0; i <= 256; i += TW) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i, 256); g.stroke(); g.beginPath(); g.moveTo(0, i); g.lineTo(256, i); g.stroke(); }
+      t = toTex(c); break;
+    }
     case 'riverbed': {
       // дно реки: илистый песок, галька, редкие водоросли — видно сквозь воду
       const [c, g] = canvas(512, 512); noise(g, 512, 512, '#8d8567', 22, 30000, 71);
@@ -748,6 +766,9 @@ export function mat(key: string): THREE.Material {
       ? new THREE.MeshStandardMaterial({ map: getTex(k), roughness: 0.94, metalness: 0.02, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 })
       : L({ map: getTex(k), polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
   } else if (key === 'zebra') m = L({ map: getTex('zebra'), transparent: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, depthWrite: false });
+  else if (key === 'poolWater') m = GFX.pbr
+    ? new THREE.MeshStandardMaterial({ map: getTex('water'), color: 0x7fd4e8, transparent: true, opacity: 0.28, metalness: 0.25, roughness: 0.18, depthWrite: false })
+    : new THREE.MeshPhongMaterial({ map: getTex('water'), color: 0x8ad7e8, transparent: true, opacity: 0.3, shininess: 90, depthWrite: false });
   else if (key === 'waterShallow') m = GFX.pbr
     ? new THREE.MeshStandardMaterial({ map: getTex('water'), color: 0x9fd4e0, transparent: true, opacity: 0.30, metalness: 0.2, roughness: 0.2, depthWrite: false })
     : new THREE.MeshPhongMaterial({ map: getTex('water'), color: 0xa8dbe4, transparent: true, opacity: 0.32, shininess: 70, depthWrite: false });
