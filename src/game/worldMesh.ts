@@ -365,8 +365,8 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
     }
     // дорожка к детской площадке и к пруду
     path(bp.x1 - 26, bp.z0 + sw, bp.x1 - 26, bp.z0 + 22, 3.6);
-    path(bp.x1 - 18, bp.z1 - 34, bp.x1 - 18, bp.z1 - 30, 4);
-    path(cx + ringR, cz, bp.x1 - 18 - 9, bp.z1 - 22, 4);
+    path(cx + ringR, cz, bp.x1 - 20 - 10, bp.z1 - 32, 4.5);
+    path(bp.x1 - 20, bp.z0 + 24, bp.x1 - 20, bp.z1 - 32 - 10, 3.6);
   }
 
   // промзона, пляж, парковка, поля

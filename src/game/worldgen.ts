@@ -685,7 +685,7 @@ export function generateLayout(): WorldLayout {
     }
     // мини-пруд: вода есть, купаться нельзя — по кромке видимая чугунная оградка
     {
-      const px = bpX1 - 18, pz = bpZ1 - 22, R = 7.5;
+      const px = bpX1 - 20, pz = bpZ1 - 32, R = 7.5;
       addProp({ t: 'pond', x: px, z: pz, h: R }, { w: R * 2, d: R * 2, h: 0.4 });
       const SEG = 20;
       for (let k = 0; k < SEG; k++) {
