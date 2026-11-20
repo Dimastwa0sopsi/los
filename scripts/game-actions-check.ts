@@ -3,6 +3,7 @@ import './domstub';
 import { Game } from '../src/game/game';
 import { generateLayout } from '../src/game/worldgen';
 import { K } from '../src/game/keys';
+import { buildInterior } from '../src/game/interiors';
 
 const L = generateLayout();
 const bath = L.buildings.find(b => b.kind === 'banya' && b.bathOwner !== undefined)!;
@@ -39,7 +40,8 @@ const inputTest = (key: string, keys: string[], inVehicle = false, mobile = fals
 let r = inputTest(K.interact, ['F']); test('E не сажает в машину', r.enter === 0 && r.action === 0);
 r = inputTest(K.enterVehicle, ['F']); test('F сажает в машину', r.enter === 1 && r.action === 0);
 r = inputTest(K.interact, ['E']); test('E выполняет действие', r.enter === 0 && r.action === 1);
-r = inputTest(K.interact, [], true); test('E позволяет выйти из машины', r.exit === 1);
+r = inputTest(K.interact, [], true); test('E не выводит из машины', r.exit === 0);
+r = inputTest(K.enterVehicle, [], true); test('F позволяет выйти из машины', r.exit === 1);
 r = inputTest('', ['F'], false, true); test('контекстная кнопка телефона сажает в машину', r.action === 1);
 {
   const h = Object.create(Game.prototype) as any;
@@ -51,5 +53,21 @@ r = inputTest('', ['F'], false, true); test('контекстная кнопка
   h.handleInput(0.1);
   test('E открывает выбор для нескольких действий', selection?.type === 'context' && selection.choices.length === 2 && selection.choices[1].label === 'запереть');
   selection.choices[1].run(); test('дополнительное действие доступно через E', called === 'lock');
+}
+{
+  const h = Object.create(Game.prototype) as any;
+  const it = buildInterior('house_village');
+  const sofa = it.seats.filter(s => s.kind === 'sofa');
+  test('в доме есть два места на диване, компьютер и туалет', sofa.length === 2 && it.seats.some(s => s.kind === 'computer') && it.seats.some(s => s.kind === 'toilet'));
+  h.interior = it; h.state = { location: { b: 10 } }; h.remotes = new Map(); h.px = sofa[0].x - 1; h.pz = sofa[0].z; h.toast = () => {}; h.fallT = 0; h.lying = false;
+  const start = { x: h.px, z: h.pz };
+  h.toggleFurnitureSeat(); test('можно сесть на диван', h.furnitureSeat?.seat === sofa[0]);
+  h.toggleFurnitureSeat(); test('можно встать на прежнее место', !h.furnitureSeat && h.px === start.x && h.pz === start.z);
+  h.remotes.set(1, { ikey: h.interiorKey(), visible: true, x: sofa[0].x, z: sofa[0].z });
+  h.toggleFurnitureSeat(); test('занятое другим игроком место не выбирается', h.furnitureSeat?.seat === sofa[1]);
+  it.dispose();
+  const bathInterior = buildInterior('banya');
+  test('в бане два места на диване', bathInterior.seats.filter(s => s.kind === 'sofa').length === 2);
+  bathInterior.dispose();
 }
 process.exit(errors ? 1 : 0);

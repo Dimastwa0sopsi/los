@@ -557,6 +557,20 @@ export class AIDriver {
     return { desired, target };
   }
 }
+/** Пересечение кузовов с учётом поворота и относительной скорости. */
+export function trafficCrash(a: Pick<Vehicle, 'x' | 'z' | 'heading' | 'speed' | 'spec'>, b: Pick<Vehicle, 'x' | 'z' | 'heading' | 'speed' | 'spec'>): boolean {
+  const af = [Math.sin(a.heading), Math.cos(a.heading)], bf = [Math.sin(b.heading), Math.cos(b.heading)];
+  const ar = [af[1], -af[0]], br = [bf[1], -bf[0]], dx = b.x - a.x, dz = b.z - a.z;
+  const rv = Math.hypot(af[0] * a.speed - bf[0] * b.speed, af[1] * a.speed - bf[1] * b.speed);
+  if (rv < 2) return false;
+  for (const axis of [af, ar, bf, br]) {
+    const dot = (v: number[]) => Math.abs(v[0] * axis[0] + v[1] * axis[1]);
+    const ra = dot(af) * a.spec.len * 0.48 + dot(ar) * a.spec.wid * 0.46;
+    const rb = dot(bf) * b.spec.len * 0.48 + dot(br) * b.spec.wid * 0.46;
+    if (Math.abs(dx * axis[0] + dz * axis[1]) >= ra + rb) return false;
+  }
+  return true;
+}
 export function nearestNodeFast(L: WorldLayout, x: number, z: number) {
   let bi = 0, bd = Infinity;
   for (let i = 0; i < L.nodes.length; i++) { const n = L.nodes[i]; const d = (n.x - x) * (n.x - x) + (n.z - z) * (n.z - z); if (d < bd) { bd = d; bi = i; } }

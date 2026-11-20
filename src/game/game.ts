@@ -11,9 +11,9 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { buildWorldMeshes, type WorldMeshes } from './worldMesh';
 import { Collision } from './collision';
 import { Character, type Pose } from './character';
-import { Vehicle, AIDriver, playerDrive, heliLanded, nearestNodeFast, type AICtx, type DriveResult } from './vehicles';
+import { Vehicle, AIDriver, playerDrive, heliLanded, nearestNodeFast, trafficCrash, type AICtx, type DriveResult } from './vehicles';
 import { PedSystem, randomLook, type Ped } from './npc';
-import { buildInterior, interiorForBuilding, type Interior, type InteriorKind } from './interiors';
+import { buildInterior, interiorForBuilding, type Interior, type InteriorKind, type InteriorSeat } from './interiors';
 import { Sound } from './audio';
 import { Input } from './input';
 import { K } from './keys';
@@ -82,7 +82,7 @@ export { POI_ICON };
 const POI_COLOR: Record<string, string> = { shop24: '#e11d48', supermarket: '#f59e0b', cafe: '#a16207', pharmacy: '#059669', gunshop: '#374151', service: '#2563eb', clothes: '#8b5cf6', barber: '#db2777', mall: '#7c3aed', dealer: '#0ea5e9', market: '#0369a1', gas: '#16a34a', police: '#1d4ed8', hospital: '#dc2626', fire: '#b91c1c', cityhall: '#1e3a8a', bank: '#0f766e', vshop: '#e11d48', vadmin: '#1e3a8a', checkpoint: '#57534e', farm: '#a16207', beach: '#0891b2', fishshop: '#0e7490', bar: '#a21caf', ozgim: '#0ea5e9' };
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
-const REMOTE_POSES = new Set(['dance1', 'dance2', 'dance3', 'dance4', 'dance5', 'wave', 'clap', 'sit', 'liedown', 'pushup', 'tread', 'crouch', 'crouchwalk', 'crouchaim', 'idle', 'walk', 'run', 'guard', 'jab', 'cross', 'hook', 'block', 'flinch', 'aim', 'knock', 'lie', 'fall', 'smoke', 'carry', 'swim', 'punch', 'cover', 'coverwalk', 'coveraim', 'bow', 'salute', 'point', 'think', 'stretch', 'cheer']);
+const REMOTE_POSES = new Set(['dance1', 'dance2', 'dance3', 'dance4', 'dance5', 'wave', 'clap', 'sit', 'liedown', 'pushup', 'tread', 'crouch', 'crouchwalk', 'crouchaim', 'idle', 'walk', 'run', 'guard', 'jab', 'cross', 'hook', 'block', 'flinch', 'aim', 'knock', 'lie', 'fall', 'smoke', 'carry', 'swim', 'sitbench', 'sitpc', 'punch', 'cover', 'coverwalk', 'coveraim', 'bow', 'salute', 'point', 'think', 'stretch', 'cheer']);
 function seatPose(seat: { pose: string }, idx: number): Pose {
   if (seat.pose === 'ride' || seat.pose === 'scoot' || seat.pose === 'ridepass') return seat.pose as Pose;
   return idx === 0 ? 'drive' : 'passenger';
@@ -139,6 +139,7 @@ export class Game {
   firstPerson = false;
   /** угол поворота персонажа в 3D-превью одежды */
   lookOrbit = 0;
+  furnitureSeat: { seat: InteriorSeat; fromX: number; fromZ: number } | null = null;
   interior: Interior | null = null; interiorKind: InteriorKind | null = null;
   panel: Panel | null = null; prompt: Prompt | null = null;
   weapon = 'fists'; smokeT = 0; dizzyT = 0; fallT = 0;
@@ -553,6 +554,7 @@ export class Game {
     this.px = b.door.x; this.pz = b.door.z; this.pa = b.door.a; this.py = this.col.groundAt(b.door.x, b.door.z, 2, 3); this.camYaw = b.door.a;
   }
   private setInterior(it: Interior, kind: InteriorKind, spot?: { x: number; z: number; a: number; y?: number }) {
+    this.furnitureSeat = null;
     if (this.interior) { this.interior.dispose(); this.peds.clearStatic(); }
     this.interior = it; this.interiorKind = kind;
     this.scene.add(it.group);
@@ -626,7 +628,7 @@ export class Game {
   exitInterior() {
     const loc = this.state.location; if (!loc) return;
     const b = this.L.buildings[loc.b];
-    this.lying = false;
+    this.lying = false; this.furnitureSeat = null;
     if (this.job?.type === 'shift') { this.toast('Смена прервана'); if (this.job.cust) this.peds.removePed(this.job.cust); this.job = null; }
     if (loc.unit !== undefined && b.kind === 'apartment') { // из квартиры — в подъезд этого дома, к её двери
       const owned = [0, 1, 2, 3].map((u) => this.state.properties.includes(`${b.id}:${u}`));
@@ -909,9 +911,9 @@ export class Game {
       }
       if (I.pressed(K.autopilot) || I.vPressed('autopilot')) this.toggleAutopilot();
     }
-    // F — посадка; E — контекстное действие или выход из транспорта.
-    if (I.pressed(K.enterVehicle) && !this.inVeh && !this.rideRemote) this.tryEnterVehicle();
-    else if (I.pressed(K.enterVehicle) && this.inVeh?.isHeli) this.exitVehicle();
+    // F — посадка и выход, E — контекстные действия.
+    if (I.pressed(K.enterVehicle)) { if (this.inVeh) this.exitVehicle(); else if (this.rideRemote) this.exitRemoteRide(); else this.tryEnterVehicle(); }
+    if ((I.pressed(K.sitFurniture) || (this.furnitureSeat && I.vPressed('jump'))) && !this.inVeh && !this.rideRemote) this.toggleFurnitureSeat();
     if (I.vPressed('enter')) { if (this.inVeh) this.exitVehicle(); else if (this.rideRemote) this.exitRemoteRide(); else this.tryEnterVehicle(); }
     const eKey = (I.pressed(K.interact) && !(v && v.isHeli)) || I.vPressed('interact');
     if (eKey) {
@@ -925,8 +927,8 @@ export class Game {
           this.openPanel({ type: 'context', choices });
         } else p.act();
       }
-      else if (this.inVeh) this.exitVehicle();
-      else if (this.rideRemote) this.exitRemoteRide();
+      else if (I.vPressed('interact') && this.inVeh) this.exitVehicle();
+      else if (I.vPressed('interact') && this.rideRemote) this.exitRemoteRide();
     }
     if (I.pressed(K.work) && !this.lying) this.cycleWeapon();
     // Все действия у объектов выбираются по E; R остаётся переключением оружия.
@@ -990,6 +992,13 @@ export class Game {
       ch.pose('selfie', performance.now() / 1000); if (ch.item !== 'phone') ch.setItem('phone');
       ch.root.visible = this.camMode.mode === 'selfie';
       return;
+    }
+    if (this.furnitureSeat) {
+      const seat = this.furnitureSeat.seat;
+      this.px = seat.x; this.pz = seat.z; this.pa = seat.a; this.py = 0; this.pvy = 0; this.lastSpeed = 0;
+      const pose: Pose = seat.kind === 'computer' ? 'sitpc' : 'sitbench';
+      ch.root.position.set(this.px, this.py, this.pz); ch.root.rotation.set(0, this.pa, 0); ch.pose(pose, performance.now() / 1000);
+      this.netPose = { p: pose, k: 0, pt: 0 }; return;
     }
     if (this.lying) {
       const bed = this.interior?.bed;
@@ -1490,7 +1499,13 @@ export class Game {
       o.sync();
       const rel = Math.abs((f1.x * v.speed - f2.x * o.speed) * nx + (f1.z * v.speed - f2.z * o.speed) * nz);
       if (rel > 3) {
-        v.speed *= 0.4; o.speed *= 0.3; o.shock = 3;
+        v.speed *= 0.4; o.speed *= 0.3;
+        if (o.role === 'traffic' && o.ai && o !== this.inVeh) {
+          // После удара игроком водитель пытается выехать, не исчезая.
+          o.shock = 0; o.ai.panic(v.x, v.z, 5);
+          const n = nearestNodeFast(this.L, o.x, o.z), next = this.L.adj[n]?.[0];
+          if (next) { o.ai.route = [n, next.n]; o.ai.k = 0; o.ai.mode = 'wander'; }
+        } else o.shock = 3;
         if (rel > 8) {
           this.crash(v, rel);
           if (!o.unbreakable) o.condition -= rel * 0.0032;
@@ -1550,6 +1565,7 @@ export class Game {
     const ctx = this.aiCtx();
     let count = 0;
     for (const v of [...this.vehicles]) {
+      if (!this.vehicles.includes(v)) continue;
       if (v === this.inVeh && !this.passenger) continue;
       if (v.role === 'aicombine') { this.updateAICombine(v, dt); continue; }
       if (!v.ai) {
@@ -1564,6 +1580,11 @@ export class Game {
       }
       if (d > 300 && v.role !== 'taxi' && v.role !== 'service' && !v.sirens) continue; // далеко — заморожен
       v.ai.step(v, dt, ctx);
+      // Убираем только обычный NPC-трафик; машины с игроками и служебные не исчезают.
+      if (v.role === 'traffic' && v !== this.inVeh && v.ai && v.model.group.visible) {
+        const other = this.vehicles.find(o => o !== v && o !== this.inVeh && o.role === 'traffic' && o.ai && o.model.group.visible && Math.abs(o.x - v.x) + Math.abs(o.z - v.z) < 14 && trafficCrash(v, o));
+        if (other) { this.removeVehicle(other); this.removeVehicle(v); continue; }
+      }
       if (v.role === 'police' && v.sirens) { const p = { x: v.x, z: v.z }; const h = this.col.pushCircle(p, v.spec.wid * 0.55, 0, 1.6, 0.55); if (h) { v.x = p.x; v.z = p.z; } }
       v.y += (this.col.groundAt(v.x, v.z, v.y, 0.6, 0.4) - v.y) * Math.min(1, dt * 8);
       if (d < 200) { v.model.animate(v.speed * dt, v.steer * 0.6); v.sync(); if (v.sirens) v.model.sirens(performance.now() / 1000); }
@@ -2238,19 +2259,33 @@ export class Game {
     return null;
   }
   // ================= ВЗАИМОДЕЙСТВИЯ =================
+  private toggleFurnitureSeat() {
+    if (this.furnitureSeat) { const p = this.furnitureSeat; this.furnitureSeat = null; this.px = p.fromX; this.pz = p.fromZ; return; }
+    if (!this.interior || this.lying || this.rideOn || this.fallT > 0) return;
+    const key = this.interiorKey();
+    const seats = this.interior.seats.filter(s => Math.hypot(s.x - this.px, s.z - this.pz) < 1.6 &&
+      !Array.from(this.remotes.values()).some(r => r.ikey === key && r.visible && Math.hypot(r.x - s.x, r.z - s.z) < 0.55));
+    seats.sort((a, b) => Math.hypot(a.x - this.px, a.z - this.pz) - Math.hypot(b.x - this.px, b.z - this.pz));
+    if (!seats.length) { this.toast('Подойдите к свободному месту'); return; }
+    this.furnitureSeat = { seat: seats[0], fromX: this.px, fromZ: this.pz }; this.emote = null; this.crouch = false;
+  }
   private updatePrompt() {
     this.prompt = this.findPrompt();
   }
   private findPrompt(): Prompt | null {
     const px = this.px, pz = this.pz;
     if (this.intro) return null;
-    if (this.rideRemote) return { text: 'E — выйти из машины', keys: ['E'], act: () => this.exitRemoteRide() };
+    if (this.rideRemote) return { text: 'F — выйти из машины', keys: ['F'], act: () => this.exitRemoteRide() };
+    if (this.furnitureSeat) {
+      if (this.furnitureSeat.seat.kind === 'computer') return { text: 'E — компьютер · . / Ю — встать', keys: ['E'], act: () => this.openPanel({ type: 'pc', mode: 'home' }) };
+      return { text: '. / Ю — встать', keys: ['E'], act: () => this.toggleFurnitureSeat() };
+    }
     if (this.lying) return { text: 'E — встать · I — еда из холодильника', keys: ['E'], act: () => { this.lying = false; if (this.interior?.bed) { this.px = this.interior.bed.x + 1.2; this.pz = this.interior.bed.z; } } };
     if (this.inVeh) {
       const v = this.inVeh;
       if (this.passenger) {
         if (this.taxi?.v === v && this.taxi.stage === 'waiting') return { text: 'E — выбрать точку на карте', keys: ['E'], act: () => this.openPanel({ type: 'map', mode: 'taxi' }) };
-        if (this.taxi?.v === v && this.taxi.stage === 'arrived') return { text: 'E — выйти из такси', keys: ['E'], act: () => this.exitVehicle() };
+        if (this.taxi?.v === v && this.taxi.stage === 'arrived') return { text: 'F — выйти из такси', keys: ['F'], act: () => this.exitVehicle() };
         return null;
       }
       if (v.owned) {
@@ -2280,6 +2315,9 @@ export class Game {
         const c = this.interior.acts.find((a) => a.action === 'counter');
         if (c && Math.hypot(c.x - px, c.z - pz) < 2.2) return { text: 'E — обслужить покупателя', keys: ['E'], act: () => this.serveCustomer() };
       }
+      const seat = this.interior.seats.find(s => Math.hypot(s.x - px, s.z - pz) < 1.6);
+      if (seat && !best) return { text: `. / Ю — сесть: ${seat.label}`, keys: ['E'], act: () => this.toggleFurnitureSeat() };
+      if (seat && best) best.text += ` · . / Ю — сесть: ${seat.label}`;
       return best;
     }
     if (this.rideOn) return { text: `E — сойти (${this.rideOn.name})`, keys: ['E'], act: () => this.leaveRide() };
@@ -2377,11 +2415,12 @@ export class Game {
       if (b.enter) {
         if (b.kind === 'house' || b.kind === 'vhouse') {
           const id = `${b.id}:0`; const own = this.state.properties.includes(id); const tk = this.takenBy(id);
-          if (own) { const lk = this.isLocked(id); return { text: `E — войти домой · L — ${lk ? 'открыть 🔓' : 'запереть 🔒'}`, keys: ['E', 'L'], act: () => this.enterBuilding(b), l: () => this.toggleLock(id) }; }
-          if (tk) return { text: tk.locked ? `🔒 Дом игрока ${tk.name} заперт` : `E — в гости к ${tk.name}`, keys: ['E'], act: () => this.enterBuilding(b) };
-          return { text: b.forSale ? `E — Дом на продажу: $${b.price?.toLocaleString('ru')}` : 'Чужой дом — заперто', keys: ['E'], act: () => this.enterBuilding(b) };
+          if (own) { const lk = this.isLocked(id); return { text: `E — войти домой · ID ${b.id} · L — ${lk ? 'открыть 🔓' : 'запереть 🔒'}`, keys: ['E', 'L'], act: () => this.enterBuilding(b), l: () => this.toggleLock(id) }; }
+          if (tk) return { text: tk.locked ? `🔒 Дом ID ${b.id} игрока ${tk.name} заперт` : `E — в гости к ${tk.name} · ID ${b.id}`, keys: ['E'], act: () => this.enterBuilding(b) };
+          return { text: b.forSale ? `E — Дом ID ${b.id}: $${b.price?.toLocaleString('ru')}` : `Чужой дом ID ${b.id} — заперто`, keys: ['E'], act: () => this.enterBuilding(b) };
         }
-        return { text: `E — войти: ${b.name}`, keys: ['E'], act: () => this.enterBuilding(b) };
+        const government = ['police', 'hospital', 'fire', 'cityhall', 'vadmin', 'checkpoint'].includes(b.kind);
+        return { text: `E — войти: ${b.name}${government ? '' : ` · ID ${b.id}`}`, keys: ['E'], act: () => this.enterBuilding(b) };
       }
     }
     // бассейн: нырнуть с бортика и вылезти обратно
@@ -2439,7 +2478,7 @@ export class Game {
     // гаражи
     for (const g of this.L.garages) if (Math.hypot(g.x - px, g.gateZ - 1.5 - pz) < 3.5) {
       const own = this.state.garages.includes(g.id);
-      return { text: own ? `Гараж №${g.id + 1} (ваш) — ворота открыты` : `E — Гараж №${g.id + 1}: купить за $${g.price.toLocaleString('ru')}`, keys: ['E'], act: () => { if (!own) this.openPanel({ type: 'garage', id: g.id }); } };
+      return { text: own ? `Гараж ID ${g.id} (ваш) — ворота открыты` : `E — Гараж ID ${g.id}: купить за $${g.price.toLocaleString('ru')}`, keys: ['E'], act: () => { if (!own) this.openPanel({ type: 'garage', id: g.id }); } };
     }
     // автобазар: места продажи
     const slotP = this.bazaarPrompt(px, pz); if (slotP) return slotP;
@@ -4409,7 +4448,7 @@ export class Game {
     if (!this.interior) return;
     const b = this.state.location ? this.L.buildings[this.state.location.b] : null;
     this.interior.dispose(); this.peds.clearStatic(); this.interior = null; this.interiorKind = null; this.activeCol = this.col;
-    this.W.root.visible = true; this.vehGroup.visible = true; this.sun.visible = true; this.lying = false;
+    this.W.root.visible = true; this.vehGroup.visible = true; this.sun.visible = true; this.lying = false; this.furnitureSeat = null;
     if (b) this.placeOutsideAt(b);
   }
   /** смена активного прогресса (соло ↔ онлайн): сохраняет текущий, выгружает его мир и загружает новый */
@@ -4845,7 +4884,7 @@ export class Game {
     this.seatChar(this.player, v, free);
     this.camDist = Math.max(5, v.spec.len * 1.1 + 2.5);
     this.sound.door();
-    this.toast(`Вы сели в машину к ${r.name}. E — выйти`);
+    this.toast(`Вы сели в машину к ${r.name}. F — выйти`);
   }
   // ================= аттракционы парка «Ракета» =================
   private nearestRide(r: number) {

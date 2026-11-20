@@ -30,6 +30,7 @@ export const K = {
   crouch: 'KeyC',
   interact: 'KeyE',
   enterVehicle: 'KeyF',
+  sitFurniture: 'Period',
   work: 'KeyR',
   rob: 'KeyL',
   reload: 'KeyG',
@@ -75,10 +76,12 @@ export const BINDINGS: Binding[] = [
   { ctx: 'foot', code: K.crouch, action: 'crouch', what: 'присесть: тише, ниже, не видно в окне' },
   { ctx: 'foot', code: K.interact, action: 'interact', what: 'действие рядом: войти, купить, поговорить' },
   { ctx: 'foot', code: K.enterVehicle, action: 'enterVehicle', what: 'сесть в транспорт' },
+  { ctx: 'foot', code: K.sitFurniture, action: 'sitFurniture', what: '. / Ю — сесть или встать' },
   { ctx: 'foot', code: K.work, action: 'work', what: 'сменить оружие' },
   { ctx: 'foot', code: K.reload, action: 'reload', what: 'перезарядка' },
   { ctx: 'foot', code: K.cover, action: 'cover', what: 'укрытие за стенами и машинами' },
   // ---- за рулём ----
+  { ctx: 'car', code: K.enterVehicle, action: 'enterVehicle', what: 'выйти из транспорта' },
   { ctx: 'car', code: K.forward, action: 'forward', what: 'газ (W), S — тормоз и задний ход' },
   { ctx: 'car', code: K.handbrake, action: 'handbrake', what: 'ручник: вместе с рулём — дрифт' },
   { ctx: 'car', code: K.lights, action: 'lights', what: 'фары' },
@@ -92,13 +95,14 @@ export const BINDINGS: Binding[] = [
   { ctx: 'car', code: K.hydroUp, action: 'hydroUp', what: 'поднять подвеску' },
   { ctx: 'car', code: K.hydroDown, action: 'hydroDown', what: 'опустить подвеску' },
   // ---- вертолёт ----
+  { ctx: 'heli', code: K.enterVehicle, action: 'enterVehicle', what: 'выйти из вертолёта' },
   { ctx: 'heli', code: K.heliUp, action: 'heliUp', what: 'набрать высоту' },
   { ctx: 'heli', code: K.heliDown, action: 'heliDown', what: 'снизиться' },
 ];
 
 const PRETTY: Record<string, string> = {
   Space: 'Пробел', ShiftLeft: 'Shift', ControlLeft: 'Ctrl', Escape: 'Esc', Backquote: '`',
-  BracketRight: ']', Backslash: '\\', Slash: '/', PageUp: 'PgUp', PageDown: 'PgDn', Enter: 'Enter', Tab: 'Tab',
+  Period: '. / Ю', BracketRight: ']', Backslash: '\\', Slash: '/', PageUp: 'PgUp', PageDown: 'PgDn', Enter: 'Enter', Tab: 'Tab',
 };
 
 /** как клавишу показать игроку */

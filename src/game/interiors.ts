@@ -7,7 +7,9 @@ import { INTERIOR_ORIGIN } from './config';
 import { dressInterior } from './interiorDetail';
 
 export interface Interact { x: number; z: number; r: number; label: string; action: string; y?: number }
+export type InteriorSeat = { x: number; z: number; a: number; kind: 'computer' | 'toilet' | 'sofa'; label: string };
 export interface Interior {
+  seats: InteriorSeat[];
   group: THREE.Group; colliders: Box[]; acts: Interact[]; spawn: { x: number; z: number; a: number; y?: number };
   npcs: { x: number; z: number; a: number; role: string }[]; bounds: { x0: number; x1: number; z0: number; z1: number; h: number };
   /** лампы интерьера: бар меняет их цвет на диско-свет */
@@ -34,6 +36,7 @@ export const GOODS = ['#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#a855f7', '#f
 export class IB {
   b = new Batcher(); cols: Box[] = []; acts: Interact[] = []; npcs: Interior['npcs'] = []; lights: THREE.Light[] = []; group = new THREE.Group();
   ox = INTERIOR_ORIGIN.x; oz = INTERIOR_ORIGIN.z; doorSpots: Interior['doorSpots'] = {};
+  seats: InteriorSeat[] = [];
   bed?: Interior['bed']; pots: { x: number; z: number }[] = []; carts: THREE.Object3D[] = [];
   /** сколько вывесок, светильников и дверей нарисовали — для проверок */
   signs = 0; fixtures = 0; doors = 0; windows = 0;
@@ -89,6 +92,7 @@ export class IB {
     if (mk.startsWith('sign:')) this.signs++;
     this.b.add(mk, T.plane, M(this.ox + x, y, this.oz + z, ry, w, h, 1));
   }
+  seat(x: number, z: number, a: number, kind: InteriorSeat['kind'], label: string) { this.seats.push({ x: this.ox + x, z: this.oz + z, a, kind, label }); }
   act(x: number, z: number, r: number, label: string, action: string, y = 0) { this.acts.push({ x: this.ox + x, z: this.oz + z, r, label, action, y }); }
   /** геометрия светильника без источника света: большие залы освещаем мало
    *  реальными лампами, а «видимых» светильников ставим по сетке — так кадры целы */
@@ -376,7 +380,7 @@ export class IB {
     for (const m of this.b.build({ receive: true })) this.group.add(m);
     const g = this.group;
     return {
-      group: g, colliders: this.cols, acts: this.acts, npcs: this.npcs, spawn: { ...spawn, x: this.ox + spawn.x, z: this.oz + spawn.z },
+      group: g, seats: this.seats, colliders: this.cols, acts: this.acts, npcs: this.npcs, spawn: { ...spawn, x: this.ox + spawn.x, z: this.oz + spawn.z },
       bounds: { x0: this.ox + bounds.x0, x1: this.ox + bounds.x1, z0: this.oz + bounds.z0, z1: this.oz + bounds.z1, h: bounds.h },
       bed: this.bed, doorSpots: this.doorSpots, pots: this.pots.map((p) => ({ x: this.ox + p.x, z: this.oz + p.z })), lights: this.lights, carts: this.carts,
       stats: { meshes: g.children.length, signs: this.signs, fixtures: this.fixtures, doors: this.doors, windows: this.windows },
@@ -1133,10 +1137,13 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
       S(8, 9, 2.8); ib.room(W, D, H, 'tex:parquet', WALLS.panel, 'Выйти из бани', 'wood');
       ib.wall(-4, 0.5, 4, 0.5, H, WALLS.panel, [[-2, 1.5]]);
       ib.f('c:#865c37', -2, 0, 0.48, 1.3, 2.1, 0.07, false);
-      ib.sofa(2.5, 2.9, 1.8, 0, '#735342');
+      ib.sofa(2.5, 3.65, 2.0, Math.PI, '#735342');
+      for (const x of [2.05, 2.95]) ib.seat(x, 3.65, Math.PI, 'sofa', 'диван бани');
       ib.act(2.7, 1.5, 0.95, 'Замок бани', 'bath_lock');
-      ib.f('c:#44403c', -3.2, 0, -0.6, 0.9, 1.0, 0.9);
-      ib.f('c:#78716c', -3.2, 1.0, -0.6, 0.75, 0.25, 0.75, false);
+      ib.f('c:#44403c', -3.05, 0, -0.95, 1.55, 1.45, 1.3);
+      ib.f('c:#78716c', -3.05, 1.45, -0.95, 1.45, 0.32, 1.2, false);
+      ib.f('c:#1c1917', -2.25, 0.25, -0.95, 0.04, 0.55, 0.55, false);
+      ib.f('c:#57534e', -3.05, 1.77, -1.25, 0.26, 0.9, 0.26, false);
       for (const x of [2.5, 3.3]) {
         ib.f('chrome', x, 1.0, 0.32, 0.14, 0.12, 0.3, false);
         ib.f('c:#94a3b8', x, 0.6, 0.1, 0.45, 0.16, 0.4, false);
@@ -1330,12 +1337,19 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
       ib.rug(left + 1.8, back + 3.45, 2.6, 1.5, village ? '#a16207' : '#a8a29e');
       ib.painting(left + 1.65, 2.05, back + 0.13, 0, '#72999a');
       ib.pc(left + 1.8, front - 0.7, Math.PI, 'homepc', 'Домашний компьютер');
+      ib.seat(left + 1.8, front - 1.42, 0, 'computer', 'компьютер');
 
       // Санузел отделён стенами и проёмом; всё оборудование у стен.
       ib.floor(bathX + 0.1, back + 0.1, right - 0.1, bathZ - 0.1, 'tex:floortile', 1.5, 0.012);
       ib.wall(bathX, back, bathX, bathZ, H, WALLS.white);
       ib.wall(bathX, bathZ, right, bathZ, H, WALLS.white, [[right - 1.5, 1.35]]);
       ib.f('c:#f8fafc', right - 0.6, 0, back + 0.9, 0.65, 0.43, 0.9);
+      ib.f('c:#f8fafc', right - 0.6, 0.43, back + 0.54, 0.62, 0.62, 0.24, false);
+      ib.seat(right - 0.6, back + 0.95, 0, 'toilet', 'туалет');
+      // Душевой поддон и смеситель в отдельном санузле.
+      ib.f('c:#e2e8f0', bathX + 0.65, 0, bathZ - 0.65, 0.9, 0.09, 0.9, false);
+      ib.f('chrome', bathX + 0.15, 0.85, bathZ - 0.65, 0.08, 1.2, 0.08, false);
+      ib.f('chrome', bathX + 0.30, 1.95, bathZ - 0.65, 0.35, 0.07, 0.12, false);
       ib.f('c:#f8fafc', bathX + 0.55, 0, back + 0.65, 0.75, 0.82, 0.6);
       ib.f('c:#dbeafe', bathX + 0.55, 1.0, back + 0.12, 0.7, 0.65, 0.04, false); // зеркало
       ib.f('c:#e2e8f0', right - 0.55, 0, bathZ - 0.55, 0.75, 0.82, 0.65); // стиральная машина
@@ -1351,6 +1365,7 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
       ib.rug(0, -1.5, 2.4, 2.3, village ? '#b98c6b' : '#d6d3d1');
       // Гостиная справа: диван смотрит к телевизору, центральный путь свободен.
       ib.sofa(right - 1.25, 1.35, 2.2, -Math.PI / 2, village ? '#8b5e4a' : '#64748b');
+      for (const z of [0.85, 1.85]) ib.seat(right - 1.25, z, -Math.PI / 2, 'sofa', 'диван');
       ib.tv(right - 3.25, 1.35, 1.35, Math.PI / 2);
       ib.rug(right - 2.25, 1.35, 2.5, 2.7, village ? '#a16207' : '#94a3b8');
       ib.plant(right - 0.55, front - 0.7);
@@ -1474,7 +1489,7 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
       break;
     }
   }
-  if (kind !== 'basement' && kind !== 'banya') dressInterior(ib, kind, { W, D, H, venue, seed });
+  if (!ib.residential && kind !== 'basement' && kind !== 'banya') dressInterior(ib, kind, { W, D, H, venue, seed });
   if (kind !== 'basement' && kind !== 'banya') ib.common(W, D, H, kind);
   const spawnZ = D / 2 - 1.6;
   return ib.finish({ x: 0, z: spawnZ, a: Math.PI }, { x0: -W / 2, x1: W / 2, z0: -D / 2, z1: D / 2, h: H });

@@ -3,7 +3,7 @@
  *   npm run check:npc
  */
 import { generateLayout } from '../src/game/worldgen';
-import { AIDriver, type AICtx } from '../src/game/vehicles';
+import { AIDriver, trafficCrash, type AICtx } from '../src/game/vehicles';
 
 const L = generateLayout();
 // берём обычную городскую улицу в жилой части
@@ -114,4 +114,11 @@ if (after > 15) bad++;
 }
 
 console.log(bad ? '✗ поведение водителей не то' : '  ✓ водители уходят от опасности и возвращаются к спокойной езде');
+{
+  const a = fakeV(0, 0), b = fakeV(0, 3);
+  a.speed = 8; b.speed = -8;
+  const ok = trafficCrash(a, b) && !trafficCrash(a, fakeV(20, 20));
+  console.log(`  ${ok ? '✓' : '✗'} столкновение двух NPC определяется по кузовам и относительной скорости`);
+  if (!ok) bad++;
+}
 process.exit(bad ? 1 : 0);

@@ -66,7 +66,7 @@ function mergeChildren(g: THREE.Object3D, keep: THREE.Object3D[]) {
   g.add(mesh);
 }
 const clampN = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
-export type Pose = 'idle' | 'walk' | 'run' | 'drive' | 'ride' | 'passenger' | 'punch' | 'lie' | 'carry' | 'smoke' | 'shoot' | 'swim' | 'sitbench' | 'dead' | 'fall'
+export type Pose = 'idle' | 'walk' | 'run' | 'drive' | 'ride' | 'passenger' | 'punch' | 'lie' | 'carry' | 'smoke' | 'shoot' | 'swim' | 'sitbench' | 'sitpc' | 'dead' | 'fall'
   | 'dance1' | 'dance2' | 'dance3' | 'dance4' | 'dance5' | 'wave' | 'clap' | 'sit' | 'liedown' | 'pushup' | 'scoot' | 'ridepass' | 'tread' | 'selfie'
   | 'handsup' | 'guard' | 'jab' | 'cross' | 'hook' | 'block' | 'flinch' | 'aim' | 'knock' | 'crouch' | 'crouchwalk' | 'crouchaim'
   | 'cover' | 'coverwalk' | 'coveraim' | 'bow' | 'salute' | 'point' | 'think' | 'stretch' | 'cheer'
@@ -396,7 +396,7 @@ export class Character {
       }
       case 'lie': this.visual.rotation.x = -Math.PI / 2; this.visual.position.set(0, 0.12, 0.85); this.shL.rotation.z = 0.2; this.shR.rotation.z = -0.2; break;
       case 'dead': case 'fall': this.visual.rotation.x = -Math.PI / 2; this.visual.position.set(0, 0.12, 0.85); this.shL.rotation.z = 1.2; this.shR.rotation.z = -1.0; this.hipL.rotation.z = 0.2; break;
-      case 'sitbench': this.hips.position.y = 0.5; this.hipL.rotation.x = -1.5; this.hipR.rotation.x = -1.5; this.knL.rotation.x = 1.5; this.knR.rotation.x = 1.5; this.shL.rotation.x = -0.3; this.shR.rotation.x = -0.3; break;
+      case 'sitpc': case 'sitbench': this.hips.position.y = 0.5; this.hipL.rotation.x = -1.5; this.hipR.rotation.x = -1.5; this.knL.rotation.x = 1.5; this.knR.rotation.x = 1.5; this.shL.rotation.x = p === 'sitpc' ? -1.05 + Math.sin(t * 7) * 0.08 : -0.3; this.shR.rotation.x = p === 'sitpc' ? -1.05 + Math.cos(t * 8) * 0.08 : -0.3; if (p === 'sitpc') { this.elL.rotation.x = -0.8; this.elR.rotation.x = -0.8; } break;
       case 'swim': // кроль у поверхности: тело горизонтально, голова над водой
         this.visual.rotation.x = 1.38; this.visual.position.set(0, 0.05, -0.75);
         this.head.rotation.x = -0.9; this.shL.rotation.x = -2.6 + s * 1.2; this.shR.rotation.x = -2.6 - s * 1.2; this.elL.rotation.x = -0.3; this.elR.rotation.x = -0.3;
