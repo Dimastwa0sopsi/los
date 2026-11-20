@@ -70,9 +70,12 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
   const bankX = (z: number) => L.river.center(z);
   // плоский четырёхугольник на земле: точки по кругу, UV в метрах (трава/дно не «мылятся»)
   const flat4 = (b: Batcher, key: string, pts: [number, number][], y: number, s = 12.5) => {
-    const area = (pts[0][0] * pts[1][1] - pts[1][0] * pts[0][1]) + (pts[1][0] * pts[2][1] - pts[2][0] * pts[1][1])
-      + (pts[2][0] * pts[3][1] - pts[3][0] * pts[2][1]) + (pts[3][0] * pts[0][1] - pts[0][0] * pts[3][1]);
-    const order = area > 0 ? [0, 1, 2, 0, 2, 3] : [0, 3, 2, 0, 2, 1];
+    // Самопроверка обхода: считаем нормаль первого треугольника и при необходимости
+    // разворачиваем — иначе земля/вода оказываются вывернутыми и «исчезают» сверху.
+    const ny = (p: [number, number][], o: number[]) =>
+      (p[o[2]][1] - p[o[0]][1]) * (p[o[1]][0] - p[o[0]][0]) - (p[o[2]][0] - p[o[0]][0]) * (p[o[1]][1] - p[o[0]][1]);
+    let order = [0, 1, 2, 0, 2, 3];
+    if (ny(pts, order) > 0) order = [0, 3, 2, 0, 2, 1];
     const pos: number[] = [], uv2: number[] = [];
     for (const i of order) { pos.push(pts[i][0], y, pts[i][1]); uv2.push(pts[i][0] / s, pts[i][1] / s); }
     b.raw(key, pos, uv2);

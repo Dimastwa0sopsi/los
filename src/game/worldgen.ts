@@ -1270,6 +1270,29 @@ export function generateLayout(): WorldLayout {
   for (const b of buildings) if (b.kind === 'vshop') truckDests.push({ name: 'Сельмаг · ' + (b.village ?? ''), x: b.door.x, z: b.door.z });
   for (const b of buildings) if (b.kind === 'mall' || (b.kind === 'supermarket' && b.name.startsWith('Гипер'))) truckDests.push({ name: b.name, x: b.door.x, z: b.door.z });
   // ---------- Сегменты дорог для проверки свободных полос ----------
+  // ---------- чистка сети: одна дорога на одну линию ----------
+  // При генерации деревень и подъездов поверх асфальта иногда ложился дубль-просёлок:
+  // два полотна на одной линии давали мерцание и «две дороги на одной». Оставляем
+  // приоритетное покрытие (шоссе → авеню → город → промзона → деревня → грунт).
+  {
+    const RANK: Record<RoadKind, number> = { highway: 6, avenue: 5, city: 4, industrial: 3, village: 2, dirt: 1 };
+    const keyOf = (e: { a: number; b: number }) => {
+      const A = nodes[e.a], B = nodes[e.b];
+      const k1 = Math.round(A.x) + ',' + Math.round(A.z), k2 = Math.round(B.x) + ',' + Math.round(B.z);
+      return k1 < k2 ? k1 + '|' + k2 : k2 + '|' + k1;
+    };
+    const best = new Map<string, { id: number; a: number; b: number; kind: RoadKind; w: number }>();
+    for (const e of edges) {
+      const k = keyOf(e), p = best.get(k);
+      if (!p || RANK[e.kind] > RANK[p.kind] || (RANK[e.kind] === RANK[p.kind] && e.w > p.w)) best.set(k, e);
+    }
+    const keep = new Set(best.values());
+    const pruned = edges.filter((e) => keep.has(e));
+    if (pruned.length !== edges.length) {
+      edges.length = 0;
+      for (const e of pruned) { e.id = edges.length; edges.push(e); }
+    }
+  }
   const roadSegments = edges.map((e) => ({ ax: nodes[e.a].x, az: nodes[e.a].z, bx: nodes[e.b].x, bz: nodes[e.b].z, w: e.w, kind: e.kind }));
   // припаркованные машины у бордюров городских улиц (можно угнать)
   {
