@@ -1,7 +1,7 @@
 {
   "name": "react-vite-tailwind",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.5.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -19,7 +19,9 @@
     "bump:minor": "npm version minor --no-git-tag-version",
     "bump:major": "npm version major --no-git-tag-version",
     "check:server": "esbuild scripts/server-check.ts --bundle --platform=node --format=cjs --outfile=.check/server.cjs --log-level=error && node .check/server.cjs",
-    "check:version": "esbuild scripts/version-check.ts --bundle --platform=node --format=cjs --outfile=.check/version.cjs --log-level=error && node .check/version.cjs"
+    "check:version": "esbuild scripts/version-check.ts --bundle --platform=node --format=cjs --outfile=.check/version.cjs --log-level=error && node .check/version.cjs",
+    "check:ads": "esbuild scripts/ads-check.ts --bundle --platform=node --format=cjs --outfile=.check/ads.cjs --log-level=error && node .check/ads.cjs",
+    "check:mesh": "esbuild scripts/mesh-check.ts --bundle --platform=node --format=cjs --outfile=.check/mesh.cjs --log-level=error --loader:.png=empty && node .check/mesh.cjs"
   },
   "dependencies": {
     "clsx": "2.1.1",

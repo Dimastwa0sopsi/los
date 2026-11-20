@@ -5,7 +5,7 @@ import { type Look, SKINS, HAIR_COLORS, CLOTH_COLORS, EYE_COLORS, FACE_SHAPES, E
 import { CELL, ROAD_W, SIDEWALK, N, RNG, clamp, angleDiff } from './config';
 import type { WorldLayout } from './worldgen';
 
-export type PedKind = 'city' | 'village' | 'beach' | 'static' | 'vendor' | 'puppet';
+export type PedKind = 'city' | 'village' | 'beach' | 'park' | 'static' | 'vendor' | 'puppet';
 export const POSE_CODES: Pose[] = ['idle', 'walk', 'run', 'lie', 'swim', 'shoot', 'dead', 'guard', 'jab', 'cross', 'hook', 'block', 'flinch', 'knock', 'sitbench', 'punch'];
 export interface Ped {
   char: Character; kind: PedKind; x: number; z: number; y: number; a: number; speed: number;
@@ -16,6 +16,8 @@ export interface Ped {
   bi: number; bj: number; corner: number; crossing: boolean; waitAxisEW: boolean | null; crossNode: number;
   // деревня/пляж
   homeX: number; homeZ: number; spot: number; lineA?: { x: number; z: number }; lineB?: { x: number; z: number };
+  /** парк: центр парка и его границы — гуляем только внутри */
+  park?: { cx: number; cz: number; r: number };
   attackCd: number; role?: string; brave: boolean; active: boolean;
   /** объезд препятствий: выбранная сторона обхода и время «прилипания» к ней */
   steerSide?: number; steerT?: number; steerA?: number; stuckT?: number;
@@ -94,6 +96,35 @@ export class PedSystem {
       const t = rng.next(); p.x = p.lineA.x + (p.lineB.x - p.lineA.x) * t; p.z = p.lineA.z + (p.lineB.z - p.lineA.z) * t;
       p.tx = k % 3 === 0 ? p.lineA.x : p.lineB.x; p.tz = k % 3 === 0 ? p.lineA.z : p.lineB.z; p.speed = 1.1;
     }
+    // парк «Ракета»: гуляющие семьями, дети у площадки, парочки на кольце
+    for (const bp of this.L.bigParks) {
+      const cx = (bp.x0 + bp.x1) / 2, cz = (bp.z0 + bp.z1) / 2;
+      const inner = Math.min(bp.x1 - bp.x0, bp.z1 - bp.z0) / 2 - 6;
+      const total = 22;
+      for (let k = 0; k < total; k++) {
+        const p = this.make('park');
+        p.park = { cx, cz, r: Math.min(30, inner) };
+        p.homeX = cx; p.homeZ = cz;
+        // 0–1 балованные дети у площадки, 2–3 «на лавочке», остальные гуляют
+        p.spot = k < 3 ? 0 : k < 6 ? 1 : 2;
+        if (p.spot === 0) {
+          p.x = bp.x1 - 26 + (rng.next() - 0.5) * 8; p.z = bp.z0 + 14 + (rng.next() - 0.5) * 8;
+          p.state = 'walk'; p.speed = 1.9 + rng.next() * 0.5;
+        } else if (p.spot === 1) {
+          const a = (k / total) * Math.PI * 2;
+          p.x = cx + Math.cos(a) * 13.8; p.z = cz + Math.sin(a) * 13.8;
+          p.state = 'idle'; p.timer = 6 + rng.next() * 10; p.a = -a;
+        } else {
+          const a = rng.next() * Math.PI * 2;
+          const rr = 20 + rng.next() * 9;
+          p.x = cx + Math.cos(a) * rr; p.z = cz + Math.sin(a) * rr;
+          p.state = 'walk'; p.speed = 1.15 + rng.next() * 0.4;
+        }
+        const t = this.parkTarget(p);
+        p.tx = t.x; p.tz = t.z;
+        p.y = 0.17;
+      }
+    }
     // пляж: много отдыхающих
     const b = this.L.beach;
     for (let k = 0; k < 26; k++) {
@@ -106,6 +137,22 @@ export class PedSystem {
       p.state = mode === 0 ? 'lie' : mode === 1 ? 'stand' : mode === 3 ? 'swim' : 'walk';
       p.tx = p.homeX; p.tz = p.homeZ + 30; p.speed = 1.0;
     }
+  }
+  /** новая точка прогулки в парке: кольцо, аллея или площадь у ракеты */
+  parkTarget(p: Ped): { x: number; z: number } {
+    const pk = p.park ?? { cx: p.x, cz: p.z, r: 26 };
+    const roll = rng.next();
+    if (roll < 0.45) {                                  // прогулочное кольцо
+      const a = rng.next() * Math.PI * 2, rr = pk.r + (rng.next() - 0.5) * 2.4;
+      return { x: pk.cx + Math.cos(a) * rr, z: pk.cz + Math.sin(a) * rr };
+    }
+    if (roll < 0.75) {                                  // аллея: строго по оси
+      const along = (rng.next() - 0.5) * 2 * (pk.r + 18);
+      return rng.chance(0.5) ? { x: pk.cx + along, z: pk.cz + (rng.next() - 0.5) * 2 }
+        : { x: pk.cx + (rng.next() - 0.5) * 2, z: pk.cz + along };
+    }
+    const a = rng.next() * Math.PI * 2, rr = 4 + rng.next() * (pk.r - 6);
+    return { x: pk.cx + Math.cos(a) * rr, z: pk.cz + Math.sin(a) * rr };
   }
   addQuest(look: Look, x: number, z: number, a: number, role: string, brave = false) { const p = this.make('vendor', look); p.x = x; p.z = z; p.a = a; p.homeX = x; p.homeZ = z; p.y = 0.15; p.role = role; p.state = brave ? 'fight' : 'stand'; p.brave = brave; p.attackCd = 1; return p; }
   initVendors() {
@@ -237,6 +284,15 @@ export class PedSystem {
           } else if (p.kind === 'village' && p.lineA && p.lineB) {
             const d = toward(p.tx, p.tz, p.speed);
             if (d < 0.3) { const atA = Math.hypot(p.tx - p.lineA.x, p.tz - p.lineA.z) < 1; p.tx = atA ? p.lineB.x : p.lineA.x; p.tz = atA ? p.lineB.z : p.lineA.z; p.state = 'idle'; p.timer = 3 + rng.next() * 4; }
+          } else if (p.kind === 'park') {
+            const d = toward(p.tx, p.tz, p.speed);
+            if (d < 0.6 || (p.stuckT ?? 0) > 1.5) {
+              // остановились полюбоваться / поболтать — и дальше
+              p.state = rng.chance(0.35) ? 'idle' : 'walk';
+              p.timer = 2 + rng.next() * 6;
+              const t = this.parkTarget(p);
+              p.tx = t.x; p.tz = t.z;
+            }
           } else if (p.kind === 'beach') {
             const d = toward(p.tx, p.tz, p.speed);
             if (d < 0.4) {
@@ -340,6 +396,7 @@ export class PedSystem {
       p.tx = toA ? p.lineB.x : p.lineA.x; p.tz = toA ? p.lineB.z : p.lineA.z;
       p.state = 'walk'; return;
     }
+    if (p.kind === 'park') { const t = this.parkTarget(p); p.tx = t.x; p.tz = t.z; p.state = 'walk'; return; }
     if (p.kind === 'beach') { p.tx = p.homeX; p.tz = p.homeZ; p.state = 'walk'; return; }
     const a = rng.next() * Math.PI * 2, r = 6 + rng.next() * 8;
     p.tx = ctx.px + Math.cos(a) * r; p.tz = ctx.pz + Math.sin(a) * r;

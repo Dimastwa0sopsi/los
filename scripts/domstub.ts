@@ -9,7 +9,9 @@ function makeCanvas(w = 256, h = 256) {
     createRadialGradient: () => grad,
     createPattern: () => null,
     measureText: () => ({ width: 40 }),
-    getImageData: (x: number, y: number, w: number, h: number) => ({ data: new Uint8ClampedArray(Math.max(1, w * h * 4)) }),
+    getImageData: (x: number, y: number, w: number, h: number) => ({ data: new Uint8ClampedArray(Math.max(1, w * h * 4)), width: w, height: h }),
+    createImageData: (w: number, h: number) => ({ data: new Uint8ClampedArray(Math.max(1, w * h * 4)), width: w, height: h }),
+    putImageData: () => undefined,
   };
   const ctx: any = new Proxy(base, {
     get(t: any, k: string) {

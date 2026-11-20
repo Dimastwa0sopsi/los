@@ -54,6 +54,8 @@ export interface WorldLayout {
   bigParks: { name: string; x0: number; z0: number; x1: number; z1: number }[];
   /** аттракционы, на которых можно кататься (геометрию строит ParkRides) */
   parkRides: { id: string; kind: 'ferris' | 'carousel' | 'tower' | 'coaster'; name: string; x: number; z: number; w: number; h: number; board: { x: number; z: number }; price: number }[];
+  /** рекламные щиты: свои объявления ставят игроки (см. game/ads.ts) */
+  billboards: { id: string; x: number; z: number; rot: number; kind: 'city' | 'road'; price: number; w: number; h: number }[];
   staticVehicles: StaticVehicle[]; garages: Garage[];
   lots: { x0: number; z0: number; x1: number; z1: number; spaces: { x: number; z: number; a: number }[]; name: string }[];
   parkades: { x: number; z: number; w: number; d: number; levels: number }[];
@@ -108,6 +110,7 @@ export function generateLayout(): WorldLayout {
   const parks: WorldLayout['parks'] = [];
   const parkRides: WorldLayout['parkRides'] = [];
   const bigParks: WorldLayout['bigParks'] = [];
+  const billboards: WorldLayout['billboards'] = [];
   const blocks: WorldLayout['blocks'] = [];
   const busStops: BusStop[] = [];
   const busRoutes: BusRoute[] = [];
@@ -139,6 +142,12 @@ export function generateLayout(): WorldLayout {
     const keep = edges.filter((e) => !inBigPark(nodes[e.a].x, nodes[e.a].z) && !inBigPark(nodes[e.b].x, nodes[e.b].z));
     edges.length = 0; keep.forEach((e, i) => { e.id = i; edges.push(e); });
     for (const n of nodes) if (inBigPark(n.x, n.z)) n.dead = true;
+    // светофоры у парка тоже убираем: на входах в парк пешеходные дорожки,
+    // а не перекрёсток — столбы и «красный» только мешали гулять
+    for (const n of nodes) {
+      if (n.gi === undefined || n.gj === undefined) continue;
+      if (n.gi >= BP.i && n.gi <= BP.i + 2 && n.gj >= BP.j && n.gj <= BP.j + 2) n.light = false;
+    }
   }
   const addNode = (x: number, z: number) => { nodes.push({ id: nodes.length, x, z, light: false }); return nodes.length - 1; };
   /** проложить дорогу по точкам от существующего узла; возвращает id узлов */
@@ -652,9 +661,18 @@ export function generateLayout(): WorldLayout {
       parkRides.push({ id: o.id, kind: o.kind, name: o.name, x: o.x, z: o.z, w: o.w, h: o.h, board: { x: o.bx, z: o.bz }, price: o.price });
     };
     addRide({ id: 'ferris', kind: 'ferris', name: 'Колесо обозрения', x: bpX0 + 20, z: bpCz - 26, w: 3.4, h: 12, bx: bpX0 + 20, bz: bpCz - 15, price: 6 });
-    addRide({ id: 'carousel', kind: 'carousel', name: 'Карусель', x: bpX1 - 22, z: bpCz - 26, w: 7, h: 8, bx: bpX1 - 22, bz: bpCz - 16, price: 4 });
+    addRide({ id: 'carousel', kind: 'carousel', name: 'Карусель', x: bpX1 - 22, z: bpCz - 26, w: 9, h: 8, bx: bpX1 - 22, bz: bpCz - 16, price: 4 });
     addRide({ id: 'tower', kind: 'tower', name: 'Башня падения', x: bpX0 + 20, z: bpCz + 24, w: 1.8, h: 22, bx: bpX0 + 26, bz: bpCz + 24, price: 7 });
     addRide({ id: 'coaster', kind: 'coaster', name: 'Американские горки', x: bpCx + 4, z: bpZ1 - 12, w: 52, h: 9, bx: bpCx + 4, bz: bpZ1 - 20, price: 9 });
+    // таблички у площадок посадки: название, цена и «касса» — чтобы аттракцион
+    // читался с земли, а не был просто железом
+    const rideSign = (name: string, price: number, x: number, z: number, a: number) => {
+      addProp({ t: 'vsign', x, z, r: a, c: `${name} · $${price}` }, { w: 0.4, d: 0.4, h: 2.6 });
+    };
+    rideSign('Колесо обозрения', 6, bpX0 + 15.5, bpCz - 15, Math.PI / 2);
+    rideSign('Карусель', 4, bpX1 - 26.5, bpCz - 16, -Math.PI / 2);
+    rideSign('Башня падения', 7, bpX0 + 26, bpCz + 29.5, Math.PI);
+    rideSign('Американские горки', 9, bpCx + 4, bpZ1 - 21.5, 0);
     // коллайдеры только под видимыми опорами (сами модели строит ParkRides)
     for (const sz of [-1.6, 1.6]) colliders.push({ x0: bpX0 + 20 - 2.6, x1: bpX0 + 20 + 2.6, z0: bpCz - 26 + sz - 0.5, z1: bpCz - 26 + sz + 0.5, y0: 0, y1: 0.9 });
     colliders.push({ x0: bpX0 + 20 - 0.7, x1: bpX0 + 20 + 0.7, z0: bpCz + 24 - 0.7, z1: bpCz + 24 + 0.7, y0: 0, y1: 22 });
@@ -685,7 +703,9 @@ export function generateLayout(): WorldLayout {
     }
     // мини-пруд: вода есть, купаться нельзя — по кромке видимая чугунная оградка
     {
-      const px = bpX1 - 20, pz = bpZ1 - 32, R = 7.5;
+      // пруд вынесен к юго-восточному углу: раньше он попадал на прогулочное
+      // кольцо, и пешеходы «шли по воде»
+      const px = bpX1 - 14, pz = bpZ1 - 24, R = 6;
       addProp({ t: 'pond', x: px, z: pz, h: R }, { w: R * 2, d: R * 2, h: 0.4 });
       const SEG = 20;
       for (let k = 0; k < SEG; k++) {
@@ -714,6 +734,79 @@ export function generateLayout(): WorldLayout {
       if (ox === 0 && oz === 0) continue;
       addProp({ t: 'lamp', x: bpCx + ox, z: bpCz + oz, r: 0 }, { w: 0.3, d: 0.3, h: 6 });
     }
+    // ---- кусты: живые изгороди вдоль аллей, у забора и вокруг площади ----
+    // куст — не препятствие (коллайдера нет), поэтому гулять по парку не мешает
+    {
+      // пруд: bushes не должны «прорастать» сквозь воду и оградку
+      const pondC = { x: bpX1 - 14, z: bpZ1 - 24, r: 6 };
+      const bush = (x: number, z: number, sc = 1) => {
+        if (x < bpX0 + 2 || x > bpX1 - 2 || z < bpZ0 + 2 || z > bpZ1 - 2) return;
+        if (Math.hypot(x - bpCx, z - bpCz) < 19) return;              // площадь у ракеты — открытая
+        if (Math.hypot(x - pondC.x, z - pondC.z) < pondC.r + 2.4) return;   // пруд с оградкой
+        for (const rd of parkRides) if (Math.hypot(x - rd.x, z - rd.z) < 7) return;
+        addProp({ t: 'bush', x, z, h: sc, r: (x + z) % 6 }, undefined);
+      };
+      // по кольцу прогулочной дорожки — с двух сторон, «рваным» ритмом
+      const RN = 64, ringR = 30;
+      for (let k = 0; k < RN; k++) {
+        const a = (k / RN) * Math.PI * 2;
+        if (k % 3 === 0) continue;
+        bush(bpCx + Math.cos(a) * (ringR + 3.1), bpCz + Math.sin(a) * (ringR + 3.1), 0.85 + ((k * 7) % 5) / 12);
+        if (k % 2 === 0) bush(bpCx + Math.cos(a + 0.05) * (ringR - 3.2), bpCz + Math.sin(a + 0.05) * (ringR - 3.2), 0.8 + ((k * 5) % 4) / 14);
+      }
+      // живые изгороди вдоль внутренней стороны ограды парка
+      for (let t = 8; t < bpS - 8; t += 5.5) {
+        bush(bpX0 + 3.4, bpZ0 + t, 0.9);
+        bush(bpX1 - 3.4, bpZ0 + t + 1.8, 0.9);
+        bush(bpX0 + t + 1.2, bpZ0 + 3.4, 0.9);
+        bush(bpX0 + t, bpZ1 - 3.4, 0.9);
+      }
+      // кусты у детской площадки и у пруда
+      for (const [ox, oz] of [[0, 0], [3.6, 1.4], [-3.4, 2.2], [2.2, -3.4], [-2.4, -3.2]] as const) {
+        bush(bpX1 - 26 + ox, bpZ0 + 12 + oz, 1.0);
+        bush(bpX1 - 19 + ox, bpZ0 + 11 + oz * 0.7, 0.9);
+      }
+      for (let k = 0; k < 10; k++) {
+        const a = (k / 10) * Math.PI * 2 + 0.3;
+        bush(bpX1 - 14 + Math.cos(a) * 10.2, bpZ1 - 24 + Math.sin(a) * 10.2, 0.88 + (k % 3) / 10);
+      }
+    }
+  }
+
+  // ---------- Рекламные щиты: город и трасса ----------
+  // Щит — это место под объявление игрока: сам текст живёт в game/ads.ts,
+  // здесь только координаты, поворот и цена часа аренды в СМИ.
+  {
+    const addBB = (id: string, x: number, z: number, rot: number, kind: 'city' | 'road', w: number, h: number, price: number) => {
+      billboards.push({ id, x, z, rot, kind, w, h, price });
+      // столбы: два тонких коллайдера, никакой «стены из воздуха»
+      const ca = Math.cos(rot), sa = Math.sin(rot);
+      for (const sx of [-1, 1]) {
+        const px = x + ca * sx * (w / 2 - 0.6), pz = z - sa * sx * (w / 2 - 0.6);
+        colliders.push({ x0: px - 0.22, x1: px + 0.22, z0: pz - 0.22, z1: pz + 0.22, y0: 0, y1: h });
+      }
+    };
+    // в городе: на тротуаре у перекрёстков главных улиц, лицом к проезжей части
+    const citySpots: [number, number, 1 | -1][] = [[2, 4, 1], [5, 7, -1], [9, 5, 1], [12, 8, -1], [15, 12, 1], [3, 15, -1]];
+    let cid = 0;
+    for (const [i, j, side] of citySpots) {
+      const bx0 = i * CELL + ROAD_W / 2, bx1 = bx0 + (CELL - ROAD_W);
+      const bz0 = j * CELL + ROAD_W / 2, bz1 = bz0 + (CELL - ROAD_W);
+      const x = side > 0 ? bx0 + 1.7 : bx1 - 1.7;
+      const z = (bz0 + bz1) / 2 + 7;
+      addBB(`city${++cid}`, x, z, side > 0 ? Math.PI / 2 : -Math.PI / 2, 'city', 6.4, 3.2, 400);
+    }
+    // за городом: вдоль шоссе, у пляжной дороги, у деревни и у фермы
+    const roadSpots: [string, number, number, number][] = [
+      ['road1', 1390, 9 * CELL + 24, Math.PI],
+      ['road2', 1478, 9 * CELL + 24, Math.PI],
+      ['road3', 1566, 9 * CELL + 24, Math.PI],
+      ['road4', 1654, 9 * CELL - 24, 0],
+      ['road5', -150, 480 + 26, Math.PI / 2],
+      ['road6', -150, 452, Math.PI / 2],
+      ['road7', 1548, 1204, Math.PI / 2],
+    ];
+    for (const [id, x, z, rot] of roadSpots) addBB(id, x, z, rot, 'road', 8.4, 4.2, 700);
   }
 
   // ---------- Внешние дороги ----------
@@ -1786,7 +1879,7 @@ export function generateLayout(): WorldLayout {
 
   void beachRoad; void wh; void clamp;
   return {
-    nodes, edges, adj, buildings, props, colliders, kiosks, villages, blocks, parks, bigParks, parkRides, pools, staticVehicles, garages, parked: [...parked, ...parkedLot], scooterDocks, livestock, bazaarSlots, vendors, lots, parkades, depot, truckDests,
+    nodes, edges, adj, buildings, props, colliders, kiosks, villages, blocks, parks, bigParks, parkRides, billboards, pools, staticVehicles, garages, parked: [...parked, ...parkedLot], scooterDocks, livestock, bazaarSlots, vendors, lots, parkades, depot, truckDests,
     river: { center: riverCenter, half: riverHalf, depth: riverDepth }, waterY, beach, busStops, busRoutes, busDepot,
     industrial: { ...ind, pickup: { x: wh.door.x, z: wh.door.z }, trucks, office: { x: cp.door.x, z: cp.door.z } },
     farm, playerSpawn: spawn, dealerLot, marketLot, helipad,
