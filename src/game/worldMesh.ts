@@ -292,24 +292,18 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
     b.add('tex:sidewalk', T.plane, M(x0 + sw / 2, 0.158, cz, 0, sw, s - 2 * sw, 1, -Math.PI / 2), 2.5);
     b.add('tex:sidewalk', T.plane, M(x0 + s - sw / 2, 0.158, cz, 0, sw, s - 2 * sw, 1, -Math.PI / 2), 2.5);
     if (!green) {
-      // газонная полоса сразу за тротуаром — «немного земли» в асфальтовом городе
-      const verge = 1.6;
-      b.add('tex:grass', T.plane, M(cx, 0.1535, z0 + sw + verge / 2, 0, s - 2 * sw, verge, 1, -Math.PI / 2), 4);
-      b.add('tex:grass', T.plane, M(cx, 0.1535, z0 + s - sw - verge / 2, 0, s - 2 * sw, verge, 1, -Math.PI / 2), 4);
-      b.add('tex:grass', T.plane, M(x0 + sw + verge / 2, 0.1536, cz, 0, verge, s - 2 * sw - 2 * verge, 1, -Math.PI / 2), 4);
-      b.add('tex:grass', T.plane, M(x0 + s - sw - verge / 2, 0.1536, cz, 0, verge, s - 2 * sw - 2 * verge, 1, -Math.PI / 2), 4);
-      // пятна газона и земли внутри квартала: 4–6 штук, без наезда на полосу
-      const ix0 = x0 + sw + verge + 2, iz0 = z0 + sw + verge + 2;
-      const iw = s - 2 * (sw + verge + 2);
-      const n = 4 + Math.floor(hsh(bl.i, bl.j, 1) * 3);
+      // Город — асфальт: газонов нет. Остаются только пятна земли (ремонт, клумбы
+      // без травы) и лунки под уличные деревья, чтобы не было «газонного ковра».
+      const ix0 = x0 + sw + 2, iz0 = z0 + sw + 2;
+      const iw = s - 2 * (sw + 2);
+      const n = 3 + Math.floor(hsh(bl.i, bl.j, 1) * 3);
       for (let k = 0; k < n; k++) {
         const px = ix0 + hsh(bl.i, bl.j, 10 + k) * iw, pz = iz0 + hsh(bl.i, bl.j, 40 + k) * iw;
-        const pw = 4 + hsh(bl.i, bl.j, 70 + k) * 7, pd = 4 + hsh(bl.i, bl.j, 90 + k) * 7;
-        const soil = hsh(bl.i, bl.j, 130 + k) > 0.74;
-        if (Math.hypot(px - cx, pz - cz) < 9) continue; // центр квартала — двор, там и так двор
-        b.add(soil ? 'tex:soil' : 'tex:grass', T.plane, M(px, 0.154 + k * 0.0004, pz, hsh(bl.i, bl.j, 160 + k) * 3.14, pw, pd, 1, -Math.PI / 2), 4);
+        const pw = 3.5 + hsh(bl.i, bl.j, 70 + k) * 6, pd = 3.5 + hsh(bl.i, bl.j, 90 + k) * 6;
+        if (Math.hypot(px - cx, pz - cz) < 8) continue;
+        b.add('tex:soil', T.plane, M(px, 0.154 + k * 0.0004, pz, hsh(bl.i, bl.j, 160 + k) * 3.14, pw, pd, 1, -Math.PI / 2), 4);
       }
-      // лунки под уличные деревья: маленькие пятна земли на тротуаре
+      // лунки под уличные деревья
       for (const tt of [-16, -3, 4.5, 16]) {
         b.add('tex:soil', T.plane, M(cx + tt, 0.159, z0 + 0.75, 0, 1.1, 1.1, 1, -Math.PI / 2), 2);
         b.add('tex:soil', T.plane, M(cx + tt, 0.159, z0 + s - 0.75, 0, 1.1, 1.1, 1, -Math.PI / 2), 2);
@@ -324,7 +318,8 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
     }
   }
   // ---------- Парк «Ракета» (2×2 квартала) ----------
-  // Внутри — сплошной газон: дорожек нет, аттракционы стоят прямо на траве.
+  // Газон + сеть пешеходных дорожек: площадь у ракеты, аллеи по четырём сторонам,
+  // кольцо вокруг площади и лучи к каждому аттракциону. Машинных проездов нет.
   for (const bp of L.bigParks) {
     const w = bp.x1 - bp.x0, d = bp.z1 - bp.z0;
     const cx = (bp.x0 + bp.x1) / 2, cz = (bp.z0 + bp.z1) / 2;
@@ -338,6 +333,40 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
     b.add('tex:sidewalk', T.plane, M(cx, 0.158, bp.z1 - sw / 2, 0, w, sw, 1, -Math.PI / 2), 2.5);
     b.add('tex:sidewalk', T.plane, M(bp.x0 + sw / 2, 0.158, cz, 0, sw, d - 2 * sw, 1, -Math.PI / 2), 2.5);
     b.add('tex:sidewalk', T.plane, M(bp.x1 - sw / 2, 0.158, cz, 0, sw, d - 2 * sw, 1, -Math.PI / 2), 2.5);
+    // плиточные дорожки: чуть светлее газона и с бордюром из мелкого камня
+    const pathY = 0.166;
+    const path = (ax: number, az: number, bx: number, bz: number, width = 5) => {
+      stripQuad(b, 'tex:sidewalk', ax, az, bx, bz, width, pathY, 3);
+      stripQuad(b, 'tex:sidewalk', ax, az, bx, bz, width * 0.82, pathY + 0.004, 3); // внутренняя «плитка» чуть выше
+    };
+    // площадь: круг радиусом 16 м вокруг ракеты
+    b.add('tex:sidewalk', T.circle, M(cx, pathY, cz, 0, 17, 17, 1, -Math.PI / 2), 12);
+    b.add('tex:sidewalk', T.circle, M(cx, pathY + 0.002, cz, 0, 15.6, 15.6, 1, -Math.PI / 2), 12);
+    // четыре аллеи от края парка к площади
+    path(cx, bp.z0 + sw, cx, cz - 15, 7);
+    path(cx, cz + 15, cx, bp.z1 - sw, 7);
+    path(bp.x0 + sw, cz, cx - 15, cz, 7);
+    path(cx + 15, cz, bp.x1 - sw, cz, 7);
+    // кольцо вокруг площади — прогулочная дорожка
+    const ringR = 30, RN = 40;
+    for (let k = 0; k < RN; k++) {
+      const a0 = (k / RN) * Math.PI * 2, a1 = ((k + 1) / RN) * Math.PI * 2;
+      stripQuad(b, 'tex:sidewalk', cx + Math.cos(a0) * ringR, cz + Math.sin(a0) * ringR, cx + Math.cos(a1) * ringR, cz + Math.sin(a1) * ringR, 4.5, pathY - 0.002, 3);
+    }
+    // лучи от кольца к аттракционам и к пруду
+    const rides = L.parkRides ?? [];
+    for (const rd of rides) {
+      const dx = rd.board.x - cx, dz = rd.board.z - cz;
+      const len = Math.hypot(dx, dz) || 1;
+      const sx = cx + (dx / len) * ringR, sz = cz + (dz / len) * ringR;
+      path(sx, sz, rd.board.x, rd.board.z, 4.5);
+      // площадка сбора у аттракциона
+      b.add('tex:sidewalk', T.plane, M(rd.board.x, pathY + 0.002, rd.board.z, 0, 9, 9, 1, -Math.PI / 2), 3);
+    }
+    // дорожка к детской площадке и к пруду
+    path(bp.x1 - 26, bp.z0 + sw, bp.x1 - 26, bp.z0 + 22, 3.6);
+    path(cx + ringR, cz, bp.x1 - 20 - 10, bp.z1 - 32, 4.5);
+    path(bp.x1 - 20, bp.z0 + 24, bp.x1 - 20, bp.z1 - 32 - 10, 3.6);
   }
 
   // промзона, пляж, парковка, поля
@@ -872,6 +901,18 @@ function buildProp(b: Batcher, p: Prop, lift = 0) {
       b.box(c, x, 0.15, z, w, h - 0.15, d);
       const len = Math.max(w, d), n = Math.floor(len / 6);
       for (let i = 0; i <= n; i++) { const t = n ? i / n - 0.5 : 0; b.box('c:#57534e', x + (w > d ? t * w : 0), 0, z + (w > d ? 0 : t * d), 0.14, h + 0.1, 0.14); }
+      break;
+    }
+    // декоративная оградка: столбики и две прожилины, ставится под любым углом
+    case 'railing': {
+      const len = p.w ?? 2, h = p.h ?? 1.0;
+      const n = Math.max(1, Math.round(len / 1.6));
+      for (let i = 0; i <= n; i++) {
+        const t = i / n - 0.5, ox = Math.cos(r) * t * len, oz = -Math.sin(r) * t * len;
+        b.add('c:#3f3f46', T.cylB, M(x + ox, 0.1, z + oz, 0, 0.06, h, 0.06), 2);
+        b.add('c:#52525b', T.sphere, M(x + ox, 0.1 + h, z + oz, 0, 0.08, 0.08, 0.08));
+      }
+      for (const yy of [h * 0.55, h * 0.95]) b.add('c:#3f3f46', T.box, M(x, 0.1 + yy, z, r, len, 0.05, 0.05));
       break;
     }
     case 'gate': break;   // створки ворот — динамические объекты (см. game.ts gates), в статику не запекаются

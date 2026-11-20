@@ -56,6 +56,43 @@ class IB {
       else { this.b.add(mk, T.box, M(this.ox + x0, y0 + 2.3 + lh / 2, this.oz + c, 0, t, lh, w), 2.5); this.b.add('c:#e7e5e4', T.box, M(this.ox + x0, y0 + 2.32, this.oz + c, 0, t + 0.04, 0.08, w + 0.2)); }
     }
   }
+  /** окна по боковым стенам: пропускаем места, где к стене придвинута мебель */
+  windowsOnSides(W: number, D: number, H: number, n = 2, w = 2.4) {
+    for (const sx of [-1, 1]) for (let i = 0; i < n; i++) {
+      const z = n === 1 ? 0 : -D * 0.3 + (i * D * 0.6) / (n - 1);
+      const x = sx * (W / 2 - 0.16);
+      // у этой точки стены не должно быть мебели (иначе окно «в шкафу»)
+      const wx = this.ox + x, wz = this.oz + z;
+      const blocked = this.cols.some((c) => wx > c.x0 - 0.7 && wx < c.x1 + 0.7 && wz > c.z0 - 0.9 && wz < c.z1 + 0.9 && c.y1 > 0.7);
+      if (blocked) continue;
+      this.window(x, H * 0.58, z, w, Math.min(1.3, H * 0.42), sx > 0 ? -Math.PI / 2 : Math.PI / 2);
+    }
+  }
+  /** общий слой для ВСЕХ интерьеров: табличка «ВЫХОД», коврик, огнетушитель,
+   *  часы, вентиляция и окна там, где их забыли. Всё без коллайдеров. */
+  common(W: number, D: number, H: number, kind: string) {
+    const noWindows = new Set(['mine', 'basement', 'vguntruck', 'truckoffice', 'checkpoint', 'parkade', 'greenhouse']);
+    // табличка и подсветка выхода
+    this.plane('sign:ВЫХОД|#166534', 0, 2.55, D / 2 - 0.16, 0.92, 0.26, Math.PI);
+    this.b.add('glow:#22c55e', T.box, M(this.ox, 2.66, this.oz + D / 2 - 0.18, 0, 0.98, 0.05, 0.05));
+    // коврик у двери
+    this.f('c:#3f3f46', 0, 0.004, D / 2 - 1.15, 1.9, 0.012, 1.0, false);
+    // огнетушитель у стены
+    this.cyl('c:#b91c1c', W / 2 - 0.42, 0.32, D / 2 - 1.5, 0.11, 0.62);
+    this.f('c:#111827', W / 2 - 0.42, 0.62, D / 2 - 1.5, 0.1, 0.08, 0.06, false);
+    // часы на стене
+    if (W > 7) {
+      this.f('c:#f8fafc', W / 2 - 0.12, H * 0.6, -0.4, 0.04, 0.38, 0.38, false);
+      this.f('c:#111827', W / 2 - 0.15, H * 0.6 + 0.18, -0.4, 0.02, 0.02, 0.13, false);
+      this.f('c:#111827', W / 2 - 0.15, H * 0.6, -0.4, 0.02, 0.1, 0.02, false);
+    }
+    // решётки вентиляции на потолке
+    for (const [vx, vz] of [[-W * 0.28, -D * 0.28], [W * 0.28, D * 0.24]] as const)
+      this.f('c:#9ca3af', vx, H - 0.05, vz, 0.7, 0.04, 0.45, false);
+    // план эвакуации у входа
+    this.plane('sign:ПЛАН ЭВАКУАЦИИ|#0e7490', -W / 2 + 0.5, 1.7, D / 2 - 1.9, 0.7, 0.5, Math.PI);
+    if (!this.windows && !noWindows.has(kind)) this.windowsOnSides(W, D, H, D > 16 ? 3 : 2);
+  }
   /** мебель: y — низ */
   f(mk: string, x: number, y: number, z: number, w: number, h: number, d: number, collide = true, ry = 0) {
     this.b.add(mk, T.box, M(this.ox + x, y + h / 2, this.oz + z, ry, w, h, d));
@@ -169,7 +206,9 @@ class IB {
     this.plane('c:' + c, x, y, z - Math.cos(ry) * 0.015, 1.0, 0.7, ry);
   }
   /** окно с рамой, подоконником и шторами */
+  windows = 0;
   window(x: number, y: number, z: number, w: number, h: number, ry: number) {
+    this.windows++;
     this.plane('glass:0.35', x, y, z, w, h, ry);
     const along = Math.abs(Math.sin(ry)) > 0.5; // окно на боковой стене
     this.f('c:#e7e5e4', x + (along ? 0 : 0), y + h / 2, z - (along ? 0 : 0), along ? 0.14 : w + 0.14, 0.1, along ? w + 0.14 : 0.14, false, ry);
@@ -580,7 +619,17 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
       ib.sofa(-4.6, 3.6, 3, Math.PI, '#1e3a8a');
       ib.f('c:#e2e8f0', 5.6, 0, 3.6, 0.6, 1.0, 0.6, true); ib.f('c:#38bdf8', 5.6, 1.0, 3.6, 0.45, 0.5, 0.45, false); // кулер
       ib.plane('sign:ПОЛИЦИЯ|#1e40af', 0, 3.0, -D / 2 + 0.18, 4.4, 0.7, 0);
+      // пульт дежурного: карта патрулей, рации, стол разбора и шкаф с ключами
+      ib.plane('sign:ПАТРУЛИ · ЛОС-ГОРОД|#0ea5e9', W / 2 - 0.15, 2.25, 1.4, 3.0, 1.35, -Math.PI / 2);
+      ib.f('glow:#38bdf8', W / 2 - 0.18, 1.52, 1.4, 0.04, 0.06, 3.0, false);
+      ib.f('c:#334155', 5.0, 0, -2.0, 2.0, 0.92, 1.0, true);
+      ib.f('c:#1e293b', 5.0, 0.92, -2.0, 2.1, 0.05, 1.1, false);
+      ib.f('c:#0f172a', 4.6, 0.97, -2.0, 0.5, 0.28, 0.3, false);       // рация
+      ib.cyl('chrome', 5.5, 0.97, -1.9, 0.03, 0.36);                    // антенна
+      ib.f('c:#52525b', -W / 2 + 0.3, 0, 2.2, 0.35, 1.5, 1.0, true);    // шкаф с ключами
+      for (let i = 0; i < 6; i++) ib.f('c:#fbbf24', -W / 2 + 0.46, 0.5 + (i % 3) * 0.42, 1.85 + Math.floor(i / 3) * 0.42, 0.04, 0.08, 0.12, false);
       ib.light(-4, H - 0.3, -1, 1.2, 0xffffff, 18); ib.light(4, H - 0.3, 1, 1.2, 0xffffff, 18);
+      ib.light(5.0, H - 0.3, -2.0, 0.8, 0xbfdbfe, 10);
       break;
     }
     // ---------------- БОЛЬНИЦА С КАБИНЕТОМ ВРАЧА ----------------
@@ -866,11 +915,11 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
       ib.f('glow:#a855f7', 8.4, 2.3, -D / 2 + 0.22, 3.0, 0.7, 0.06, false);
       ib.plane('sign:DJ · ЛОС-ГОРОД|#a855f7', 8.4, 3.3, -D / 2 + 0.2, 3.2, 0.6, 0);
       ib.act(8.4, -0.6, 2.0, 'Пульт диджея: музыка и свет', 'dj');
-      // сцена с шестом и колонками
-      ib.f('c:#1f2937', 0, 0, 7.6, 12, 0.55, 3.2, true);
-      ib.cyl('chrome', 0, 0.55, 7.6, 0.09, 3.1);
-      for (const sx of [-5.4, 5.4]) { ib.f('c:#111827', sx, 0, 7.9, 1.1, 2.4, 1.1, true); ib.cyl('c:#374151', sx, 1.1, 7.35, 0.22, 0.22); }
-      ib.act(0, 6.2, 2.2, 'Танцпол: зажигать', 'dance');
+      // сцена у восточной стены: вход с юга остаётся свободным
+      ib.f('c:#1f2937', 7.4, 0, 6.4, 7.4, 0.55, 3.0, true);
+      ib.cyl('chrome', 7.4, 0.55, 6.4, 0.09, 3.1);
+      for (const sx of [4.6, 10.2]) { ib.f('c:#111827', sx, 0, 6.9, 1.0, 2.4, 1.0, true); ib.cyl('c:#374151', sx, 1.1, 6.35, 0.22, 0.22); }
+      ib.act(3.4, 5.0, 2.4, 'Танцпол: зажигать', 'dance');
       // столики у стен и диваны
       for (const [x, z] of [[-8.4, 1.4], [-8.4, 4.6], [8.4, 3.6], [8.4, 6.2]]) ib.table(x, z, 3);
       ib.sofa(-11.0, 3.0, 3.2, Math.PI / 2, '#7c2d12');
@@ -897,7 +946,7 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
         ib.npc(cx, cz, ((i * 37) % 63) / 10, i % 4 === 0 ? 'hostess' : 'dancer');
       }
       // хостес у сцены и в VIP, бармен за стойкой, гости на диванах и у бара
-      ib.npc(-2.6, 6.3, Math.PI, 'hostess'); ib.npc(2.6, 6.3, Math.PI, 'hostess');
+      ib.npc(4.9, 6.2, -Math.PI / 2, 'hostess'); ib.npc(9.9, 6.2, -Math.PI / 2, 'hostess');
       ib.npc(-10.4, 3.0, Math.PI / 2, 'hostess');
       ib.npc(-2.4, -4.0, Math.PI, 'bartender');
       ib.npc(-10.8, 4.4, Math.PI / 2, 'guest'); ib.npc(10.8, 5.8, -Math.PI / 2, 'guest');
@@ -1271,7 +1320,7 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
       ib.fridgeAt(W / 2 - 0.45, -1.9, -Math.PI / 2);
       ib.kitchen(W / 2 - 0.35, 1.4, 2.4, Math.PI / 2);
       ib.table(0.4, -0.6, 3);
-      ib.sofa(0.2, 2.6, 2.3, Math.PI, city ? '#475569' : '#7f1d1d');
+      ib.sofa(-0.8, 1.1, 2.3, Math.PI, city ? '#475569' : '#7f1d1d');
       if (city) {
         ib.tv(-W / 2 + 0.15, -1.4, 1.2, Math.PI / 2);
         ib.pc(1.6, -D / 2 + 0.5, 0, 'homepc', 'Компьютер');
@@ -1366,6 +1415,7 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
       break;
     }
   }
+  ib.common(W, D, H, kind);
   const spawnZ = D / 2 - 1.6;
   return ib.finish({ x: 0, z: spawnZ, a: Math.PI }, { x0: -W / 2, x1: W / 2, z0: -D / 2, z1: D / 2, h: H });
 }

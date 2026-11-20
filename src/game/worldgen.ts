@@ -30,7 +30,7 @@ export type PropType = 'tree' | 'pine' | 'bush' | 'lamp' | 'bench' | 'hydrant' |
   // настоящий пляж: лодки, буйки, спасательный круг, гирлянды флажков, дюнная трава, лежак
   'boat' | 'buoy' | 'ring' | 'flagline' | 'dunegrass' | 'sunbed' |
   // парк «Ракета»: аттракционы и пруд
-  'parkarch' | 'rocket' | 'ferris' | 'carouselbig' | 'droptower' | 'coaster' | 'pond';
+  'parkarch' | 'rocket' | 'ferris' | 'carouselbig' | 'droptower' | 'coaster' | 'pond' | 'railing';
 export interface Prop {
   t: PropType; x: number; z: number; r?: number; w?: number; d?: number; h?: number; c?: string; v?: number;
   /** створка на петле: куда поворачивается при открытии (+1 / −1) */
@@ -52,6 +52,8 @@ export interface WorldLayout {
   parks: { x0: number; z0: number; x1: number; z1: number }[];
   /** большие парки на 2×2 квартала: рисуются одним куском, без внутренних дорог */
   bigParks: { name: string; x0: number; z0: number; x1: number; z1: number }[];
+  /** аттракционы, на которых можно кататься (геометрию строит ParkRides) */
+  parkRides: { id: string; kind: 'ferris' | 'carousel' | 'tower' | 'coaster'; name: string; x: number; z: number; w: number; h: number; board: { x: number; z: number }; price: number }[];
   staticVehicles: StaticVehicle[]; garages: Garage[];
   lots: { x0: number; z0: number; x1: number; z1: number; spaces: { x: number; z: number; a: number }[]; name: string }[];
   parkades: { x: number; z: number; w: number; d: number; levels: number }[];
@@ -104,6 +106,7 @@ export function generateLayout(): WorldLayout {
   const truckDests: WorldLayout['truckDests'] = [];
   const parked: StaticVehicle[] = []; const parkedLot: StaticVehicle[] = []; const bazaarSlots: WorldLayout['bazaarSlots'] = []; const vendors: WorldLayout['vendors'] = [];
   const parks: WorldLayout['parks'] = [];
+  const parkRides: WorldLayout['parkRides'] = [];
   const bigParks: WorldLayout['bigParks'] = [];
   const blocks: WorldLayout['blocks'] = [];
   const busStops: BusStop[] = [];
@@ -624,30 +627,53 @@ export function generateLayout(): WorldLayout {
   }
 
   // ---------- Парк «Ракета»: аттракционы, мороженое, пруд без купания ----------
+  // Парк — 2×2 квартала одним куском. Внутри только пешеходные дорожки (асфальтовых
+  // проездов нет), поэтому он читается как парк, а не как четыре газона.
   {
     bigParks.push({ name: BP.name, x0: bpX0, z0: bpZ0, x1: bpX1, z1: bpZ1 });
     parks.push({ x0: bpX0 + SIDEWALK, z0: bpZ0 + SIDEWALK, x1: bpX1 - SIDEWALK, z1: bpZ1 - SIDEWALK });
-    // арка на входе с северной стороны
-    addProp({ t: 'parkarch', x: bpCx, z: bpZ0 + 4.5, r: 0, c: 'ПАРК «РАКЕТА»', h: 7 }, { w: 13, d: 1.6, h: 6 });
-    // главный монумент — ракета «Восток»
-    addProp({ t: 'rocket', x: bpCx, z: bpCz, h: 27 }, { w: 9, d: 9, h: 2.2 });
-    for (const [ox, oz] of [[-7, 7], [7, 7], [-7, -7], [7, -7]] as const) addProp({ t: 'lamp', x: bpCx + ox, z: bpCz + oz, r: 0 }, { w: 0.3, d: 0.3, h: 6 });
-    for (let k = 0; k < 8; k++) {
-      const a = (k / 8) * Math.PI * 2 + 0.4;
-      addProp({ t: 'bench', x: bpCx + Math.cos(a) * 10.5, z: bpCz + Math.sin(a) * 10.5, r: -a }, { w: 1.8, d: 0.6, h: 0.5 });
+    // арка на входе с северной стороны: коллайдер только у столбов, иначе она
+    // перекрывает вход невидимой стеной во всю ширину
+    {
+      const archX = bpCx, archZ = bpZ0 + 4.5, archW = 13;
+      addProp({ t: 'parkarch', x: archX, z: archZ, r: 0, c: 'ПАРК «РАКЕТА»', h: 7 }, undefined);
+      for (const sx of [-1, 1]) colliders.push({ x0: archX + sx * archW / 2 - 0.5, x1: archX + sx * archW / 2 + 0.5, z0: archZ - 0.5, z1: archZ + 0.5, y0: 0, y1: 7 });
     }
-    // колесо обозрения
-    addProp({ t: 'ferris', x: bpX0 + 22, z: bpCz - 14, r: 0, h: 12 }, { w: 3.2, d: 9, h: 2.5 });
-    // карусель (взрослая, под навесом)
-    addProp({ t: 'carouselbig', x: bpX1 - 24, z: bpCz - 14, h: 8 }, { w: 7, d: 7, h: 1.2 });
-    // башня свободного падения
-    addProp({ t: 'droptower', x: bpX0 + 22, z: bpCz + 16, h: 22 }, { w: 1.6, d: 1.6, h: 22 });
-    // американские горки вдоль юга
-    addProp({ t: 'coaster', x: bpCx + 4, z: bpZ1 - 16, r: 0, w: 52, h: 9 }, { w: 14, d: 20, h: 9 });
-    // детская площадка
-    addProp({ t: 'swing', x: bpX0 + 12, z: bpZ1 - 14 }, { w: 3.2, d: 0.4, h: 2.2 });
-    addProp({ t: 'slide', x: bpX0 + 19, z: bpZ1 - 15 }, { w: 1, d: 3.6, h: 2 });
-    addProp({ t: 'sandbox', x: bpX0 + 12, z: bpZ1 - 21 }, { w: 4, d: 4, h: 0.4 });
+    // главный монумент — ракета «Восток» в центре площади
+    addProp({ t: 'rocket', x: bpCx, z: bpCz, h: 27 }, { w: 10.6, d: 10.6, h: 2.2 });
+    for (const [ox, oz] of [[-9, 9], [9, 9], [-9, -9], [9, -9]] as const) addProp({ t: 'lamp', x: bpCx + ox, z: bpCz + oz, r: 0 }, { w: 0.3, d: 0.3, h: 6 });
+    for (let k = 0; k < 12; k++) {
+      const a = (k / 12) * Math.PI * 2 + 0.26;
+      addProp({ t: 'bench', x: bpCx + Math.cos(a) * 13.5, z: bpCz + Math.sin(a) * 13.5, r: -a }, { w: 1.8, d: 0.6, h: 0.5 });
+      addProp({ t: 'trash', x: bpCx + Math.cos(a + 0.09) * 13.5, z: bpCz + Math.sin(a + 0.09) * 13.5 }, { w: 0.4, d: 0.4, h: 0.9 });
+    }
+    // ---- аттракционы: у каждого своя площадка сбора, к ней ведёт дорожка ----
+    const addRide = (o: { id: string; kind: 'ferris' | 'carousel' | 'tower' | 'coaster'; name: string; x: number; z: number; w: number; h: number; bx: number; bz: number; price: number }) => {
+      parkRides.push({ id: o.id, kind: o.kind, name: o.name, x: o.x, z: o.z, w: o.w, h: o.h, board: { x: o.bx, z: o.bz }, price: o.price });
+    };
+    addRide({ id: 'ferris', kind: 'ferris', name: 'Колесо обозрения', x: bpX0 + 20, z: bpCz - 26, w: 3.4, h: 12, bx: bpX0 + 20, bz: bpCz - 15, price: 6 });
+    addRide({ id: 'carousel', kind: 'carousel', name: 'Карусель', x: bpX1 - 22, z: bpCz - 26, w: 7, h: 8, bx: bpX1 - 22, bz: bpCz - 16, price: 4 });
+    addRide({ id: 'tower', kind: 'tower', name: 'Башня падения', x: bpX0 + 20, z: bpCz + 24, w: 1.8, h: 22, bx: bpX0 + 26, bz: bpCz + 24, price: 7 });
+    addRide({ id: 'coaster', kind: 'coaster', name: 'Американские горки', x: bpCx + 4, z: bpZ1 - 12, w: 52, h: 9, bx: bpCx + 4, bz: bpZ1 - 20, price: 9 });
+    // коллайдеры только под видимыми опорами (сами модели строит ParkRides)
+    for (const sz of [-1.6, 1.6]) colliders.push({ x0: bpX0 + 20 - 2.6, x1: bpX0 + 20 + 2.6, z0: bpCz - 26 + sz - 0.5, z1: bpCz - 26 + sz + 0.5, y0: 0, y1: 0.9 });
+    colliders.push({ x0: bpX0 + 20 - 0.7, x1: bpX0 + 20 + 0.7, z0: bpCz + 24 - 0.7, z1: bpCz + 24 + 0.7, y0: 0, y1: 22 });
+    // низкие оградки вокруг площадок сбора — видимые, а не «стены из воздуха»
+    const railRect = (x0: number, z0: number, x1: number, z1: number, gapX: number, gapW: number) => {
+      const seg = (ax: number, az: number, bx: number, bz: number) => {
+        addProp({ t: 'fence', x: (ax + bx) / 2, z: (az + bz) / 2, w: Math.max(0.12, Math.abs(bx - ax)), d: Math.max(0.12, Math.abs(bz - az)), h: 0.9, c: '#8b6b4a' }, { w: Math.max(0.14, Math.abs(bx - ax)), d: Math.max(0.14, Math.abs(bz - az)), h: 0.9 });
+      };
+      seg(x0, z0, x0, z1); seg(x1, z0, x1, z1); seg(x0, z1, x1, z1);
+      seg(x0, z0, gapX - gapW / 2, z0); seg(gapX + gapW / 2, z0, x1, z0);
+    };
+    railRect(bpX0 + 12, bpCz - 20, bpX0 + 28, bpCz - 12, bpX0 + 20, 4);
+    railRect(bpX1 - 30, bpCz - 21, bpX1 - 14, bpCz - 13, bpX1 - 22, 4);
+    railRect(bpX0 + 14, bpCz + 20, bpX0 + 26, bpCz + 28, bpX0 + 26, 4);
+    railRect(bpCx - 24, bpZ1 - 17, bpCx + 32, bpZ1 - 8, bpCx + 4, 4.5);
+    // детская площадка у входа
+    addProp({ t: 'swing', x: bpX1 - 26, z: bpZ0 + 12 }, { w: 3.2, d: 0.4, h: 2.2 });
+    addProp({ t: 'slide', x: bpX1 - 19, z: bpZ0 + 11 }, { w: 1, d: 3.6, h: 2 });
+    addProp({ t: 'sandbox', x: bpX1 - 23, z: bpZ0 + 19 }, { w: 4, d: 4, h: 0.4 });
     // мороженое у входа
     {
       const kx = bpX0 + 16, kz = bpZ0 + 12, ka = Math.PI / 2;
@@ -655,30 +681,39 @@ export function generateLayout(): WorldLayout {
       addProp({ t: 'kiosk', x: kx, z: kz, r: ka, c: KIOSK_TYPES[2].color }, { w: 2.6, d: 2.0, h: 2.6 });
       addProp({ t: 'bench', x: kx + 3.4, z: kz + 2.2, r: Math.PI }, { w: 1.8, d: 0.6, h: 0.5 });
       addProp({ t: 'trash', x: kx + 3.4, z: kz - 0.4 }, { w: 0.4, d: 0.4, h: 0.9 });
+      addProp({ t: 'vsign', x: kx + 1.6, z: kz - 2.2, r: 0, c: 'МОРОЖЕНОЕ' }, { w: 0.4, d: 0.4, h: 2.4 });
     }
-    // мини-пруд: вода есть, купаться нельзя — по кромке глухая ограда
+    // мини-пруд: вода есть, купаться нельзя — по кромке видимая чугунная оградка
     {
-      const px = bpX1 - 20, pz = bpZ1 - 13, R = 7.5;
+      const px = bpX1 - 20, pz = bpZ1 - 32, R = 7.5;
       addProp({ t: 'pond', x: px, z: pz, h: R }, { w: R * 2, d: R * 2, h: 0.4 });
-      const SEG = 24;
+      const SEG = 20;
       for (let k = 0; k < SEG; k++) {
-        const a = (k / SEG) * Math.PI * 2;
-        const qx = px + Math.cos(a) * (R + 1.1), qz = pz + Math.sin(a) * (R + 1.1);
-        colliders.push({ x0: qx - 1.2, x1: qx + 1.2, z0: qz - 1.2, z1: qz + 1.2, y0: 0, y1: 1.1 });
+        const a0 = (k / SEG) * Math.PI * 2, a1 = ((k + 1) / SEG) * Math.PI * 2, am = (a0 + a1) / 2;
+        const rr = R + 1.35;
+        const ax = px + Math.cos(a0) * rr, az = pz + Math.sin(a0) * rr;
+        const bx = px + Math.cos(a1) * rr, bz = pz + Math.sin(a1) * rr;
+        const cx2 = px + Math.cos(am) * rr, cz2 = pz + Math.sin(am) * rr;
+        const chord = Math.hypot(bx - ax, bz - az);
+        addProp({ t: 'railing', x: cx2, z: cz2, r: -am + Math.PI / 2, w: chord + 0.2, h: 1.05 }, undefined);
+        colliders.push({ x0: cx2 - chord / 2 - 0.1, x1: cx2 + chord / 2 + 0.1, z0: cz2 - 0.55, z1: cz2 + 0.55, y0: 0, y1: 1.05 });
       }
       addProp({ t: 'vsign', x: px, z: pz - R - 2.6, r: 0, c: 'Купаться запрещено' }, { w: 0.4, d: 0.4, h: 2.6 });
-      for (const [ox, oz] of [[-R - 3, 0], [R + 3, 0], [0, R + 3.4]] as const)
-        addProp({ t: 'bench', x: px + ox, z: pz + oz, r: ox ? Math.PI / 2 : Math.PI }, { w: 1.8, d: 0.6, h: 0.5 });
+      for (const [ox, oz] of [[-R - 3.4, 0], [0, -R - 3.4], [0, R + 3.4]] as const)
+        addProp({ t: 'bench', x: px + ox, z: pz + oz, r: ox ? Math.PI / 2 : (oz > 0 ? Math.PI : 0) }, { w: 1.8, d: 0.6, h: 0.5 });
     }
-    // зелень: деревья по краю, чтобы парк читался как парк, а не как поле
-    for (let k = 0; k < 26; k++) {
-      const a = (k / 26) * Math.PI * 2;
-      const rr = 46 + ((k * 37) % 9);
+    // зелень: деревья по краю и вокруг площади, чтобы парк читался как парк
+    for (let k = 0; k < 30; k++) {
+      const a = (k / 30) * Math.PI * 2;
+      const rr = 44 + ((k * 37) % 9);
       const tx = bpCx + Math.cos(a) * rr, tz = bpCz + Math.sin(a) * rr;
       if (tx < bpX0 + 6 || tx > bpX1 - 6 || tz < bpZ0 + 6 || tz > bpZ1 - 6) continue;
       addProp({ t: k % 5 === 0 ? 'pine' : 'tree', x: tx, z: tz, h: 0.95 + ((k * 13) % 7) / 20, r: k }, { w: 0.55, d: 0.55, h: 3.2 });
     }
-    for (const [ox, oz] of [[-24, -34], [24, -34], [-28, 30], [26, 34]] as const) addProp({ t: 'lamp', x: bpCx + ox, z: bpCz + oz, r: 0 }, { w: 0.3, d: 0.3, h: 6 });
+    for (const [ox, oz] of [[-26, -36], [26, -36], [-28, 32], [28, 34], [0, 0]] as const) {
+      if (ox === 0 && oz === 0) continue;
+      addProp({ t: 'lamp', x: bpCx + ox, z: bpCz + oz, r: 0 }, { w: 0.3, d: 0.3, h: 6 });
+    }
   }
 
   // ---------- Внешние дороги ----------
@@ -1751,7 +1786,7 @@ export function generateLayout(): WorldLayout {
 
   void beachRoad; void wh; void clamp;
   return {
-    nodes, edges, adj, buildings, props, colliders, kiosks, villages, blocks, parks, bigParks, pools, staticVehicles, garages, parked: [...parked, ...parkedLot], scooterDocks, livestock, bazaarSlots, vendors, lots, parkades, depot, truckDests,
+    nodes, edges, adj, buildings, props, colliders, kiosks, villages, blocks, parks, bigParks, parkRides, pools, staticVehicles, garages, parked: [...parked, ...parkedLot], scooterDocks, livestock, bazaarSlots, vendors, lots, parkades, depot, truckDests,
     river: { center: riverCenter, half: riverHalf, depth: riverDepth }, waterY, beach, busStops, busRoutes, busDepot,
     industrial: { ...ind, pickup: { x: wh.door.x, z: wh.door.z }, trucks, office: { x: cp.door.x, z: cp.door.z } },
     farm, playerSpawn: spawn, dealerLot, marketLot, helipad,

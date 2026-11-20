@@ -59,8 +59,10 @@ async function main() {
     { label: 'двор деревни', x: 601, z: 1730, want: (k) => isGrass(k) || k.startsWith('road:'), why: 'в деревне должна быть трава или дорога' },
     { label: 'деревня: у улицы', x: 610, z: 1735, want: (k) => isGrass(k) || k.startsWith('road:'), why: 'у деревенской улицы должна быть трава' },
     { label: 'деревня: палисадник', x: 592, z: 1690, want: (k) => isGrass(k) || k.startsWith('road:') || k.startsWith('c:'), why: 'у дома должна быть трава' },
-    { label: 'парк «Ракета»', x: 470, z: 770, want: isGrass, why: 'в парке должен быть газон (без дорожек)' },
-    { label: 'парк: пруд', x: 514, z: 821, want: (k) => k === 'water' || k === 'tex:grass', why: 'в пруду должна быть вода' },
+    { label: 'парк: газон', x: 452, z: 758, want: isGrass, why: 'между дорожками парка должен оставаться газон' },
+    { label: 'парк: дорожка', x: 480, z: 750, want: (k) => k === 'tex:sidewalk' || k === 'tex:grass', why: 'от входа к площади парка должна идти плиточная дорожка' },
+    { label: 'парк: площадь', x: 480, z: 790, want: (k) => k === 'tex:sidewalk' || k.startsWith('c:'), why: 'у ракеты должна быть вымощенная площадь' },
+    { label: 'парк: пруд', x: 514, z: 802, want: (k) => k === 'water' || k === 'tex:grass' || k.startsWith('c:'), why: 'в пруду должна быть вода' },
     { label: 'дорога-шоссе', x: 30, z: 540, want: (k) => k.startsWith('road:'), why: 'на шоссе должно быть полотно' },
     { label: 'дорога-город', x: 330, z: 540, want: (k) => k.startsWith('road:'), why: 'на городской улице должно быть полотно' },
   ];
