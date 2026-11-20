@@ -706,7 +706,22 @@ export function mat(key: string): THREE.Material {
       ? new THREE.MeshStandardMaterial({ map: getTex(k), roughness: 0.94, metalness: 0.02, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 })
       : L({ map: getTex(k), polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
   } else if (key === 'zebra') m = L({ map: getTex('zebra'), transparent: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, depthWrite: false });
-  else if (key === 'water') m = GFX.pbr ? new THREE.MeshStandardMaterial({ map: getTex('water'), color: 0x7fb6d8, transparent: true, opacity: 0.9, metalness: 0.35, roughness: 0.12 }) : new THREE.MeshPhongMaterial({ map: getTex('water'), color: 0x88bbdd, transparent: true, opacity: 0.88, shininess: 80 });
+  else if (key === 'water') {
+    // объёмная вода: живые волны на вершинах + прозрачность, сквозь которую видно песчаное дно
+    m = GFX.pbr
+      ? new THREE.MeshStandardMaterial({ map: getTex('water'), color: 0x7fb6d8, transparent: true, opacity: 0.8, metalness: 0.35, roughness: 0.12 })
+      : new THREE.MeshPhongMaterial({ map: getTex('water'), color: 0x88bbdd, transparent: true, opacity: 0.76, shininess: 90 });
+    m.userData.uTime = { value: 0 };
+    m.onBeforeCompile = (sh) => {
+      sh.uniforms.uTime = m.userData.uTime;
+      sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader.replace('#include <begin_vertex>',
+        `#include <begin_vertex>
+        float lgw = sin(position.x * 0.05 + position.z * 0.03 + uTime * 0.7) * 0.12;
+        float swl = sin(position.x * 0.16 + uTime * 1.4) * cos(position.z * 0.21 + uTime * 1.1) * 0.16;
+        transformed.y += lgw + swl;`);
+    };
+    m.customProgramCacheKey = () => 'los-water-waves-v1';
+  }
   else m = L({ color: 0xff00ff });
   matCache.set(key, m);
   return m;

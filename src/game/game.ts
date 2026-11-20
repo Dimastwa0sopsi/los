@@ -679,6 +679,8 @@ export class Game {
   }
   private updateWorldSystems(dt: number) {
     const inside = !!this.interior;
+    // часы для шейдера воды (волны на море и в бассейнах)
+    const ut = (this.W?.water?.material as THREE.Material | undefined)?.userData?.uTime as { value: number } | undefined; if (ut) ut.value += dt;
     // хмель выветривается, диско-свет переливается, если включён
     if (this.buzzT > 0) this.buzzT = Math.max(0, this.buzzT - dt);
     if (this.discoOn && this.interior && this.interiorKind === 'bar') this.pulseDisco();
@@ -1010,11 +1012,11 @@ export class Game {
     if (this.py <= ground) { this.py = ground; this.pvy = 0; }
     if (inWater) {
       const pool = !this.interior ? this.poolAt(this.px, this.pz) : null;
-      // в бассейне вода по грудь: модель погружается (dip), высота столкновений не меняется
-      const deep = pool ? 0.62 : 0.14;
+      // вода по грудь: персонаж держится на поверхности (дип), нырнуть нельзя
+      const deep = pool ? 0.62 : 0.22;
       this.pvy = 0; this.crouch = false;
       if (mag > 0.05) this.state.energy = Math.max(0, this.state.energy - dt * (pool ? 0.08 : 0.12));
-      this.dip += ((Math.sin(performance.now() / 700) * 0.02) - deep - this.dip) * Math.min(1, dt * 5);
+      this.dip += ((Math.sin(performance.now() / 700) * (pool ? 0.02 : 0.05)) - deep - this.dip) * Math.min(1, dt * 5);
     } else {
       this.dip += (0 - this.dip) * Math.min(1, dt * 7);
       if (Math.abs(this.dip) < 0.01) this.dip = 0;

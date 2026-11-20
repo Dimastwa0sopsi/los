@@ -68,7 +68,7 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
   for (let z = bnd.z0 - 400; z < bnd.z1 + 400; z += 20) {
     const a = L.river.center(z), b = L.river.center(z + 20);
     stripQuad(wb, 'water', a, z, b, z + 20, L.river.half * 2, 0.08, 30);
-    stripQuad(bed, 'c:#3b5a4a', a, z, b, z + 20, L.river.half * 2 + 6, 0.012, 30);
+    stripQuad(bed, 'c:#d4b077', a, z, b, z + 20, L.river.half * 2 + 6, 0.012, 30);   // песчаное дно под водой
   }
   const water = wb.build()[0]; root.add(water);
   bed.build().forEach((m) => root.add(m));
