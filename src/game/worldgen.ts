@@ -210,13 +210,11 @@ export function generateLayout(): WorldLayout {
       if (nb >= names.length) break;
       const kb = `${ci},${cj}`;
       if (parkSet.has(kb) || fullBlocks.has(kb) || barBlocks.has(kb)) continue;
-      let placed = false;
       for (const q of [1, 2, 0, 3]) {
         const k = `${ci},${cj},${q}`;
         if (usedKeys.has(k)) continue;
-        S('bar', ci, cj, q, names[nb]); usedKeys.add(k); barBlocks.add(kb); nb++; placed = true; break;
+        S('bar', ci, cj, q, names[nb]); usedKeys.add(k); barBlocks.add(kb); nb++; break;
       }
-      if (placed) continue;
     }
   }
   const specAt = new Map<string, Spec>();
