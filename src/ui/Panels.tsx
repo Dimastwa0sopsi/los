@@ -8,6 +8,7 @@ import { BAR_DRINKS, DRESSES, ITEMS, VEHICLES, KIOSK_TYPES, PAINT_COLORS, NEON_C
 import { CarPreview } from './CarPreview';
 import { LookPreview } from './LookPreview';
 import { repairCost, sellPrice, demand, carValue, type MarketOffer } from '../game/state';
+import { HelpPanel } from './Help';
 
 const $ = (n: number) => '$' + Math.round(n).toLocaleString('ru');
 
@@ -144,21 +145,22 @@ export function GamePanel({ g, panel, close }: { g: Game; panel: Panel; close: (
     case 'info': return <Modal title={panel.title} onClose={close}><p>{panel.text}</p></Modal>;
     case 'phone': return <Tablet g={g} close={close} initial={panel.tab} />;
     case 'inventory': return <Modal title="🎒 Инвентарь" onClose={close} wide><InventoryGrid g={g} /></Modal>;
-    case 'bar': return <BarMenu g={g} close={close} />;
+    case 'bar': return <BarMenu g={g} close={close} name={panel.name} />;
     case 'ozgim': return <Ozgim g={g} close={close} />;
     case 'casino': return <CasinoPanel g={g} close={close} name={panel.name} />;
+    case 'help': return <HelpPanel close={close} startTab={(panel.tab as 'start') ?? 'start'} mobile={!!g.mobile} />;
     case 'promo': return <Promo g={g} close={close} />;
     case 'svc': return <SvcPanel g={g} kind={panel.kind} close={close} />;
     default: return null;
   }
 }
 
-function BarMenu({ g, close }: { g: Game; close: () => void }) {
+function BarMenu({ g, close, name }: { g: Game; close: () => void; name?: string }) {
   const [tab, setTab] = useState<'drinks' | 'shift'>('drinks');
   const s = g.getState();
   const onShift = g.job?.type === 'shift';
   const buzz = (g as unknown as { buzzT: number }).buzzT;
-  return (<Modal title="🍸 Бар-клуб «Огонёк»" onClose={close} wide>
+  return (<Modal title={`🍸 ${name || 'Бар'}`} onClose={close} wide>
     <div className="lp-tabs">
       <button className={tab === 'drinks' ? 'on' : ''} onClick={() => setTab('drinks')}>🍹 Напитки</button>
       <button className={tab === 'shift' ? 'on' : ''} onClick={() => setTab('shift')}>💼 Подработка</button>

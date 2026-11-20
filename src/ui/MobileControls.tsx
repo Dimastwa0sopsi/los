@@ -170,6 +170,7 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
       { ico: '📜', label: 'Сюжет', on: () => g.openPanel({ type: 'quest' }) },
       { ico: '🎟️', label: 'Промокод', on: () => g.openPanel({ type: 'promo' }) },
       { ico: '📱', label: 'Телефон', on: () => g.openPanel({ type: 'phone' }) },
+      { ico: '❓', label: 'Как играть?', on: () => g.openPanel({ type: 'help' }) },
       { ico: '⚙️', label: 'Настройки', on: () => g.openPanel({ type: 'settings' }) },
     ],
   }, {
@@ -305,7 +306,7 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
         {hud.promptKeys.includes('R') && <Btn g={g} name="work" ico="💼" sub="R" hold={false} cls="mini" />}
         <div className="mui-main-wrap">
           <Btn g={g} name="interact" ico="✋" hold={false} cls="ctx-big" />
-          <span className="mui-ctx-label">{actLabel}</span>
+          {g.settings.hints !== 'off' && <span className="mui-ctx-label">{actLabel}</span>}
         </div>
         {hud.promptKeys.includes('L') && <Btn g={g} name="rob" ico="💰" sub="L" hold={false} cls="mini red" />}
       </div>

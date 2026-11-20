@@ -124,7 +124,7 @@ export interface RemotePlayer {
   /** номерной знак с сервера (car_number) */
   number?: string;
 }
-export interface ChatMsg { name: string; text: string; color: string; t: number; me?: boolean; kind?: 'me' | 'news' | 'sys' | 'cmd' }
+export interface ChatMsg { name: string; text: string; color: string; t: number; me?: boolean; kind?: 'me' | 'news' | 'sys' | 'cmd' | 'weather' }
 export type NetStatus = 'connecting' | 'online' | 'reconnecting' | 'offline';
 
 /** данные игрока, пришедшие с сервера в login_success (деньги, координаты) */

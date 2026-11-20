@@ -215,19 +215,31 @@ export function getTex(key: string): THREE.Texture {
       t = toTex(c); break;
     }
     case 'grass': {
-      // новый газон: разнотравный ковёр — пятна света/тени, проплешины, плотные травинки, микро-цветы
-      const [c, g] = canvas(256, 256); noise(g, 256, 256, '#4e8b3a', 20, 7000, 9);
+      // газон: сочная зелень с полосами «стрижки», пятнами солнца/тени и густой травой.
+      // Важно, чтобы средний цвет был насыщенно-зелёным: иначе издалека газон читается серым.
+      const S = 512;
+      const [c, g] = canvas(S, S);
+      noise(g, S, S, '#3f7a2e', 16, 26000, 9);
       const r = new RNG(19);
-      const tones = ['rgba(96,158,62,0.16)', 'rgba(58,116,44,0.16)', 'rgba(128,170,72,0.13)', 'rgba(84,104,48,0.14)', 'rgba(40,86,34,0.16)'];
-      for (let i = 0; i < 56; i++) { g.fillStyle = r.pick(tones); g.beginPath(); g.arc(r.range(0, 256), r.range(0, 256), r.range(9, 42), 0, 7); g.fill(); }
-      for (let i = 0; i < 10; i++) { g.fillStyle = 'rgba(122,102,64,0.15)'; g.beginPath(); g.ellipse(r.range(0, 256), r.range(0, 256), r.range(6, 20), r.range(4, 12), r.range(0, 3), 0, 7); g.fill(); }
-      for (let i = 0; i < 1400; i++) {
-        const x = r.range(0, 256), y = r.range(0, 256);
-        g.strokeStyle = r.chance(0.62) ? 'rgba(152,196,92,0.34)' : 'rgba(64,110,46,0.30)';
-        g.lineWidth = r.chance(0.8) ? 1 : 1.6;
-        g.beginPath(); g.moveTo(x, y); g.lineTo(x + r.range(-1.2, 1.2), y - r.range(2, 6)); g.stroke();
+      // полосы стрижки (как на ухоженном газоне) — очень мягкие, чтобы не было «зебры»
+      for (let i = 0; i < 8; i++) {
+        g.fillStyle = i % 2 ? 'rgba(126,178,74,0.055)' : 'rgba(22,60,26,0.055)';
+        g.fillRect(0, (i * S) / 8, S, S / 8);
       }
-      for (let i = 0; i < 26; i++) { g.fillStyle = r.pick(['rgba(250,240,140,0.5)', 'rgba(240,240,245,0.45)', 'rgba(216,180,254,0.4)']); g.beginPath(); g.arc(r.range(0, 256), r.range(0, 256), r.range(0.8, 1.8), 0, 7); g.fill(); }
+      // крупные пятна света и тени, проплешины
+      const tones = ['rgba(108,170,64,0.20)', 'rgba(46,102,38,0.20)', 'rgba(140,184,74,0.16)', 'rgba(72,116,44,0.18)', 'rgba(30,74,30,0.20)'];
+      for (let i = 0; i < 120; i++) { g.fillStyle = r.pick(tones); g.beginPath(); g.arc(r.range(0, S), r.range(0, S), r.range(12, 66), 0, 7); g.fill(); }
+      for (let i = 0; i < 16; i++) { g.fillStyle = 'rgba(118,98,62,0.14)'; g.beginPath(); g.ellipse(r.range(0, S), r.range(0, S), r.range(8, 26), r.range(5, 15), r.range(0, 3), 0, 7); g.fill(); }
+      // травинки: тысячи коротких штрихов с тёмным низом и светлым кончиком
+      for (let i = 0; i < 5200; i++) {
+        const x = r.range(0, S), y = r.range(0, S), len = r.range(2.5, 7), lean = r.range(-1.6, 1.6);
+        g.strokeStyle = r.chance(0.55) ? 'rgba(150,198,88,0.40)' : r.chance(0.5) ? 'rgba(58,110,42,0.42)' : 'rgba(96,150,58,0.36)';
+        g.lineWidth = r.chance(0.82) ? 1 : 1.7;
+        g.beginPath(); g.moveTo(x, y); g.lineTo(x + lean, y - len); g.stroke();
+      }
+      // клевер и мелкие цветы — совсем редко
+      for (let i = 0; i < 34; i++) { g.fillStyle = r.pick(['rgba(250,244,150,0.45)', 'rgba(244,246,250,0.40)', 'rgba(214,182,252,0.36)']); g.beginPath(); g.arc(r.range(0, S), r.range(0, S), r.range(1.2, 2.4), 0, 7); g.fill(); }
+      for (let i = 0; i < 40; i++) { g.fillStyle = 'rgba(120,186,94,0.22)'; g.beginPath(); g.arc(r.range(0, S), r.range(0, S), r.range(2, 5), 0, 7); g.fill(); }
       t = toTex(c); break;
     }
     case 'cloud': {

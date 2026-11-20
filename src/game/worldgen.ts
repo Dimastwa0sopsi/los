@@ -4,7 +4,7 @@ import { KIOSK_TYPES, VILLAGE_NAMES } from './data';
 
 export type RoadKind = 'city' | 'avenue' | 'highway' | 'village' | 'dirt' | 'industrial';
 export const AVENUE_J = 9; // главное шоссе — улица z = 9 * CELL
-export interface RNode { id: number; x: number; z: number; light: boolean; gi?: number; gj?: number }
+export interface RNode { id: number; x: number; z: number; light: boolean; gi?: number; gj?: number; /** узел без дорог после чистки сети (на карте не рисуется) */ dead?: boolean }
 export interface REdge { id: number; a: number; b: number; kind: RoadKind; w: number }
 export interface Box { x0: number; y0: number; z0: number; x1: number; y1: number; z1: number; tag?: string }
 
@@ -1329,6 +1329,11 @@ export function generateLayout(): WorldLayout {
       edges.length = 0;
       for (const e of pruned) { e.id = edges.length; edges.push(e); }
     }
+    // узлы, у которых после чистки не осталось ни одной дороги, помечаем «мёртвыми»:
+    // они были частью дубля и больше ни к чему не ведут — мосты к ним рисовать нельзя
+    const degLeft = new Map<number, number>();
+    for (const e of edges) { degLeft.set(e.a, (degLeft.get(e.a) ?? 0) + 1); degLeft.set(e.b, (degLeft.get(e.b) ?? 0) + 1); }
+    for (const n of nodes) if (!degLeft.get(n.id)) n.dead = true;
   }
   const roadSegments = edges.map((e) => ({ ax: nodes[e.a].x, az: nodes[e.a].z, bx: nodes[e.b].x, bz: nodes[e.b].z, w: e.w, kind: e.kind }));
   // припаркованные машины у бордюров городских улиц (можно угнать)
@@ -1676,6 +1681,7 @@ export function generateLayout(): WorldLayout {
 // ---------- Маршрутизация (A*) ----------
 export function astar(L: WorldLayout, start: number, goal: number): number[] | null {
   if (start === goal) return [start];
+  if (!L.adj[start]?.length || !L.adj[goal]?.length) return null;
   const n = L.nodes.length;
   const g = new Float64Array(n).fill(Infinity);
   const f = new Float64Array(n).fill(Infinity);
@@ -1725,6 +1731,6 @@ export function nearestRoadPoint(L: WorldLayout, x: number, z: number) {
 }
 export function nearestNode(L: WorldLayout, x: number, z: number) {
   let bi = 0, bd = Infinity;
-  for (const n of L.nodes) { const d = (n.x - x) ** 2 + (n.z - z) ** 2; if (d < bd) { bd = d; bi = n.id; } }
+  for (const n of L.nodes) { if (n.dead) continue; const d = (n.x - x) ** 2 + (n.z - z) ** 2; if (d < bd) { bd = d; bi = n.id; } }
   return bi;
 }

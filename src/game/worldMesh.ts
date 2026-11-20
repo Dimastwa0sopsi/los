@@ -251,6 +251,7 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
     }
   }
   for (const n of L.nodes) {
+    if (n.dead || !L.adj[n.id]?.length) continue;      // узлы-сироты после чистки дублей: дорог нет
     const deg = L.adj[n.id].length;
     if (n.gi !== undefined) B(n.x, n.z).add('road:patch', T.plane, M(n.x, 0.035, n.z, 0, ROAD_W, ROAD_W, 1, -Math.PI / 2), 12);
     else if (deg !== 2 || true) {
@@ -262,24 +263,33 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
   await tick();
   // ---------- поверхности кварталов ----------
   progress(0.24, 'Кварталы и тротуары');
+  // Квартал — это НЕ бетонная плита: газон на всю площадь, асфальт только на служебных
+  // кварталах (рынок, авторынок, парковки, гаражи, склад), тротуар — узким кольцом по краю.
+  // Раньше весь квартал заливался текстурой тротуара, из-за чего в городе не было травы.
+  const PAVED_BLOCKS = ['market', 'dealer', 'parking', 'parkade', 'garages', 'storage'];
   for (const bl of L.blocks) {
     const x0 = bl.ox ?? bl.i * CELL + ROAD_W / 2, z0 = bl.oz ?? bl.j * CELL + ROAD_W / 2, s = CELL - ROAD_W;
-    const b = B(x0 + s / 2, z0 + s / 2);
-    b.box('tex:sidewalk', x0 + s / 2, 0, z0 + s / 2, s, 0.15, s, 0, 2.5);
+    const cx = x0 + s / 2, cz = z0 + s / 2;
+    const b = B(cx, cz);
+    const paved = PAVED_BLOCKS.includes(bl.type);
+    // основание квартала: газон (или асфальт на служебных) — с него и начинается вся поверхность
+    b.box(paved ? 'tex:asphalt' : 'tex:grass', cx, 0, cz, s, 0.15, s, 0, paved ? 6 : 4);
     const cc = 'c:#c9c6bf';
-    b.box(cc, x0 + s / 2, 0, z0 + 0.12, s, 0.18, 0.24); b.box(cc, x0 + s / 2, 0, z0 + s - 0.12, s, 0.18, 0.24);
-    b.box(cc, x0 + 0.12, 0, z0 + s / 2, 0.24, 0.18, s); b.box(cc, x0 + s - 0.12, 0, z0 + s / 2, 0.24, 0.18, s);
+    b.box(cc, cx, 0, z0 + 0.12, s, 0.18, 0.24); b.box(cc, cx, 0, z0 + s - 0.12, s, 0.18, 0.24);
+    b.box(cc, x0 + 0.12, 0, cz, 0.24, 0.18, s); b.box(cc, x0 + s - 0.12, 0, cz, 0.24, 0.18, s);
+    // тротуар по периметру квартала: четыре полосы шириной SIDEWALK
+    const sw = SIDEWALK;
+    b.add('tex:sidewalk', T.plane, M(cx, 0.158, z0 + sw / 2, 0, s, sw, 1, -Math.PI / 2), 2.5);
+    b.add('tex:sidewalk', T.plane, M(cx, 0.158, z0 + s - sw / 2, 0, s, sw, 1, -Math.PI / 2), 2.5);
+    b.add('tex:sidewalk', T.plane, M(x0 + sw / 2, 0.158, cz, 0, sw, s - 2 * sw, 1, -Math.PI / 2), 2.5);
+    b.add('tex:sidewalk', T.plane, M(x0 + s - sw / 2, 0.158, cz, 0, sw, s - 2 * sw, 1, -Math.PI / 2), 2.5);
     const ix = x0 + SIDEWALK, iz = z0 + SIDEWALK, is = s - SIDEWALK * 2;
-    if (bl.type === 'park' || bl.type === 'private') {
-      b.add('tex:grass', T.plane, M(ix + is / 2, 0.155, iz + is / 2, 0, is, is, 1, -Math.PI / 2), 8);
-      if (bl.type === 'park') {
-        const cx = ix + is / 2, cz = iz + is / 2;
-        b.add('tex:sidewalk', T.plane, M(cx, 0.165, cz, 0, 4, is, 1, -Math.PI / 2), 2.5);
-        b.add('tex:sidewalk', T.plane, M(cx, 0.166, cz, 0, is, 4, 1, -Math.PI / 2), 2.5);
-        for (let k = 0; k < 16; k++) { const a0 = (k / 16) * Math.PI * 2, a1 = ((k + 1) / 16) * Math.PI * 2; stripQuad(b, 'tex:sidewalk', cx + Math.cos(a0) * 13, cz + Math.sin(a0) * 13, cx + Math.cos(a1) * 13, cz + Math.sin(a1) * 13, 3, 0.167, 3); }
-      }
+    if (bl.type === 'park') {
+      // дорожки парка поверх газона: две аллеи и кольцо
+      b.add('tex:sidewalk', T.plane, M(ix + is / 2, 0.165, iz + is / 2, 0, 4, is, 1, -Math.PI / 2), 2.5);
+      b.add('tex:sidewalk', T.plane, M(ix + is / 2, 0.166, iz + is / 2, 0, is, 4, 1, -Math.PI / 2), 2.5);
+      for (let k = 0; k < 16; k++) { const a0 = (k / 16) * Math.PI * 2, a1 = ((k + 1) / 16) * Math.PI * 2; stripQuad(b, 'tex:sidewalk', ix + is / 2 + Math.cos(a0) * 13, iz + is / 2 + Math.sin(a0) * 13, ix + is / 2 + Math.cos(a1) * 13, iz + is / 2 + Math.sin(a1) * 13, 3, 0.167, 3); }
     }
-    if (['market', 'dealer', 'parking', 'parkade', 'garages', 'storage'].includes(bl.type)) b.add('tex:asphalt', T.plane, M(ix + is / 2, 0.156, iz + is / 2, 0, is, is, 1, -Math.PI / 2), 6);
   }
   // промзона, пляж, парковка, поля
   const ind = L.industrial;
@@ -351,8 +361,16 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
   }
   // ---------- реквизит ----------
   progress(0.55, 'Деревья и объекты');
+  // кварталы приподняты на 0.15 (бордюр): плоскостные объекты во дворах (дорожки, въезды,
+  // площадки) нужно поднять на эту же высоту, иначе они тонут внутри газона и их не видно
+  const blockRects = L.blocks.map((bl) => {
+    const bx0 = bl.ox ?? bl.i * CELL + ROAD_W / 2, bz0 = bl.oz ?? bl.j * CELL + ROAD_W / 2, bs = CELL - ROAD_W;
+    return { x0: bx0, z0: bz0, x1: bx0 + bs, z1: bz0 + bs };
+  });
+  const liftAt = (x: number, z: number) =>
+    blockRects.some((q) => x > q.x0 + 0.3 && x < q.x1 - 0.3 && z > q.z0 + 0.3 && z < q.z1 - 0.3) ? 0.15 : 0;
   for (let i = 0; i < L.props.length; i++) {
-    buildProp(B(L.props[i].x, L.props[i].z), L.props[i]);
+    buildProp(B(L.props[i].x, L.props[i].z), L.props[i], liftAt(L.props[i].x, L.props[i].z));
     if (i % 800 === 0) { progress(0.55 + (i / L.props.length) * 0.15, `Объекты ${i}/${L.props.length}`); await tick(); }
   }
   // ларьки — вывески
@@ -645,7 +663,7 @@ function buildBuilding(b: Batcher, bd: Building) {
 }
 
 // ---------- реквизит ----------
-function buildProp(b: Batcher, p: Prop) {
+function buildProp(b: Batcher, p: Prop, lift = 0) {
   const { x, z } = p; const r = p.r ?? 0; const s = p.h ?? 1;
   switch (p.t) {
     case 'tree':
@@ -774,10 +792,11 @@ function buildProp(b: Batcher, p: Prop) {
       break;
     }
     case 'path': {
+      // дорожки во дворах лежат на приподнятом основании квартала (+lift), на земле — на нуле
       const pw = p.w ?? 2, pd = p.d ?? 1.6;
       const col = 'c:' + (p.c ?? '#b8a99a');
-      b.add(col, T.box, M(x, 0.045, z, r, pw, 0.09, pd));
-      b.add('c:#8f8172', T.box, M(x, 0.005, z, r, pw + 0.12, 0.05, pd + 0.12));
+      b.add(col, T.box, M(x, 0.045 + lift, z, r, pw, 0.09, pd));
+      b.add('c:#8f8172', T.box, M(x, 0.005 + lift, z, r, pw + 0.12, 0.05, pd + 0.12));
       // швы плитки
       const n = Math.min(14, Math.max(1, Math.round(Math.max(pw, pd) / 1.2)));
       for (let i = 1; i < n; i++) {
@@ -806,9 +825,9 @@ function buildProp(b: Batcher, p: Prop) {
       break;
     }
     case 'gate': break;   // створки ворот — динамические объекты (см. game.ts gates), в статику не запекаются
-    case 'driveway': b.add('c:' + (p.c ?? '#9a8f7f'), T.box, M(x, 0.02, z, 0, p.w ?? 3, 0.04, p.d ?? 5)); break;
+    case 'driveway': b.add('c:' + (p.c ?? '#9a8f7f'), T.box, M(x, 0.02 + lift, z, 0, p.w ?? 3, 0.04, p.d ?? 5)); break;
     // текстурированная плита (настил променада, площадки, дорожки по песку)
-    case 'pave': b.add('tex:' + (p.c ?? 'sidewalk'), T.plane, M(x, p.h ?? 0.12, z, r, (p.w ?? 3) / 2, (p.d ?? 5) / 2, 1, -Math.PI / 2), p.v ?? 4); break;
+    case 'pave': b.add('tex:' + (p.c ?? 'sidewalk'), T.plane, M(x, (p.h ?? 0.12) + lift, z, r, (p.w ?? 3) / 2, (p.d ?? 5) / 2, 1, -Math.PI / 2), p.v ?? 4); break;
     // песчаная дюна: половина сферы, вкопанная в песок
     case 'dune': b.add('tex:sand', T.sphere, M(x, (p.h ?? 1.1) * -0.15, z, r, (p.w ?? 5) / 2, p.h ?? 1.1, (p.d ?? 5) / 2), 3); break;
     // деревенский столбик с красным светоотражателем

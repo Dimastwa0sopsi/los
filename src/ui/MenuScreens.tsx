@@ -119,7 +119,7 @@ export function HowTo({ onClose }: { onClose: () => void }) {
   );
 }
 
-export function SettingsPanel({ value, onChange, onClose, inGame, onExit, onResetSave }: { value: Settings; onChange: (s: Settings) => void; onClose: () => void; inGame?: boolean; onExit?: () => void; onResetSave?: () => void }) {
+export function SettingsPanel({ value, onChange, onClose, inGame, onExit, onResetSave, onHelp }: { value: Settings; onChange: (s: Settings) => void; onClose: () => void; inGame?: boolean; onExit?: () => void; onResetSave?: () => void; onHelp?: () => void }) {
   const [s, setS] = useState(value);
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => { const n = { ...s, [k]: v }; setS(n); onChange(n); };
   const Seg = <K extends keyof Settings>({ k, opts }: { k: K; opts: [Settings[K], string][] }) => (
@@ -155,7 +155,9 @@ export function SettingsPanel({ value, onChange, onClose, inGame, onExit, onRese
         <label>Чувствительность камеры</label><Range k="sensitivity" min={0.3} max={2.5} step={0.1} fmt={(v) => v.toFixed(1)} />
         <label>Масштаб мини-карты</label><Range k="minimapZoom" min={0.5} max={3} step={0.1} fmt={(v) => v.toFixed(1) + '×'} />
         <label>Вращение мини-карты</label><Seg k="minimapRotate" opts={[[true, 'По камере'], [false, 'Север вверху']]} />
-        <p className="text-xs opacity-70">V — вид от первого лица · Q+1..5 — передачи · Пробел+руль — дрифт (без наград деньгами)</p>
+        <label>Подсказки в игре</label><Seg k="hints" opts={[['short', 'Коротко'], ['off', 'Выключены']]} />
+        <p className="text-xs opacity-70">Всё обучение — в «Как играть?» (F1) и в меню «☰» на телефоне.</p>
+        {onHelp && <button className="ui-btn sm" onClick={onHelp}>❓ Как играть?</button>}
       </div>}
       {tab === 'game' && <div className="lg-settings">
         <label>Плотность трафика</label><Range k="traffic" min={0} max={1} step={0.05} fmt={(v) => Math.round(v * 100) + '%'} />
