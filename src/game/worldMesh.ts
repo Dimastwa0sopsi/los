@@ -146,6 +146,31 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
     bedMesh.receiveShadow = true; bedMesh.matrixAutoUpdate = false; bedMesh.updateMatrix();
     root.add(bedMesh);
   }
+  // ---------- дно не пустое: валуны, галька и водоросли под водой ----------
+  {
+    const db = new Batcher();
+    const rnd = (i: number) => { const v = Math.sin(i * 12.9898) * 43758.5453; return v - Math.floor(v); };
+    let i = 0;
+    for (let z = GZ0; z < GZ1; z += 22) {
+      const c = bankX(z);
+      const spots = 1 + ((z / 22) % 2 === 0 ? 1 : 0);
+      for (let k = 0; k < spots; k++, i++) {
+        const x = c + (rnd(i * 3.1) - 0.5) * 2 * (bankHalf - 4);
+        const d = L.river.depth(x, z);
+        if (d < 0.3) continue;
+        const y = -d;
+        const s = 0.3 + rnd(i * 7.7) * 0.75;
+        db.add('c:#8a8371', T.ico, M(x, y + s * 0.3, z + rnd(i * 5.3) * 5, rnd(i) * 6, s, s * 0.62, s * 0.9));
+        if (rnd(i * 2.2) > 0.45) {
+          const wh = 0.7 + rnd(i * 9.1) * 1.3;
+          db.add('c:#3f6b45', T.cylB, M(x + 0.8, y, z - 0.6, 0, 0.06, wh, 0.06));
+          db.add('c:#4d7a50', T.cylB, M(x + 0.62, y, z - 0.4, 0, 0.05, wh * 0.75, 0.05));
+          db.add('c:#356040', T.cylB, M(x + 0.95, y, z - 0.85, 0, 0.05, wh * 0.6, 0.05));
+        }
+      }
+    }
+    db.build().forEach((m) => { m.receiveShadow = true; root.add(m); });
+  }
   // вода: три слоя прозрачности, чтобы отмель просвечивала, а фарватер был тёмным
   const waters: THREE.Mesh[] = [];
   for (const [batcher, key] of [[wShallow, 'waterShallow'], [wMid, 'waterMid'], [wDeep, 'waterDeep']] as const) {

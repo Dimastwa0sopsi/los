@@ -124,6 +124,7 @@ export class Game {
   waterDepthNow = 0;
   /** камера под водой: включаем «муть» */
   private underWater = false;
+  private underWaterShown = false;
   private fogSaved: { color: number; near: number; far: number } | null = null;
   private swimHinted = false;
   inVeh: Vehicle | null = null; passenger = false;
@@ -4759,15 +4760,18 @@ export class Game {
     const d = this.waterDepthAt(c.x, c.z);
     const under = d > 0.3 && c.y < L.waterY - 0.02;
     const fog = this.scene.fog as THREE.Fog | null;
-    if (under === this.underWater) return;
-    this.underWater = under;
-    if (!fog) return;
-    if (under) {
-      this.fogSaved = { color: fog.color.getHex(), near: fog.near, far: fog.far };
-      fog.color.setHex(0x0d4a55); fog.near = 2; fog.far = 55;
+    if (under && fog) {
+      if (!this.fogSaved) this.fogSaved = { color: fog.color.getHex(), near: fog.near, far: fog.far };
+      // держим муть каждый кадр: смена суток тоже перекрашивает туман
+      fog.color.setHex(0x0d4a55); fog.near = 2; fog.far = Math.min(this.fogSaved.far, 55);
     } else if (this.fogSaved) {
-      fog.color.setHex(this.fogSaved.color); fog.near = this.fogSaved.near; fog.far = this.fogSaved.far;
+      if (fog) { fog.color.setHex(this.fogSaved.color); fog.near = this.fogSaved.near; fog.far = this.fogSaved.far; }
       this.fogSaved = null;
+    }
+    this.underWater = under;
+    if (under !== this.underWaterShown) {
+      this.underWaterShown = under;
+      if (under) this.toast('🌊 Вы под водой — видно дно и водоросли');
     }
   }
   private followSky(dt: number) {
