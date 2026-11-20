@@ -3833,6 +3833,11 @@ export class Game {
   }
   // ================= КАЗИНО «ЖАР-ПТИЦА»: примитивы ставок =================
   static CASINO_MIN = 30000; static CASINO_MAX = 1000000;
+  /** крупные получения денег: не изымаем, но шлём уведомление в поддержку (Telegram) */
+  static BIG_MONEY = 5_000_000;
+  private reportBigMoney(from: string, amt: number) {
+    sendTicket({ category: '💸 Крупное получение', text: `Игрок «${from}» перевёл $${amt.toLocaleString('ru')}. Баланс получателя: $${this.state.money.toLocaleString('ru')}. Изъятий нет — информация к сведению.`, nick: this.state.nick ?? '?', online: true, place: this.interiorKind ? ('помещение: ' + this.interiorKind) : 'город', money: this.state.money }).catch(() => { /* поддержка оффлайн — молча */ });
+  }
   casinoStart(bet: number): boolean {
     if (bet < Game.CASINO_MIN || bet > Game.CASINO_MAX) { this.toast(`Ставка от $${(Game.CASINO_MIN).toLocaleString('ru')} до $${(Game.CASINO_MAX).toLocaleString('ru')}`); return false; }
     if (this.state.money < bet) { this.sound.error(); this.routeToBank(`💳 Для ставки не хватает $${(bet - this.state.money).toLocaleString('ru')}.`); return false; }
@@ -4199,9 +4204,11 @@ export class Game {
     this.net.onGift = (from, d) => {
       const who = this.net?.displayName(from) ?? 'Игрок';
       if (d.k === 'money' && Number(d.v) > 0) {
-        const amt = Math.min(1_000_000, Math.round(Number(d.v)));
+        // никаких изъятий: получил — твоё, сколько бы ни было (лишь бы влезло в int)
+        const amt = Math.min(2147483647 - this.state.money, Math.max(0, Math.round(Number(d.v))));
         this.state.money += amt; this.sound.coin(); this.save();
         this.sysMsg(`💵 ${who} перевёл вам $${amt.toLocaleString('ru')}`);
+        if (amt >= Game.BIG_MONEY) this.reportBigMoney(who, amt);   // тихо сигналит в поддержку Telegram
       } else if (d.k === 'item' && typeof d.v === 'string' && ITEMS[d.v]) {
         const n = Math.max(1, Math.min(999, Math.round(Number(d.n) || 1)));
         this.state.inventory[d.v] = (this.state.inventory[d.v] ?? 0) + n; this.save();

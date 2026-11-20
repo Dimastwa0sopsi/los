@@ -1,175 +1,307 @@
 # ════════════════════════════════════════════════════════════════════════════
-#  LOS GOROD — АДМИН-ПАНЕЛЬ (одна ячейка Colab)
+#  LOS GOROD — АДМИН-ПАНЕЛЬ (одна ячейка Colab, виджеты как раньше)
 #
-#  Консольная админка к вашему серверу: игроки онлайн, выдача денег, ~100
-#  действий по группам (модерация, телепорт, транспорт, чат, события…),
-#  инвентарь игрока, логи сервера, публикация постоянной ссылки.
+#  Вторая ячейка рядом с серверной (colab_one.py). Рисует интерактивную панель
+#  прямо в ноутбуке: поиск и список игроков, карточка выбранного, ~100 кнопок
+#  по группам (берутся живьём из каталога сервера), выдача предметов и наборов,
+#  чат/объявления, настройки денег, публикация постоянной ссылки, логи.
 #
-#  Сервер берётся автоматически из MyDrive/los-gorod/cfg.json (его пишет
-#  ячейка-сервер colab_one.py). Если сервер на другой машине — панель сама
-#  спросит адрес. Токен админки по умолчанию losgorod-admin (как в сервере).
-#  Запускайте прямо во время работающего сервера или позже — панель ходит по
-#  HTTP, ей всё равно, где живёт сервер.
+#  Адрес сервера берётся сам из MyDrive/los-gorod/cfg.json (LAST_URL), иначе
+#  спросит один раз. Токен админки — losgorod-admin (как в сервере).
+#  Работает по HTTP /admin/* — сервер может жить где угодно.
 # ════════════════════════════════════════════════════════════════════════════
-import json, os, urllib.request, urllib.error
+import json, os, subprocess, sys, urllib.request, urllib.error
 
 CFG_F = '/content/drive/MyDrive/los-gorod/cfg.json'
 ADMIN_TOKEN = 'losgorod-admin'
 
 def say(icon, *m): print(f'{icon} \033[1m{" ".join(map(str, m))}\033[0m')
 
-base = ''
+BASE = ''
 try:
-    cfg = json.load(open(CFG_F))
-    base = str(cfg.get('LAST_URL') or '').replace('wss://', 'https://').replace('ws://', 'http://').rstrip('/')
+    _cfg = json.load(open(CFG_F))
+    BASE = str(_cfg.get('LAST_URL') or '').replace('wss://', 'https://').replace('ws://', 'http://').rstrip('/')
 except Exception:
-    cfg = {}
-if not base:
-    base = input('Адрес сервера (например https://имя.ngrok-free.dev): ').strip().rstrip('/')
-if not base.startswith('http'): base = 'https://' + base
-say('🔌', 'Админ-панель →', base)
+    pass
+if not BASE:
+    BASE = input('Адрес сервера (https://имя.ngrok-free.dev): ').strip().rstrip('/')
+if not BASE.startswith('http'):
+    BASE = 'https://' + BASE
 
-def api(path, method='GET', body=None, timeout=12):
-    req = urllib.request.Request(base + path + ('&' if '?' in path else '?') + 'token=' + ADMIN_TOKEN,
-                                 method=method, headers={'Content-Type': 'application/json'})
+def http_json(url, body=None, timeout=20):
+    req = urllib.request.Request(url, method='POST' if body is not None else 'GET',
+                                 headers={'Content-Type': 'application/json'})
     data = json.dumps(body).encode() if body is not None else None
+    with urllib.request.urlopen(req, data=data, timeout=timeout) as r:
+        return json.loads(r.read())
+
+def api(path, body=None, timeout=20):
     try:
-        with urllib.request.urlopen(req, data=data, timeout=timeout) as r:
-            return json.loads(r.read())
+        return http_json(f'{BASE}{path}{"&" if "?" in path else "?"}token={ADMIN_TOKEN}', body, timeout)
     except urllib.error.HTTPError as e:
-        if e.code in (401, 403): return {'ok': False, 'error': 'Неверный ADMIN_TOKEN (проверьте токен сервера)'}
+        if e.code in (401, 403):
+            return {'ok': False, 'error': 'Неверный токен админки'}
         return {'ok': False, 'error': f'HTTP {e.code}'}
-    except Exception as e:
+    except Exception as e:                      # noqa: BLE001
         return {'ok': False, 'error': f'Сервер недоступен: {e}'}
 
-h = api('/admin/state')
-if not h.get('ok'):
-    say('❌', 'Нет связи с сервером:', h.get('error')); raise SystemExit(1)
+chk = api('/admin/state')
+if not chk.get('ok'):
+    say('❌', 'Нет связи с сервером:', chk.get('error')); raise SystemExit(1)
+say('🔌', 'Админ-панель →', BASE)
 
-nick = ''          # выбранный игрок
-groups, actions = {}, []
+# --- ipywidgets (в Colab иногда слетает) ------------------------------------
+try:
+    import ipywidgets as W                     # noqa: F401
+except ImportError:
+    say('📦', 'Ставлю ipywidgets…')
+    subprocess.run(f'{sys.executable} -m pip install -q ipywidgets', shell=True)
+    import ipywidgets as W
+from IPython.display import display
 
-def load_catalog():
-    global groups, actions
-    c = api('/admin/actions')
-    if c.get('ok'): groups, actions = c.get('groups', {}), c.get('actions', [])
-load_catalog()
+L = W.Layout
 
-def fmt_players(st):
-    ps = st.get('players') or []
-    if not ps: print('   (онлайн никого нет)'); return [p.get('name', '?') for p in ps]
-    names = []
-    for i, p in enumerate(ps, 1):
-        nm = p.get('name', '?'); names.append(nm)
-        mark = ' ⭐' if nm == nick else ''
-        print(f"   {i:>2}. {nm}{mark} · ${int(p.get('money', 0)):,}".replace(',', ' ') + f" · {p.get('vehicle', 'пешком')}")
-    return names
+def pill(text, bg='#1e293b', fg='#e2e8f0'):
+    return (f'<span style="display:inline-block;padding:3px 9px;border-radius:999px;background:{bg};'
+            f'color:{fg};font-size:12px;margin:0 4px 4px 0">{text}</span>')
 
-def header(title): print('\n' + '─' * 60 + f'\n\033[96m{title}\033[0m\n' + '─' * 60)
+def box(inner, bg='#0b1220'):
+    return (f'<div style="padding:10px 12px;border-radius:12px;background:{bg};'
+            f'border:1px solid #1e293b;margin:4px 0">{inner}</div>')
 
-def do_action(a):
-    global nick
-    body = {'action': a['id']}
-    if a.get('need'):
-        if not nick:
-            say('⚠️', 'Это действие требует игрока — сначала выберите его в пункте 2.'); return
-        body['name'] = nick
-    if a['id'].startswith('chat') or a['id'] in ('announce', 'broadcast'):
-        txt = input('   Текст сообщения: ').strip()
-        if not txt: return
-        body['text'] = txt
-    if a.get('confirm') and input(f"   Точно выполнить «{a['t']}»? (y/N): ").strip().lower() != 'y':
-        return
-    res = api('/admin/action', 'POST', body)
-    if res.get('ok'): say('✅', res.get('message') or a['t'])
-    else: say('⚠️', res.get('error') or 'не получилось')
+def head(text):
+    return W.HTML(f'<b style="font-size:13px;color:#cbd5e1">{text}</b>')
 
-while True:
-    header(f'🖥 АДМИНКА LOS GOROD · сервер: {base}' + (f' · игрок: {nick}' if nick else ''))
-    print(' 1. 📊 Состояние сервера и игроки')
-    print(' 2. 👤 Выбрать игрока')
-    print(' 3. 🎛 Действия по группам (≈100 кнопок)')
-    print(' 4. 🎒 Инвентарь игрока')
-    print(' 5. 💵 Настройки выдачи денег')
-    print(' 6. 📜 Лог сервера')
-    print(' 7. 🔗 Адрес туннеля / опубликовать ссылку')
-    print(' 8. 🔄 Переподключиться / другой адрес')
-    print(' 0. Выход')
-    ch = input('\n ▸ ').strip()
+def flow(children):
+    return W.Box(children=children, layout=L(display='flex', flex_flow='row wrap', align_content='flex-start'))
 
-    if ch == '0' or ch == '': break
+status = W.HTML(pill('Загрузка…'))
+msg = W.HTML(pill('Выберите игрока слева, затем жмите кнопки.'))
+result = W.HTML('')
+card = W.HTML(pill('Игрок не выбран'))
 
-    elif ch == '1':
-        st = api('/admin/state')
-        if not st.get('ok'): say('⚠️', st.get('error')); continue
-        inf = st.get('server', {})
-        print(f"   онлайн: {len(st.get('players') or [])} · аптайм: {inf.get('uptime', '?')} с · сборка: {inf.get('build', '?')}")
-        fmt_players(st)
+search = W.Text(placeholder='поиск по нику…', layout=L(width='210px'))
+filt = W.Dropdown(options=[('все', 'all'), ('в сети', 'online'), ('офлайн', 'offline')], value='all',
+                  description='Кто', layout=L(width='190px'))
+sort = W.Dropdown(options=[('по нику', 'name'), ('по деньгам', 'money')], value='name',
+                  description='Сорт.', layout=L(width='210px'))
+plist = W.Select(options=[], rows=12, layout=L(width='320px'))
+danger = W.Checkbox(value=False, description='Разрешить опасные (с подтверждением)')
+reason = W.Text(value='Нарушение правил', description='Причина', layout=L(width='330px'))
+car_id = W.Text(value='volga', description='Авто (id)', layout=L(width='260px'))
+chat_text = W.Text(placeholder='текст объявления / сообщения…', layout=L(width='560px'))
+item_sel = W.Dropdown(options=[], description='Предмет', layout=L(width='360px'))
+qty = W.IntText(value=1, description='Кол-во', layout=L(width='180px'))
+inv_view = W.HTML('')
+log_view = W.HTML('')
 
-    elif ch == '2':
-        names = fmt_players(api('/admin/state'))
-        sel = input('   Номер или ник (Enter — сброс): ').strip()
-        if not sel: nick = ''; say('👤', 'Игрок не выбран')
-        elif sel.isdigit() and 1 <= int(sel) <= len(names): nick = names[int(sel) - 1]; say('👤', 'Выбран:', nick)
-        else: nick = sel; say('👤', 'Выбран:', nick)
+st = {'players': [], 'online': set()}
 
-    elif ch == '3':
-        if not actions: load_catalog()
-        gkeys = list(groups.keys())
-        header('Группы действий')
-        for i, k in enumerate(gkeys, 1): print(f' {i}. {groups[k]}')
-        gi = input(' ▸ группа (Enter — назад): ').strip()
-        if gi.isdigit() and 1 <= int(gi) <= len(gkeys):
-            acts = [a for a in actions if a.get('g') == gkeys[int(gi) - 1]]
-            gtitle = groups[gkeys[int(gi) - 1]]
-            while True:
-                who = nick or '—'
-                header(f'{gtitle} · игрок: {who}')
-                for i, a in enumerate(acts, 1): print(f" {i:>2}. {a['t']}" + (' · нужен игрок' if a.get('need') else ''))
-                print('  0. ← назад')
-                ai = input(' ▸ ').strip()
-                if ai == '0' or ai == '': break
-                if ai.isdigit() and 1 <= int(ai) <= len(acts): do_action(acts[int(ai) - 1])
+def picked():
+    return (plist.value or '').split(' · ')[0].lstrip('🟢 ').strip()
 
-    elif ch == '4':
-        nm = nick or input('   Ник игрока: ').strip()
-        if not nm: continue
-        inv = api('/admin/inventory?name=' + urllib.request.quote(nm))
-        if not inv.get('ok'): say('⚠️', inv.get('error')); continue
-        rows = inv.get('rows') or []
-        say('🎒', f'Инвентарь {nm}' + (' · в сети' if inv.get('live') else ''))
-        for row in rows[:40]: print('  ', row)
-        if not rows: print('   (пусто)')
+def say_msg(ok, text):
+    msg.value = pill(('✅ ' if ok else '⚠️ ') + str(text), '#065f46' if ok else '#7f1d1d', '#fff')
 
-    elif ch == '5':
-        mn = api('/admin/money')
-        if not mn.get('ok'): say('⚠️', mn.get('error')); continue
-        m = mn.get('money', {})
-        def fm(v): return f'{int(v):,}'.replace(',', ' ') if str(v).isdigit() else str(v)
-        print(f"   сумма выдачи: ${fm(m.get('amount', '?'))} · потолок: ${fm(m.get('cap', '?'))} · шаг: ${fm(m.get('step', '?'))}")
-        if input('   Изменить настройки? (y/N): ').strip().lower() == 'y':
-            body = {}
-            for k, label in (('amount', 'Сумма выдачи'), ('cap', 'Потолок баланса'), ('step', 'Шаг изменения')):
-                val = input(f'   {label} (Enter — оставить {m.get(k)}): ').strip()
-                if val.isdigit(): body[k] = int(val)
-            res = api('/admin/money', 'POST', body)
-            say('✅' if res.get('ok') else '⚠️', res.get('error') or 'Настройки сохранены')
+CATALOG = api('/admin/actions')
+GROUPS = CATALOG.get('groups') or {}
+ACTIONS = [a for a in (CATALOG.get('actions') or []) if isinstance(a, dict)]
+ITEMS_CAT = api('/admin/items')
+ITEMS_LIST = ITEMS_CAT.get('items') or []
+KITS = ITEMS_CAT.get('kits') or []
+if ITEMS_LIST:
+    item_sel.options = [(f"{it.get('icon','')} {it.get('name')} (${it.get('price',0)})", it.get('id')) for it in ITEMS_LIST]
 
-    elif ch == '6':
-        lg = api('/admin/log')
-        for line in (lg.get('log') or [])[-25:]: print('  ', line)
+def run(aid, **kw):
+    r = api('/admin/action', {'action': aid, **kw})
+    rows = r.get('rows') or []
+    result.value = box(''.join(f'<div>{x}</div>' for x in rows)) if rows else ''
+    say_msg(bool(r.get('ok')), r.get('message') or r.get('error') or 'готово')
+    reload_players()
+    return r
 
-    elif ch == '7':
-        t = api('/admin/tunnel')
-        say('🔗', 'Адрес:', t.get('url') or t.get('ws') or '(нет)')
-        if input('   Опубликовать постоянную ссылку (live.json)? (y/N): ').strip().lower() == 'y':
-            r = api('/admin/publish', 'POST', {})
-            say('✅' if r.get('ok') else '⚠️', r.get('error') or r.get('site') or 'Опубликовано')
+def make_action_btn(defn):
+    b = W.Button(description=defn.get('t', defn.get('id')), button_style='danger' if defn.get('confirm') else '',
+                 layout=L(margin='2px', width='auto'))
+    def on_click(_b, d=defn):
+        kw = {}
+        if d.get('need'):
+            p = picked()
+            if not p:
+                say_msg(False, 'Сначала выберите игрока в списке'); return
+            kw['name'] = p
+        if d.get('confirm') and not danger.value:
+            say_msg(False, 'Опасно! Поставьте галочку «Разрешить опасные»'); return
+        if d.get('text'):
+            txt = chat_text.value.strip()
+            if not txt:
+                say_msg(False, 'Введите текст в поле на вкладке «Чат»'); return
+            kw['text'] = txt
+        if d.get('car'):
+            kw['carId'] = car_id.value.strip() or 'volga'
+        if d['id'] in ('ban', 'ban_silent', 'warn'):
+            kw['reason'] = reason.value.strip() or 'Нарушение правил'
+        run(d['id'], **kw)
+    b.on_click(on_click)
+    return b
 
-    elif ch == '8':
-        base = input('   Новый адрес сервера: ').strip().rstrip('/')
-        if not base.startswith('http'): base = 'https://' + base
-        h2 = api('/admin/state')
-        say('✅' if h2.get('ok') else '❌', 'Подключено' if h2.get('ok') else h2.get('error'))
+group_boxes = []
+for gk, gtitle in GROUPS.items():
+    acts = [a for a in ACTIONS if a.get('g') == gk]
+    if not acts:
+        continue
+    gb = W.VBox([head(gtitle), flow([make_action_btn(a) for a in acts])],
+                layout=L(margin='6px 0'))
+    group_boxes.append(gb)
 
-print('\n👋 Админ-панель закрыта.')
+def reload_players(_b=None):
+    s = api('/admin/state')
+    if not s.get('ok'):
+        card.value = pill('Нет связи: ' + str(s.get('error')), '#7f1d1d', '#fff'); return
+    st['players'] = s.get('players') or []
+    st['online'] = set(s.get('online') or [])
+    inf = s.get('server') or {}
+    status.value = (pill(f"🟢 в сети: {len(st['online'])}", '#065f46', '#d1fae5')
+                    + pill(f"👥 аккаунтов: {len(st['players'])}")
+                    + pill(f"🖥 аптайм: {inf.get('uptime', '?')} с")
+                    + (pill('🛠 ТЕХРАБОТЫ', '#7f1d1d', '#fff') if inf.get('maintenance') else ''))
+    draw_list(); draw_card()
+
+def draw_list():
+    q = search.value.strip().lower(); f = filt.value; so = sort.value
+    rows = []
+    for p in st['players']:
+        nm = p.get('name', '?')
+        if q and q not in nm.lower():
+            continue
+        on = nm in st['online']
+        if f == 'online' and not on:
+            continue
+        if f == 'offline' and on:
+            continue
+        rows.append((nm, int(p.get('money', 0)), on))
+    rows.sort(key=lambda r: (r[0].lower() if so == 'name' else -r[1]))
+    plist.options = [(('🟢 ' if on else '') + f'{nm} · ${m:,}'.replace(',', ' '), nm) for nm, m, on in rows]
+
+def draw_card():
+    p = picked()
+    if not p:
+        card.value = pill('Игрок не выбран'); return
+    rec = next((x for x in st['players'] if x.get('name') == p), None)
+    if not rec:
+        card.value = pill(p); return
+    on = p in st['online']
+    bits = [pill(('🟢 онлайн' if on else '⚪ офлайн'), '#065f46' if on else '#334155', '#fff'),
+            pill(f"💵 ${int(rec.get('money',0)):,}".replace(',', ' ')),
+            pill(f"⚠ варны: {rec.get('warns', 0)}")]
+    if rec.get('vehicle'):
+        bits.append(pill('🚗 ' + str(rec['vehicle'])))
+    card.value = box('<b>' + p + '</b><br>' + ''.join(bits))
+
+search.observe(lambda _c: draw_list(), 'value')
+filt.observe(lambda _c: draw_list(), 'value')
+sort.observe(lambda _c: draw_list(), 'value')
+plist.observe(lambda _c: draw_card(), 'value')
+
+def plain(label, cb, style='', width='auto'):
+    b = W.Button(description=label, button_style=style, layout=L(margin='2px', width=width))
+    b.on_click(lambda _b: cb())
+    return b
+
+# ---- вкладка 1: игроки и все кнопки -----------------------------------------
+players_tab = W.VBox([
+    status,
+    W.HBox([search, filt, sort, plain('🔄 Обновить', reload_players, 'info')]),
+    W.HBox([plist, W.VBox([card, danger, reason, car_id, msg, result])]),
+    W.HTML('<hr style="border-color:#1e293b">'),
+    *group_boxes,
+])
+
+# ---- вкладка 2: предметы ------------------------------------------------------
+def give_item(mode):
+    p = picked()
+    if mode in ('item_give', 'item_take') and not p:
+        say_msg(False, 'Выберите игрока'); return
+    if not item_sel.value:
+        say_msg(False, 'Выберите предмет'); return
+    kw = {'item': item_sel.value, 'qty': max(1, int(qty.value or 1))}
+    if p:
+        kw['name'] = p
+    run(mode, **kw)
+
+def show_inventory():
+    p = picked()
+    if not p:
+        inv_view.value = pill('Выберите игрока'); return
+    r = api('/admin/inventory?name=' + urllib.request.quote(p))
+    rows = r.get('rows') or []
+    inv_view.value = box('<b>🎒 ' + p + ('</b> 🟢' if r.get('live') else '</b>')
+                         + '<br>' + (' · '.join(str(x) for x in rows[:30]) or '(пусто)'))
+
+items_tab = W.VBox([
+    msg,
+    W.HBox([item_sel, qty]),
+    flow([plain('🎁 Выдать игроку', lambda: give_item('item_give'), 'success'),
+          plain('🗑 Забрать у игрока', lambda: give_item('item_take')),
+          plain('📢 Выдать всем онлайн', lambda: give_item('item_give_all'), 'success'),
+          plain('🧹 Забрать у всех', lambda: give_item('item_take_all'), 'danger'),
+          plain('🗑 Очистить инвентарь', lambda: give_item('item_clear'), 'danger')]),
+    W.HTML('<hr style="border-color:#1e293b">'),
+    W.HBox([plain('🎒 Показать инвентарь выбранного', show_inventory, 'info')]),
+    inv_view, result,
+])
+
+# ---- вкладка 3: чат ------------------------------------------------------------
+chat_acts = [a for a in ACTIONS if a.get('g') == 'chat']
+chat_tab = W.VBox([
+    msg,
+    W.HBox([chat_text]),
+    head('Действия чата'),
+    flow([make_action_btn(a) for a in chat_acts]),
+    result,
+])
+
+# ---- вкладка 4: сервер ----------------------------------------------------------
+def load_money_cfg():
+    m = (api('/admin/money').get('money') or {})
+    m_amount.value = int(m.get('amount', 5000)); m_cap.value = int(m.get('cap', 1000000)); m_step.value = int(m.get('step', 1000))
+
+m_amount = W.IntText(description='Выдача $', layout=L(width='240px'))
+m_cap = W.IntText(description='Потолок $', layout=L(width='260px'))
+m_step = W.IntText(description='Шаг $', layout=L(width='220px'))
+
+def save_money():
+    r = api('/admin/money', {'amount': int(m_amount.value), 'cap': int(m_cap.value), 'step': int(m_step.value)})
+    say_msg(bool(r.get('ok')), r.get('error') or 'Настройки денег сохранены')
+
+def publish():
+    r = api('/admin/publish', {})
+    say_msg(bool(r.get('ok')), r.get('error') or f"Опубликовано: {r.get('site') or 'live.json обновлён'}")
+
+def refresh_log():
+    lg = api('/admin/log')
+    lines = (lg.get('log') or [])[-30:]
+    log_view.value = box('<div style="font-family:monospace;font-size:11px">'
+                         + '<br>'.join(str(x) for x in lines) + '</div>' if lines else pill('Лог пуст'))
+
+load_money_cfg()
+server_tab = W.VBox([
+    status, msg,
+    head('💵 Настройки выдачи денег'),
+    W.HBox([m_amount, m_cap, m_step, plain('💾 Сохранить', save_money, 'success')]),
+    W.HTML('<hr style="border-color:#1e293b">'),
+    head('🔗 Постоянная ссылка'),
+    flow([plain('📡 Опубликовать live.json', publish, 'info')]),
+    W.HTML('<hr style="border-color:#1e293b">'),
+    W.HBox([plain('📜 Обновить лог', refresh_log, 'info')]),
+    log_view,
+])
+
+reload_players()
+panel = W.Tab(children=[players_tab, items_tab, chat_tab, server_tab])
+panel.set_title(0, '👥 Игроки · 🎛 Кнопки')
+panel.set_title(1, '🎁 Предметы')
+panel.set_title(2, '📢 Чат')
+panel.set_title(3, '🖥 Сервер')
+say('🖥', 'Админ-панель готова. Вкладки сверху, игрок выбирается в списке.')
+display(panel)
