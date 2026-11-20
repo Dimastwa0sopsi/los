@@ -823,7 +823,7 @@ export function generateLayout(): WorldLayout {
     { name: VILLAGE_NAMES[0], from: cid(5, 0), conn: [[300, -300]], street: [540, -300] },
   ];
   let villageEntryNode = 0;
-  let sosnovkaLaneEnd = 0, sosnovkaStreetEnd = 0;
+  let sosnovkaLaneEnd = 0, sosnovkaStreetEnd = 0, sosnovkaLaneStart = 0;
   const villageHouseSpots: { x: number; z: number; vi: number; ux: number; uz: number; nx: number; nz: number }[] = [];
   for (let vi = 0; vi < vdefs.length; vi++) {
     const v = vdefs[vi];
@@ -888,7 +888,7 @@ export function generateLayout(): WorldLayout {
   {
     const vname = vdefs[0].name;
     const laneA = roadSeg(villageEntryNode, [[300, -262]], 'dirt', 7);
-    const laneNode = laneA[laneA.length - 1];
+    const laneNode = laneA[laneA.length - 1]; sosnovkaLaneStart = laneNode;
     sosnovkaLaneEnd = roadSeg(laneNode, [[560, -262]], 'dirt', 7).at(-1)!;
     for (const hx2 of [330, 396, 462, 528]) {
       const hz2 = -248;
@@ -901,17 +901,7 @@ export function generateLayout(): WorldLayout {
       addProp({ t: 'hay', x: hx2 - 8, z: hz2 + 8 }, { w: 1.6, d: 1.6, h: 1.2 });
       addProp({ t: 'tree', x: hx2 + 9, z: hz2 + 10, h: 1.1 }, { w: 0.6, d: 0.6, h: 3.4 });
     }
-    // на краю новой улицы — пруд с лавочками и колодец
-
-    addProp({ t: 'bench', x: 546, z: -290, r: 0.3 }, { w: 1.8, d: 0.6, h: 0.5 });
-    addProp({ t: 'bench', x: 586, z: -290, r: -0.3 }, { w: 1.8, d: 0.6, h: 0.5 });
-    addWell(566, -296);
-    addProp({ t: 'towel', x: 548, z: -286, c: '#f97316' });
-    addProp({ t: 'towel', x: 584, z: -286, c: '#22c55e' });
-    path(566, -262, 566, -280, 1.6, '#c2b49f');
-    path(566, -280, 546, -288, 1.3, '#c2b49f');
-    path(566, -280, 586, -288, 1.3, '#c2b49f');
-    path(560, -284, 560, -296, 1.3, '#c2b49f');
+    // Декорации бывшего пруда убраны: здесь теперь дорожное соединение.
     for (let k = 0; k < 5; k++) addProp({ t: 'tree', x: 310 + k * 60, z: -234, h: 1.05 + (k % 2) * 0.1, r: k }, { w: 0.6, d: 0.6, h: 3.2 });
   }
   // Дома деревни: фасад в 9.5 м от осевой (≈ длина авто от края дороги)
@@ -1287,6 +1277,7 @@ export function generateLayout(): WorldLayout {
   // Соседний город за рекой и мост убраны: игра идёт в одном Лос-Городе и его области.
   const newCity: WorldLayout['newCity'] = null;
 
+  let klenovkaEast = -1, olkhovkaWest = -1;
   // ---------- Деревня «Кленовка» с большой фермой ----------
   {
     const VNAME = 'Кленовка';
@@ -1295,7 +1286,7 @@ export function generateLayout(): WorldLayout {
     const streetA = roadSeg(sNode, [[600, 1830]], 'village', 8);       // главная улица деревни (с севера на юг)
     const midNode = streetA[streetA.length - 1];
     roadSeg(midNode, [[600, 1900]], 'village', 8);                     // южный конец главной улицы
-    roadSeg(midNode, [[820, 1830]], 'village', 8);                     // восточная улица-дубль: село выросло вдвое
+    klenovkaEast = roadSeg(midNode, [[820, 1830]], 'village', 8).at(-1)!;                     // восточная улица-дубль: село выросло вдвое
     roadSeg(sNode, [[470, 1670]], 'dirt', 7);          // просёлок к ферме
     roadSeg(sNode, [[600, 1600]], 'dirt', 7);          // выезд на трассу
     villages.push({ name: VNAME, sx: 600, sz: 1650, ex: 820, ez: 1900, signX: 576, signZ: 1654, cx: 650, cz: 1780 });
@@ -1410,7 +1401,7 @@ export function generateLayout(): WorldLayout {
     const VNAME = 'Ольховка';
     const road = roadSeg(zCityNode, [[1110, 1560]], 'village', 8);
     const sNode = road[road.length - 1];
-    roadSeg(sNode, [[994, 1560]], 'village', 8);       // улица деревни (с запада на восток)
+    olkhovkaWest = roadSeg(sNode, [[994, 1560]], 'village', 8).at(-1)!;       // улица деревни (с запада на восток)
     const eastRoad = roadSeg(sNode, [[1320, 1560]], 'village', 8);
     roadSeg(eastRoad[eastRoad.length - 1], [[1300, 1640]], 'dirt', 7);   // просёлок к ферме
     villages.push({ name: VNAME, sx: 1050, sz: 1560, ex: 1290, ez: 1560, signX: 1120, signZ: 1544, cx: 1170, cz: 1560 });
@@ -1534,6 +1525,16 @@ export function generateLayout(): WorldLayout {
     }
     roadSeg(east, [[890, -290], [890, -360]], 'village', 8);
   }
+
+  // Новые улицы Сосновки и два подъезда к гаражным кооперативам.
+  { const west = roadSeg(sosnovkaLaneStart, [[300, -210]], 'village', 8).at(-1)!;
+    const east = roadSeg(west, [[560, -210]], 'village', 8).at(-1)!;
+    addEdge(east, sosnovkaLaneEnd, 'village', 8);
+    roadSeg(west, [[300, -155], [380, -155]], 'village', 8);
+    roadSeg(olkhovkaWest, [[960, 1520], [900, 1520]], 'village', 8);
+  }
+  // Прямая связка двух деревень, с узлами для навигации трафика.
+  { const end = roadSeg(klenovkaEast, [[900, 1830], [950, 1700]], 'village', 8).at(-1)!; addEdge(end, olkhovkaWest, 'village', 8); }
 
   // пункты доставки дальнобойщика
   truckDests.push({ name: 'Завод «Сталь»', x: 1600, z: 560 }, { name: 'Агрохолдинг «Нива»', x: 1470, z: 1140 }, { name: 'Ферма «Зорька»', x: 1646, z: 1140 });
@@ -1964,6 +1965,39 @@ export function generateLayout(): WorldLayout {
       const col = colliders.find(c => c.tag === 'b' + bath.id)!;
       Object.assign(col, { x0: x - 1.7, x1: x + 1.7, z0: z - 1.7, z1: z + 1.7 });
     }
+  }
+
+
+  // Только добавляем в конец: старые номера домов, бань и гаражей не меняются.
+  const clearVegetation = (x: number, z: number, w: number, d: number) => {
+    for (let i = props.length - 1; i >= 0; i--) {
+      const p = props[i];
+      if (!['tree', 'pine', 'bush'].includes(p.t) || Math.abs(p.x - x) > w / 2 || Math.abs(p.z - z) > d / 2) continue;
+      const ci = colliders.findIndex(c => !c.tag && Math.abs((c.x0 + c.x1) / 2 - p.x) < 0.001 && Math.abs((c.z0 + c.z1) / 2 - p.z) < 0.001);
+      if (ci >= 0) colliders.splice(ci, 1);
+      props.splice(i, 1);
+    }
+  };
+  const newHomes = [
+    ...[330, 365, 400, 435, 470, 505, 540].map(x => ({ x, z: -192, village: 'Сосновка', face: 'n' as const, roadZ: -210 })),
+    ...[850, 880].flatMap(x => [{ x, z: 1850, village: 'Кленовка', face: 'n' as const, roadZ: 1830 }, { x, z: 1810, village: 'Кленовка', face: 's' as const, roadZ: 1830 }]),
+    ...[905, 935, 965].map(x => ({ x, z: 1500, village: 'Ольховка', face: 's' as const, roadZ: 1520 })),
+  ];
+  newHomes.forEach((p, i) => {
+    const w = [8.5, 10, 11][i % 3], d = [8, 9, 8.5][i % 3];
+    clearVegetation(p.x, p.z, 28, 34);
+    const home = addBuilding({ kind: 'vhouse', name: 'Дом · ' + p.village, x: p.x, z: p.z, w, d, h: [4.5, 5, 5.4][i % 3],
+      door: doorFor(p.x, p.z, w, d, p.face), facade: ['wood', 'plaster', 'brick'][i % 3], roof: 'gable', enter: true,
+      village: p.village, price: 9000 + i * 500, forSale: true, color: ['#854d3a', '#7c8f72', '#8f7470', '#71869b'][i % 4] });
+    home.cls = 'eco'; plotFence(home, [2, 2.5, 3][i % 3], 1.15, ['#8b6b4a', '#a8a29e', '#d6d3d1'][i % 3]);
+    driveway(home.door, { z: p.roadZ }, 3.2, '#8b8b8b'); wallLamp(home.door);
+    const bz = p.z + (p.face === 'n' ? 1 : -1) * (d / 2 + 4);
+    addBuilding({ kind: 'banya', name: 'Баня · ' + p.village, x: p.x, z: bz, w: 3.4, d: 3.4, h: 3,
+      door: doorFor(p.x, bz, 3.4, 3.4, p.face), facade: 'wood', roof: 'gable', enter: true,
+      village: p.village, color: '#855c3b', bathOwner: home.id });
+  });
+  for (const [x, z] of [...[310, 320, 330, 340, 350, 360, 370].map(x => [x, -141]), ...[908, 918, 928, 938, 948].map(x => [x, 1534])]) {
+    clearVegetation(x, z, 9, 12); addGarage(x, z, 24000);
   }
 
 

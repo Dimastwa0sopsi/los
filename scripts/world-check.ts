@@ -59,6 +59,15 @@ try {
   const visited = new Set([start.id]), queue = [start.id];
   while (queue.length) for (const e of L.adj[queue.shift()!] || []) if (!visited.has(e.n)) { visited.add(e.n); queue.push(e.n); }
   if (!visited.has(finish.id)) throw new Error('Егоровка не соединена с Сосновкой');
+  if (new Set(L.buildings.map(b => b.id)).size !== L.buildings.length || L.buildings.some((b, i) => b.id !== i)) throw new Error('неуникальные ID зданий');
+  if (L.garages.length < 34 || new Set(L.garages.map(g => g.id)).size !== L.garages.length) throw new Error('недостаточно гаражей или повторяются ID');
+  if (L.buildings.filter(b => b.kind === 'vhouse' && b.village === 'Сосновка').length < 22) throw new Error('нет новых домов Сосновки');
+  if (L.props.some(p => ['bench', 'path', 'towel'].includes(p.t) && p.x >= 544 && p.x <= 590 && p.z >= -300 && p.z <= -263)) throw new Error('декорации мешают новой дороге');
+  const klen = L.nodes.find(n => n.x === 820 && n.z === 1830)!;
+  const olh = L.nodes.find(n => n.x === 994 && n.z === 1560)!;
+  const reached = new Set([klen.id]), q = [klen.id];
+  while (q.length) for (const e of L.adj[q.shift()!] || []) if (!reached.has(e.n)) { reached.add(e.n); q.push(e.n); }
+  if (!reached.has(olh.id)) throw new Error('Кленовка не соединена с Ольховкой');
   if (L.parkRides.length) throw new Error('в парке остались аттракционы');
   for (const gone of ['Берёзово', 'Тихая Гавань', 'Лесной Край', 'Дубрава']) if (L.villages.some((v) => v.name === gone)) throw new Error('деревня ' + gone + ' не удалена');
   if (L.newCity || L.bridges.length) throw new Error('соседний город и мост должны быть убраны');

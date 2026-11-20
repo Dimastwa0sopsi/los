@@ -152,7 +152,7 @@ export function Hud({ g, hud, mobile }: { g: Game; hud: HudState; mobile: boolea
         {hud.rental && <div className="hx-task">🛴 Аренда: {hud.rental.min} мин · ${hud.rental.cost}</div>}
         {hud.tradeInvite && <div className="hx-task">🔁 {hud.tradeInvite} предлагает обмен — /obm да</div>}
         {hud.taxi && <div className="hx-task">🚕 {hud.taxi}</div>}
-        {hud.riding && <div className="hx-task">🧍 Вы пассажир · E — выйти</div>}
+        {hud.riding && <div className="hx-task">🧍 Вы пассажир · F — выйти</div>}
       </div>
       {v && !v.passenger && mobile && (
         <div className="hx-sp-pill">
