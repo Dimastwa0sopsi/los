@@ -47,7 +47,7 @@ export type Panel =
   | { type: 'shop'; kind: ShopKind; title: string; items: string[] } | { type: 'kiosk'; id: number } | { type: 'market'; sellUid?: string }
   | { type: 'tuning'; uid: string } | { type: 'clothes' } | { type: 'barber' } | { type: 'hospital' } | { type: 'police'; title: string }
   | { type: 'property'; b: number; unit: number } | { type: 'garage'; id: number } | { type: 'vadmin'; village: string } | { type: 'factory' } | { type: 'bank' }
-  | { type: 'pc'; mode: 'office' | 'home' } | { type: 'officehr' } | { type: 'livestock' } | { type: 'dealer'; scooter?: boolean } | { type: 'trucker' } | { type: 'emotes'; dance?: boolean } | { type: 'passport' } | { type: 'trade' } | { type: 'tradeInvite' } | { type: 'plant'; key: string; basement: boolean } | { type: 'quest' } | { type: 'editor'; fresh: boolean } | { type: 'listing'; uid: string; slot: number } | { type: 'info'; title: string; text: string } | { type: 'map'; mode: 'waypoint' | 'taxi' | 'autopilot' } | { type: 'phone'; tab?: string } | { type: 'onlineJoin' } | { type: 'inventory' } | { type: 'promo' } | { type: 'settings' } | { type: 'farm' } | { type: 'radio' } | { type: 'bar' } | { type: 'ozgim' } | { type: 'casino'; name?: string } | { type: 'svc'; kind: SvcKind };
+  | { type: 'pc'; mode: 'office' | 'home' } | { type: 'officehr' } | { type: 'livestock' } | { type: 'dealer'; scooter?: boolean } | { type: 'trucker' } | { type: 'emotes'; dance?: boolean } | { type: 'passport' } | { type: 'trade' } | { type: 'tradeInvite' } | { type: 'plant'; key: string; basement: boolean } | { type: 'quest' } | { type: 'editor'; fresh: boolean } | { type: 'listing'; uid: string; slot: number } | { type: 'info'; title: string; text: string } | { type: 'map'; mode: 'waypoint' | 'taxi' | 'autopilot' } | { type: 'phone'; tab?: string } | { type: 'onlineJoin' } | { type: 'inventory' } | { type: 'promo' } | { type: 'settings' } | { type: 'help'; tab?: string } | { type: 'farm' } | { type: 'radio' } | { type: 'bar'; name?: string } | { type: 'ozgim' } | { type: 'casino'; name?: string } | { type: 'svc'; kind: SvcKind };
 /** городские услуги: мойка, шиномонтаж, доставка, парковка, автомат, ломбард, садок, стоянка, запчасти */
 export type SvcKind = 'wash' | 'tire' | 'food' | 'park' | 'slot' | 'pawn' | 'fish' | 'impound' | 'parts' | 'charge';
 interface Prompt { text: string; keys: string[]; act: () => void; r?: () => void; l?: () => void }
@@ -325,11 +325,10 @@ export class Game {
     this.peds.onDeath = (p, mine) => { if (mine) this.onPedDeath(p); };
     this.scene.add(this.vehGroup);
     this.scene.add(this.weather.group);
+    // Погода больше не сыплет подсказками поверх игры: сводка приходит в чат от «Погоды»
     this.weather.onSwitch((m) => {
-      if (m === 'rain') { this.toast('🌧️ Пошёл дождь — дорога скользкая'); this.sound.crackle(); }
-      else if (m === 'snow') { this.toast('❄️ Пошёл снег — тормозите заранее'); }
-      else if (m === 'cloud') this.toast('☁️ Небо затянуло');
-      else this.toast('🌤️ Распогодилось');
+      this.weatherSay(m);
+      if (m === 'rain' || m === 'snow') this.sound.crackle();
     });
     this.spawnStaticVehicles();
     this.spawnOwnedVehicles();
@@ -344,6 +343,7 @@ export class Game {
     this.intro = { t: 0, dur: this.state.location ? 0.01 : 9 };
     this.last = performance.now();
     this.loop();
+    this.weatherSay();
     this.cb.onReady();
   }
   private setupScene() {
@@ -644,6 +644,8 @@ export class Game {
     }
     if (code === 'Backquote' && !this.input.keys.has('KeyQ')) { if (!this.panel || this.panel.type === 'phone' || this.panel.type === 'onlineJoin') { if (this.panel?.type === 'onlineJoin') this.closePanel(); else this.toggleOnline(); } return; }
     if (code === 'Escape' && this.camMode && !this.panel) { this.stopCamera(); return; }
+    // F1 — «Как играть?»: вся справка и обучение живут здесь, а не поверх игры
+    if (code === 'F1') { if (this.panel?.type === 'help') this.closePanel(); else this.openPanel({ type: 'help' }); return; }
     if (code === 'Escape') { if (this.panel) this.closePanel(); else this.openPanel({ type: 'settings' }); return; }
     if (this.panel && this.panel.type !== 'map') { if (code === 'KeyI' && this.panel.type === 'inventory') this.closePanel(); return; }
     if (code === 'KeyV') { this.toggleFirstPerson(); return; }
@@ -2320,7 +2322,7 @@ export class Game {
     if (action === 'counter') {
       if (this.interiorKind === 'bar') {
         return { text: 'E — меню напитков · R — смена бармена (5 гостей)', keys: ['E', 'R'],
-          act: () => this.openPanel({ type: 'bar' }), r: () => this.startShift() };
+          act: () => this.openPanel({ type: 'bar', name: b.name }), r: () => this.startShift() };
       }
       const kind = (this.interiorKind === 'gas' ? 'gas' : this.interiorKind === 'vguntruck' ? 'gunshop' : this.interiorKind === 'vpharmacy' ? 'pharmacy' : this.interiorKind) as ShopKind;
       const items = SHOP_ITEMS[kind] ?? SHOP_ITEMS.shop24;
@@ -3533,6 +3535,16 @@ export class Game {
   }
   /** сообщение системы в чат (используют команды и подсказки) */
   sysMsg(text: string) { this.pushLocal({ name: 'Система', text, color: '#93c5fd', kind: 'cmd' }); }
+  /** «🌤 Погода»: сводка в чат (погода — это картинка, на управление не влияет) */
+  weatherSay(mode?: 'clear' | 'cloud' | 'rain' | 'snow') {
+    const m = mode ?? this.weather.mode;
+    const hour = Math.floor(this.state.gameTime / 60) % 24;
+    const base = 15 + Math.round(6 * Math.sin(((hour - 9) / 24) * Math.PI * 2));
+    const temp = base + (m === 'rain' ? -4 : m === 'snow' ? -16 : m === 'cloud' ? -2 : 2);
+    const what = m === 'rain' ? 'дождь' : m === 'snow' ? 'снег' : m === 'cloud' ? 'облачно, без осадков' : 'ясно';
+    const tail = m === 'rain' ? 'Дорога мокрая — тормозите заранее.' : m === 'snow' ? 'Снег: видимость хуже, дистанцию держите больше.' : m === 'cloud' ? 'Ветер слабый, на дороге сухо.' : 'Отличная погода для прогулки.';
+    this.pushLocal({ name: '🌤 Погода', text: `${what} · ${temp > 0 ? '+' : ''}${temp} °C · Лос-Город. ${tail}`, color: '#7dd3fc', kind: 'weather' });
+  }
   /** сохранить прогресс (публичная обёртка) */
   saveGame() { this.save(); }
   /** открыть планшет на нужном экране */

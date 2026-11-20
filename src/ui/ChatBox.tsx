@@ -37,10 +37,11 @@ export function ChatBox({ g, mobile, online }: { g: Game; mobile: boolean; onlin
               {m.kind === 'me' ? <i style={{ color: m.color }}>* {m.name} {m.text}</i>
                 : m.kind === 'news' ? <><span className="news-tag">📰 СМИ</span> <b>{m.name}:</b> {m.text}</>
                 : m.kind === 'sys' ? <><span style={{ color: m.color }}>⚙ {m.text}</span></>
+                : m.kind === 'weather' ? <><span className="wthr-tag">🌤 ПОГОДА</span> <span style={{ color: m.color }}>{m.text}</span></>
                 : <><b style={{ color: m.color }}>{m.name}</b> {m.text}</>}
             </div>
           ))}
-          {open && !msgs.length && <div className="chat-msg sys">{online ? 'Сообщений пока нет' : 'Команды: /help · сделки: /pay /give'}</div>}
+          {open && !msgs.length && <div className="chat-msg sys">{online ? 'Сообщений пока нет' : 'Сообщений пока нет — сводка погоды придёт первой'}</div>}
         </div>
       )}
       {open ? (
@@ -57,7 +58,7 @@ export function ChatBox({ g, mobile, online }: { g: Game; mobile: boolean; onlin
           {mobile && <button className="x" onPointerDown={(e) => { e.preventDefault(); close(); }}>✕</button>}
         </div>
       ) : mobile ? <button className="chat-open" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); openNow(); }}>💬</button>
-        : <div className="chat-hint">{online ? 'Enter — чат · онлайн' : 'Enter — чат · /help — команды'}</div>}
+        : <button className="chat-open pc" onClick={openNow} title="Чат (Enter)">💬</button>}
     </div>
   );
 }

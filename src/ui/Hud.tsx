@@ -144,17 +144,24 @@ export function Hud({ g, hud, mobile }: { g: Game; hud: HudState; mobile: boolea
       {!hud.gun && hud.hitMarker && <div className="hx-cross hit fist"><em /></div>}
       {hud.drift > 40 && <div className="hx-drift"><b>{hud.drift}</b><small>ДРИФТ</small></div>}
 
-      {hud.prompt && <Prompt text={hud.prompt} />}
+      {hud.prompt && g.settings.hints !== 'off' && <Prompt text={hud.prompt} short={g.settings.hints === 'short'} />}
     </div>
   );
 }
 
-/** подсказка: выделяет клавиши в начале фраз ("E — …", "· L — …") */
-function Prompt({ text }: { text: string }) {
-  const parts = text.split(/(?:^|\s·\s)/).filter(Boolean);
+/**
+ * Контекстная подсказка действия. Короткий режим (по умолчанию) показывает только
+ * «клавиша + что делает» без длинных пояснений — они переехали в «Как играть?» (F1).
+ */
+function Prompt({ text, short }: { text: string; short?: boolean }) {
+  const parts = (short ? text.split(/\s·\s/).slice(0, 1) : text.split(/(?:^|\s·\s)/)).filter(Boolean);
   return (
     <div className="hx-prompt">
-      {parts.map((p, i) => { const m = p.match(/^([A-ZЁ]{1,2}|ЛКМ|ПКМ)\s—\s(.*)$/); return <span key={i}>{m ? <><kbd>{m[1]}</kbd>{m[2]}</> : p}</span>; })}
+      {parts.map((p, i) => {
+        const m = p.match(/^([A-ZЁ]{1,2}|ЛКМ|ПКМ)\s—\s(.*)$/);
+        const body = m && short ? m[2].split(':')[0] : m ? m[2] : p;
+        return <span key={i}>{m ? <><kbd>{m[1]}</kbd>{body}</> : body}</span>;
+      })}
     </div>
   );
 }

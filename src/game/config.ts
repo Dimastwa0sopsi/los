@@ -92,6 +92,8 @@ export interface Settings {
   minimapRotate: boolean;
   transmission: 'auto' | 'manual';
   autoQuality: boolean;
+  /** подсказки в игре: коротко (только действие) или совсем без них — всё в «Как играть?» */
+  hints: 'short' | 'off';
 }
 export function defaultSettings(): Settings {
   const mob = isMobileDevice();
@@ -99,7 +101,7 @@ export function defaultSettings(): Settings {
     control: 'auto', moveStyle: 'joy', quality: mob ? 'low' : 'high', drawDistance: mob ? 220 : 560,
     renderScale: mob ? 0.68 : 1, shadows: !mob, effects: !mob, traffic: mob ? 0.35 : 0.8,
     peds: mob ? 0.35 : 0.8, volume: 0.6, muted: false, sensitivity: 1, minimapZoom: 1.2,
-    minimapRotate: true, transmission: 'auto', autoQuality: true,
+    minimapRotate: true, transmission: 'auto', autoQuality: true, hints: 'short',
   };
 }
 export function loadSettings(): Settings {

@@ -271,7 +271,8 @@ export const COMMANDS: Cmd[] = [
   } },
   { name: 'where', cat: 'world', desc: 'где вы находитесь', run: (g) => { const p = near(g); say(g, `📍 ${g.locationName()} · X ${Math.round(p.x)} · Z ${Math.round(p.z)}`); } },
   { name: 'online', cat: 'world', desc: 'игроки в сети', run: (g) => say(g, g.net ? [...g.net.players.values()].filter((p) => p.id !== g.net!.id).map((p) => p.nick ?? p.name).join(', ') || 'Кроме вас никого' : 'Вы в одиночной игре') },
-  { name: 'time', cat: 'world', desc: 'игровое время и погода', run: (g) => { const s = g.getState(); say(g, `🕒 ${String(Math.floor(s.gameTime / 60)).padStart(2, '0')}:${String(Math.floor(s.gameTime % 60)).padStart(2, '0')} · ${g.isNight() ? 'ночь' : 'день'}`); } },
+  { name: 'time', cat: 'world', desc: 'игровое время', run: (g) => { const s = g.getState(); say(g, `🕒 ${String(Math.floor(s.gameTime / 60)).padStart(2, '0')}:${String(Math.floor(s.gameTime % 60)).padStart(2, '0')} · ${g.isNight() ? 'ночь' : 'день'}`); } },
+  { name: 'weather', cat: 'world', desc: 'сводка погоды от «Погоды»', run: (g) => g.weatherSay() },
   { name: 'stats', cat: 'world', desc: 'полная статистика персонажа', run: (g) => {
     const s = g.getState();
     say(g, `👤 ${s.nick ?? 'Вы'} · ${$(s.money)} · ❤${Math.round(s.health)}% 🍗${Math.round(s.food)}% 💧${Math.round(s.water)}% ⚡${Math.round(s.energy)}% · 🏠${s.properties.length} 🚘${s.vehicles.length} 🏪${s.kiosks.length} · в игре ${Math.floor(s.playTime / 60)} мин`);
