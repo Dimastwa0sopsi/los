@@ -11,7 +11,7 @@ export interface Box { x0: number; y0: number; z0: number; x1: number; y1: numbe
 export type BKind = 'tower' | 'apartment' | 'house' | 'vhouse' | 'shop24' | 'supermarket' | 'cafe' | 'pharmacy' | 'gunshop' | 'clothes' | 'barber' |
   'mall' | 'dealer' | 'market' | 'service' | 'gas' | 'police' | 'hospital' | 'fire' | 'cityhall' | 'bank' | 'vshop' | 'vadmin' |
   'factory' | 'warehouse' | 'checkpoint' | 'garage' | 'farm' | 'parking' | 'parkade' | 'garages' | 'storage' | 'depot' | 'scootershop' | 'office' | 'barn' | 'coop' | 'livestock' |
-  'fishshop' | 'vpharmacy' | 'vguntruck' | 'greenhouse' | 'bar' | 'ozgim' | 'mine';
+  'fishshop' | 'vpharmacy' | 'vguntruck' | 'greenhouse' | 'bar' | 'ozgim' | 'mine' | 'casino';
 export interface Building {
   id: number; kind: BKind; name: string; x: number; z: number; w: number; d: number; h: number;
   door: { x: number; z: number; a: number }; cls?: 'eco' | 'mid' | 'lux'; price?: number; forSale?: boolean;
@@ -77,7 +77,7 @@ const SIGN: Record<string, string> = {
   barber: 'Парикмахерская', mall: 'ТЦ «Орбита»', dealer: 'Автосалон «Драйв»', market: 'Авторынок', service: 'Автосервис и тюнинг', gas: 'АЗС',
   police: 'Полиция', hospital: 'Больница', fire: 'Пожарная часть', cityhall: 'Мэрия', bank: 'Банк', vshop: 'Сельмаг', vadmin: 'Администрация',
   checkpoint: 'Проходная завода', vpharmacy: 'Аптека', vguntruck: 'Оружейный грузовик', office: 'Бизнес-центр «ЛосТех»', scootershop: 'Электросамокаты «Вжух Store»', farm: 'Агрохолдинг «Нива»', warehouse: 'Склад деталей', fishshop: 'Рыболовный магазин «Поплавок»',
-  mine: 'Шахта «Чёрная Жила»',
+  mine: 'Шахта «Чёрная Жила»', casino: 'Казино «Жар-Птица»',
 };
 
 export function generateLayout(): WorldLayout {
@@ -1513,6 +1513,14 @@ export function generateLayout(): WorldLayout {
   for (const e of edges) { adj[e.a].push({ n: e.b, e: e.id }); adj[e.b].push({ n: e.a, e: e.id }); }
   // Проверка индексов блоков
   for (const b of blocks) if (b.ox === undefined && !inGrid(b.i, b.j)) throw new Error('Блок вне сетки');
+
+  // ---------- казино «Жар-Птица»: неон и золото на окраине, фейсконтроль $50k ----------
+  {
+    const cxm = -1250, czm = -850;
+    addBuilding({ kind: 'casino', name: SIGN.casino, x: cxm, z: czm, w: 18, d: 14, h: 9, door: doorFor(cxm, czm, 18, 14, 's'), facade: 'glass', roof: 'flat', enter: true });
+    addProp({ t: 'driveway', x: cxm, z: czm + 14, r: 0 }, { w: 12, d: 16, h: 0.02 });
+    for (const fx of [-11.5, 11.5]) for (let fz = -8; fz <= 10; fz += 3.4) addProp({ t: 'fence', x: cxm + fx, z: czm + fz, r: 0 }, { w: 2.6, d: 0.2, h: 1.7 });
+  }
 
   // ---------- шахта «Чёрная Жила»: вход за городом, в холмах к северо-востоку ----------
   {

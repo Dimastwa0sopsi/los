@@ -445,6 +445,25 @@ export function getTex(key: string): THREE.Texture {
       for (let r = 0; r < 16; r++) for (let i = 0; i < 5; i++) { g.fillStyle = `rgb(${150 + ((r * 31 + i * 17) % 30)},${62 + ((r * 7 + i) % 15)},${45})`; g.fillRect(i * 28 + (r % 2) * 14 - 14, r * 8, 26, 7); }
       t = toTex(c); break;
     }
+    // ---------- казино: зелёное сукно стола и красный бархатный ковёр ----------
+    case 'felt': {
+      const [c, g] = canvas(256, 256); noise(g, 256, 256, '#14683d', 10, 9000, 17);
+      const r = new RNG(71);
+      for (let i = 0; i < 700; i++) { g.fillStyle = `rgba(${r.chance(0.5) ? '16,120,70' : '8,80,46'},0.2)`; g.fillRect(r.range(0, 256), r.range(0, 256), 2, 2); }
+      g.strokeStyle = 'rgba(250,204,21,0.5)'; g.lineWidth = 3; g.beginPath(); g.arc(128, 128, 96, 0, 7); g.stroke();
+      g.strokeStyle = 'rgba(250,204,21,0.28)'; g.lineWidth = 1.5; g.beginPath(); g.arc(128, 128, 78, 0, 7); g.stroke();
+      t = toTex(c); break;
+    }
+    case 'carpet_red': {
+      const [c, g] = canvas(256, 256); noise(g, 256, 256, '#7f1d1d', 14, 8000, 15);
+      const r = new RNG(97);
+      for (let i = 0; i < 64; i++) { g.fillStyle = 'rgba(60,8,12,0.35)'; g.beginPath(); g.ellipse(r.range(0, 256), r.range(0, 256), r.range(10, 34), r.range(8, 26), r.range(0, 3), 0, 7); g.fill(); }
+      for (let y = 16; y < 256; y += 64) for (let x = 16; x < 256; x += 64) { // золотой дамасский узор
+        g.fillStyle = 'rgba(251,191,36,0.16)'; g.beginPath(); g.moveTo(x, y - 10); g.quadraticCurveTo(x + 12, y, x, y + 10); g.quadraticCurveTo(x - 12, y, x, y - 10); g.fill();
+        g.fillStyle = 'rgba(251,191,36,0.22)'; g.beginPath(); g.arc(x, y, 2.4, 0, 7); g.fill();
+      }
+      t = toTex(c); break;
+    }
     // ---------- шахта «Чёрная Жила»: скальная порода, угольный пласт, щебень ----------
     case 'rockwall': {
       const [c, g] = canvas(256, 256); const _r47 = new RNG(47); const rr = () => _r47.next();

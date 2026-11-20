@@ -47,7 +47,7 @@ export type Panel =
   | { type: 'shop'; kind: ShopKind; title: string; items: string[] } | { type: 'kiosk'; id: number } | { type: 'market'; sellUid?: string }
   | { type: 'tuning'; uid: string } | { type: 'clothes' } | { type: 'barber' } | { type: 'hospital' } | { type: 'police'; title: string }
   | { type: 'property'; b: number; unit: number } | { type: 'garage'; id: number } | { type: 'vadmin'; village: string } | { type: 'factory' } | { type: 'bank' }
-  | { type: 'pc'; mode: 'office' | 'home' } | { type: 'officehr' } | { type: 'livestock' } | { type: 'dealer'; scooter?: boolean } | { type: 'trucker' } | { type: 'emotes' } | { type: 'passport' } | { type: 'trade' } | { type: 'tradeInvite' } | { type: 'plant'; key: string; basement: boolean } | { type: 'quest' } | { type: 'editor'; fresh: boolean } | { type: 'listing'; uid: string; slot: number } | { type: 'info'; title: string; text: string } | { type: 'map'; mode: 'waypoint' | 'taxi' | 'autopilot' } | { type: 'phone'; tab?: string } | { type: 'onlineJoin' } | { type: 'inventory' } | { type: 'promo' } | { type: 'settings' } | { type: 'farm' } | { type: 'radio' } | { type: 'bar' } | { type: 'ozgim' } | { type: 'svc'; kind: SvcKind };
+  | { type: 'pc'; mode: 'office' | 'home' } | { type: 'officehr' } | { type: 'livestock' } | { type: 'dealer'; scooter?: boolean } | { type: 'trucker' } | { type: 'emotes' } | { type: 'passport' } | { type: 'trade' } | { type: 'tradeInvite' } | { type: 'plant'; key: string; basement: boolean } | { type: 'quest' } | { type: 'editor'; fresh: boolean } | { type: 'listing'; uid: string; slot: number } | { type: 'info'; title: string; text: string } | { type: 'map'; mode: 'waypoint' | 'taxi' | 'autopilot' } | { type: 'phone'; tab?: string } | { type: 'onlineJoin' } | { type: 'inventory' } | { type: 'promo' } | { type: 'settings' } | { type: 'farm' } | { type: 'radio' } | { type: 'bar' } | { type: 'ozgim' } | { type: 'casino' } | { type: 'svc'; kind: SvcKind };
 /** городские услуги: мойка, шиномонтаж, доставка, парковка, автомат, ломбард, садок, стоянка, запчасти */
 export type SvcKind = 'wash' | 'tire' | 'food' | 'park' | 'slot' | 'pawn' | 'fish' | 'impound' | 'parts' | 'charge';
 interface Prompt { text: string; keys: string[]; act: () => void; r?: () => void; l?: () => void }
@@ -532,6 +532,9 @@ export class Game {
       if (n.role === 'dancer') { look.gender = 'f'; look.top = 'tshirt'; look.topColor = ['#db2777', '#a855f7', '#22d3ee', '#facc15'][n.x.toFixed(1).length % 4]; look.bottom = 'skirt'; look.bottomColor = '#1f2937'; look.hairColor = ['#f5d76e', '#8b5cf6', '#111827', '#b91c1c'][Math.abs(Math.round(n.z)) % 4]; }
       if (n.role === 'hostess') { look.gender = 'f'; look.top = 'tshirt'; look.topColor = '#dc2626'; look.bottom = 'skirt'; look.bottomColor = '#7f1d1d'; look.hairColor = '#f5d76e'; look.lips = 'full'; look.lipColor = '#dc2626'; }
       if (n.role === 'bartender') { look.top = 'shirt'; look.topColor = '#111827'; look.bottom = 'trousers'; look.bottomColor = '#1f2937'; }
+      if (n.role === 'security') { look.gender = 'm'; look.build = 0.95; look.top = 'tshirt'; look.topColor = '#111827'; look.bottom = 'trousers'; look.bottomColor = '#111827'; look.beard = 'stubble'; look.acc = 'cap'; }
+      if (n.role === 'dealer') { look.top = 'shirt'; look.topColor = '#f8fafc'; look.bottom = 'trousers'; look.bottomColor = '#111827'; }
+      if (n.role === 'guest') { /* обычный посетитель — образ случайный */ }
       this.peds.addStatic(look, n.x, n.z, n.a, n.role);
     }
     this.scene.background = new THREE.Color(0x1a1a1f);
@@ -541,6 +544,7 @@ export class Game {
   enterBuilding(b: Building, silent = false) {
     const kind = interiorForBuilding(b.kind);
     if (!kind) return;
+    if (b.kind === 'casino' && this.state.money < 50000) { this.sound.error(); this.toast('🕴 Охрана разворачивает вас: нужно $50 000'); return; }
     if (b.kind === 'house' || b.kind === 'vhouse') {
       const id = `${b.id}:0`;
       if (!this.state.properties.includes(id)) {
@@ -2161,6 +2165,10 @@ export class Game {
     if (best) {
       const b = best;
       if (b.kind === 'market') return { text: 'E — Авторынок: б/у машины', keys: ['E'], act: () => this.openPanel({ type: 'market' }) };
+      if (b.kind === 'casino') {
+        const ok = this.state.money >= 50000;
+        return { text: ok ? `E — ${b.name}: добро пожаловать 🕴` : `🕴 Фейсконтроль: вход при $${(50000).toLocaleString('ru')} на руках`, keys: ['E'], act: () => { if (!ok) { this.sound.error(); this.toast('🕴 Охранник скрещивает руки: «Дресс-код простой — пятьдесят тысяч в кармане»'); } else this.enterBuilding(b); } };
+      }
       if (b.kind === 'livestock') return { text: 'E — Ферма «Зорька»: работа на ферме', keys: ['E'], act: () => this.openPanel({ type: 'livestock' }) };
       if (b.kind === 'farm') return { text: 'E — Агрохолдинг: работа на комбайне', keys: ['E'], act: () => this.openPanel({ type: 'farm' }) };
       if (b.enter) {
@@ -2277,6 +2285,7 @@ export class Game {
     if (action === 'mine_uniform') return { text: 'E — ' + label, keys: ['E'], act: () => this.mineHire() };
     if (action === 'mine_down') return { text: 'E — Спуститься в забой · L — наверх', keys: ['E', 'L'], act: () => this.mineLift(true), l: () => this.mineLift(false) };
     if (action === 'mine') return { text: 'E — ' + label, keys: ['E'], act: () => this.mineSwing() };
+    if (action === 'gamble') return { text: 'E — ' + label, keys: ['E'], act: () => this.openPanel({ type: 'casino' }) };
     if (action === 'mine_cart') return { text: 'E — ' + label + (this.state.mineCoal ? ` (в забое: ${this.state.mineCoal} т)` : ''), keys: ['E'], act: () => this.mineLoadCart() };
     if (action === 'water') return { text: 'E — умыться и напиться из крана', keys: ['E'], act: () => { this.state.water = Math.min(100, this.state.water + 20); this.toast('💧 Вода из крана (+20)'); } };
     if (action.startsWith('pot:')) return this.plantPrompt(`${b.id}:pot:${action.slice(4)}`, true, this.interiorKind === 'greenhouse');
@@ -3821,6 +3830,19 @@ export class Game {
         const coal = tmp.getObjectByName('coal'); if (coal) coal.visible = false;
       }
     }
+  }
+  // ================= КАЗИНО «ЖАР-ПТИЦА»: примитивы ставок =================
+  static CASINO_MIN = 30000; static CASINO_MAX = 1000000;
+  casinoStart(bet: number): boolean {
+    if (bet < Game.CASINO_MIN || bet > Game.CASINO_MAX) { this.toast(`Ставка от $${(Game.CASINO_MIN).toLocaleString('ru')} до $${(Game.CASINO_MAX).toLocaleString('ru')}`); return false; }
+    if (this.state.money < bet) { this.sound.error(); this.routeToBank(`💳 Для ставки не хватает $${(bet - this.state.money).toLocaleString('ru')}.`); return false; }
+    this.state.money -= bet; this.save(); this.sound.click();
+    return true;
+  }
+  casinoPayout(amount: number, label: string) {
+    if (amount > 0) { this.state.money += amount; this.sound.coin(); this.toast(label + ` · выигрыш +$${amount.toLocaleString('ru')}`); }
+    else { this.sound.hurt(); this.toast(label); }
+    this.save();
   }
   pcReward(mode: 'office' | 'home', ok: boolean) {
     if (!ok) { this.sound.error(); return 0; }
