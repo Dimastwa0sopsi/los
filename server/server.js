@@ -22,12 +22,15 @@ const GH_BRANCH = String(process.env.GH_BRANCH || 'main').trim();
 const LIVE_PATH = 'server/live.json';
 // отпечаток кода: ячейка Colab сверяет его с файлом на Диске и понимает,
 // что на порту висит старый процесс (после обновления сервера он перезапускается сам)
+const { checkText: checkAdText } = require('./moderation.cjs');
+const { createAdsStore, AD_TTL } = require('./ads.cjs');
+
 const BUILD = (() => {
   try { return crypto.createHash('sha1').update(fs.readFileSync(__filename)).digest('hex').slice(0, 12); }
   catch { return 'dev'; }
 })();
 /** версия протокола сервера: клиент показывает её в диагностике */
-const SERVER_VERSION = '0.4.0';
+const SERVER_VERSION = '0.5.1';
 const db = new Database(process.env.DB_FILE || 'game.db');
 db.pragma('journal_mode = WAL');
 
@@ -83,6 +86,48 @@ const q = {
   house: db.prepare('UPDATE players SET house_id = ? WHERE name = ?'),
   inv: db.prepare('UPDATE players SET inventory = ? WHERE name = ?'),
 };
+
+/* ---------- рекламные щиты: объявления общие для всех игроков ---------- */
+db.exec(`CREATE TABLE IF NOT EXISTS ads (
+  id TEXT PRIMARY KEY, text TEXT NOT NULL, tag TEXT NOT NULL DEFAULT 'biz',
+  who TEXT NOT NULL DEFAULT '', until INTEGER NOT NULL, created INTEGER NOT NULL DEFAULT 0
+)`);
+/** какие щиты существуют в мире: id → цена часа (совпадает с worldgen) */
+const BILLBOARDS = {};
+for (let i = 1; i <= 6; i++) BILLBOARDS['city' + i] = { kind: 'city', price: 400 };
+for (let i = 1; i <= 7; i++) BILLBOARDS['road' + i] = { kind: 'road', price: 700 };
+
+const qAds = {
+  list: db.prepare('SELECT id, text, tag, who, until FROM ads WHERE until > ?'),
+  one: db.prepare('SELECT id, text, tag, who, until FROM ads WHERE id = ?'),
+  put: db.prepare('INSERT INTO ads (id, text, tag, who, until, created) VALUES (?, ?, ?, ?, ?, ?) ' +
+    'ON CONFLICT(id) DO UPDATE SET text = excluded.text, tag = excluded.tag, who = excluded.who, ' +
+    'until = excluded.until, created = excluded.created'),
+  del: db.prepare('DELETE FROM ads WHERE id = ?'),
+  prune: db.prepare('DELETE FROM ads WHERE until <= ?'),
+  byWho: db.prepare('SELECT COUNT(*) c FROM ads WHERE who = ? AND until > ?'),
+  clear: db.prepare('DELETE FROM ads'),
+};
+const pushAds = () => broadcast({ type: 'ads', ads: adStore.map() });
+const adStore = createAdsStore({
+  boards: BILLBOARDS,
+  checkText: checkAdText,
+  onPush: () => pushAds(),
+  onLog: (line) => adminLog(line),
+  store: {
+    list: (t) => qAds.list.all(t),
+    get: (id) => qAds.one.get(id),
+    put: (r) => qAds.put.run(r.id, r.text, r.tag, r.who, r.until, r.created),
+    del: (id) => qAds.del.run(id),
+    countByWho: (who, t) => qAds.byWho.get(who, t).c,
+    clearAll: () => qAds.clear.run(),
+  },
+});
+/** активные объявления в виде объекта: id → { text, tag, who, until } */
+const adsMap = () => { qAds.prune.run(Date.now()); return adStore.map(); };
+const buyAd = (name, id, text, tag) => adStore.buy(name, id, text, tag);
+const dropAd = (name, id) => adStore.drop(name, id);
+setInterval(() => { try { qAds.prune.run(Date.now()); } catch { /* база занята */ } }, 60_000).unref?.();
 
 /* ---------- настройки панели (живут в базе, переживают перезапуск) ---------- */
 db.exec('CREATE TABLE IF NOT EXISTS settings (k TEXT PRIMARY KEY, v TEXT)');
@@ -250,6 +295,8 @@ const ADMIN_ACTIONS = [
   { id: 'say_admin', g: 'chat', t: '🎙️ Написать в чат от админа', text: true },
   { id: 'chat_export', g: 'chat', t: '💾 Выгрузить чат' },
   { id: 'chat_log_clear', g: 'chat', t: '🗑 Удалить историю чата', confirm: true },
+  { id: 'ads_list', g: 'chat', t: '📰 Щиты: что висит' },
+  { id: 'ads_clear', g: 'chat', t: '🧹 Очистить все щиты', confirm: true },
   // ——— Игрок (12) ———
   { id: 'player_info', g: 'player', t: '📇 Карточка игрока', need: true },
   { id: 'player_heal', g: 'player', t: '❤️ Вылечить', need: true },
@@ -683,6 +730,11 @@ const ADMIN_HANDLERS = {
     return { ok: true, rows: rows.map((r) => `${r.name}: ${r.text}`), message: `Последние ${rows.length} сообщений` };
   },
   chat_count: () => ({ ok: true, message: `Сообщений в базе: ${db.prepare('SELECT COUNT(*) c FROM chat_log').get().c}` }),
+  ads_list: () => {
+    const rows = Object.entries(adsMap()).map(([id, a]) => `${id}: «${a.text}» — ${a.who}, ещё ${Math.max(0, Math.round((a.until - Date.now()) / 60000))} мин`);
+    return { ok: true, rows, message: rows.length ? `Щитов занято: ${rows.length}` : 'Все щиты свободны' };
+  },
+  ads_clear: () => { adStore.clearAll(); adminLog('🧹 все рекламные щиты очищены'); return { ok: true, message: 'Щиты очищены' }; },
   dm: (a) => {
     if (!a.name) return noPlayer();
     const t = String(a.text || '').slice(0, 200); if (!t) return { ok: false, error: 'Пустое сообщение' };
@@ -1003,6 +1055,11 @@ const server = http.createServer(async (req, res) => {
     json(res, 200, { ok: true, online: active.size, uptime: Math.round(process.uptime()), maintenance: MAINTENANCE, build: BUILD, caps: { state: 1, adm: 1 } });
     return;
   }
+  // объявления на щитах: публичная ручка, клиент забирает их до входа в игру
+  if (req.method === 'GET' && url.pathname === '/ads') {
+    json(res, 200, { ok: true, ads: adsMap(), boards: BILLBOARDS, ttl: AD_TTL, time: Date.now() });
+    return;
+  }
   if (url.pathname === '/version' || url.pathname === '/diag') {
     // один запрос — весь диагноз: жив ли сервер, какая сборка, сколько игроков,
     // принимает ли он админ-токен. Игра показывает это в окне «Нет связи».
@@ -1112,6 +1169,7 @@ wss.on('connection', (ws) => {
         x: row.pos_x, z: row.pos_z, rot: row.pos_rot, number: row.car_number, carNumber: row.car_number,
       } });
       pushPlayers();
+      send(ws, { type: 'ads', ads: adsMap(), boards: BILLBOARDS, ttl: AD_TTL });
       return;
     }
 
@@ -1124,6 +1182,23 @@ wss.on('connection', (ws) => {
       q.move.run(x, z, rot, Date.now(), row.id);
       row.pos_x = x; row.pos_z = z; row.pos_rot = rot;
       pushPlayers();
+      return;
+    }
+
+    if (m.type === 'ad') {
+      // покупка щита идёт через сессию: имя берём из базы, а не из сообщения
+      const r = buyAd(row.name, String(m.id || ''), m.text, String(m.tag || 'biz'));
+      send(ws, { type: 'ad_result', ok: !!r.ok, error: r.error, id: m.id });
+      return;
+    }
+    if (m.type === 'ads') {
+      // запрос списка: панель СМИ спрашивает при открытии и после переподключения
+      send(ws, { type: 'ads', ads: adsMap(), boards: BILLBOARDS, ttl: AD_TTL });
+      return;
+    }
+    if (m.type === 'ad_drop') {
+      const r = dropAd(row.name, String(m.id || ''));
+      send(ws, { type: 'ad_result', ok: !!r.ok, error: r.error, id: m.id, drop: true });
       return;
     }
 

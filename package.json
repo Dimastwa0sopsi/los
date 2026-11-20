@@ -1,7 +1,7 @@
 {
   "name": "react-vite-tailwind",
   "private": true,
-  "version": "0.5.0",
+  "version": "0.5.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -21,7 +21,9 @@
     "check:server": "esbuild scripts/server-check.ts --bundle --platform=node --format=cjs --outfile=.check/server.cjs --log-level=error && node .check/server.cjs",
     "check:version": "esbuild scripts/version-check.ts --bundle --platform=node --format=cjs --outfile=.check/version.cjs --log-level=error && node .check/version.cjs",
     "check:ads": "esbuild scripts/ads-check.ts --bundle --platform=node --format=cjs --outfile=.check/ads.cjs --log-level=error && node .check/ads.cjs",
-    "check:mesh": "esbuild scripts/mesh-check.ts --bundle --platform=node --format=cjs --outfile=.check/mesh.cjs --log-level=error --loader:.png=empty && node .check/mesh.cjs"
+    "check:mesh": "esbuild scripts/mesh-check.ts --bundle --platform=node --format=cjs --outfile=.check/mesh.cjs --log-level=error --loader:.png=empty && node .check/mesh.cjs",
+    "check:moderation": "esbuild scripts/moderation-check.ts --bundle --platform=node --format=esm --outfile=.check/moderation.mjs --log-level=error && node .check/moderation.mjs",
+    "check:ads-server": "esbuild scripts/ads-server-check.ts --bundle --platform=node --format=esm --outfile=.check/ads-server.mjs --log-level=error && node .check/ads-server.mjs"
   },
   "dependencies": {
     "clsx": "2.1.1",
