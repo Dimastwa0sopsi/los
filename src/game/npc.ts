@@ -99,7 +99,8 @@ export class PedSystem {
     for (let k = 0; k < 26; k++) {
       const p = this.make('beach');
       const mode = k % 4; // 0 лежит, 1 стоит, 2 гуляет, 3 плавает
-      p.homeX = mode === 3 ? b.x0 - 4 - rng.next() * 10 : b.x0 + 10 + rng.next() * (b.x1 - b.x0 - 20);
+      // купальщики — подальше от кромки: у пляжа отмель, метров с 12 уже по грудь
+      p.homeX = mode === 3 ? b.x0 - 12 - rng.next() * 14 : b.x0 + 10 + rng.next() * (b.x1 - b.x0 - 20);
       p.homeZ = b.z0 + 15 + rng.next() * (b.z1 - b.z0 - 30);
       p.spot = mode; p.x = p.homeX; p.z = p.homeZ; p.a = rng.next() * 6;
       p.state = mode === 0 ? 'lie' : mode === 1 ? 'stand' : mode === 3 ? 'swim' : 'walk';

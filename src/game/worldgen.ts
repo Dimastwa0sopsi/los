@@ -871,10 +871,10 @@ export function generateLayout(): WorldLayout {
     addProp({ t: 'ring', x: sandAt(lz, 15), z: lz + 2.4, r: 0.2 });
     addProp({ t: 'ring', x: sandAt(lz, 14), z: lz - 1.6, r: -0.2 });
     addProp({ t: 'flagline', x: sandAt(lz, 20), z: lz + 6, w: 7 });
-    // линия буйков в воде: ограждают зону купания (вода начинается сразу за кромкой)
-    for (let k = 0; k < 9; k++) {
-      const bz = lz - 22 + k * 5.6;
-      addProp({ t: 'buoy', x: bankOf(bz) - 4.5, z: bz });
+    // линия буйков в воде: ограждают зону купания там, где уже глубоко (18 м от кромки)
+    for (let k = 0; k < 11; k++) {
+      const bz = lz - 26 + k * 5.4;
+      addProp({ t: 'buoy', x: bankOf(bz) - 18, z: bz });
     }
   }
   {
