@@ -3,7 +3,7 @@
 // Щит — физическое место в мире: в городе на тротуаре или на трассе за городом.
 // Игрок платит за час, пишет текст, СМИ проверяет его на мат и ссылки и вешает
 // объявление на выбранный щит. Через час место освобождается само.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Game } from '../game/game';
 import { Modal } from './MenuScreens';
 import { AD_MAX, checkText } from '../game/moderation';
@@ -23,6 +23,12 @@ export function AdsPanel({ g, close }: { g: Game; close: () => void }) {
   const [text, setText] = useState('');
   const [tag, setTag] = useState<AdTag>('biz');
   const [err, setErr] = useState<string | null>(null);
+  // объявления общие: сервер присылает их в любой момент, панель подхватывает
+  useEffect(() => {
+    g.refreshAds();                       // спросить сервер при открытии
+    const t = window.setInterval(() => force((x) => x + 1), 3000);
+    return () => window.clearInterval(t);
+  }, []);
 
   const shown = list.filter((b) => {
     if (tab === 'free') return !b.busy;
@@ -45,6 +51,7 @@ export function AdsPanel({ g, close }: { g: Game; close: () => void }) {
       <p className="tb-note" style={{ marginBottom: 10 }}>
         Рекламный щит — на час. Оплата в СМИ: <b>{$(s.money)}</b> на счету.
         Мат, ссылки, ники и телефоны не принимаются — текст проверяется автоматически.
+        В онлайне объявления общие: щит видят все игроки.
         Короткое объявление в ленту новостей — команда <b>/smi</b> за $300.
       </p>
 
@@ -63,7 +70,7 @@ export function AdsPanel({ g, close }: { g: Game; close: () => void }) {
             <div style={{ flex: 1, minWidth: 150 }}>
               <b>{b.kind === 'city' ? 'Щит в городе' : 'Щит на трассе'} №{b.id.replace(/\D/g, '')}</b>
               <small>{Math.round(b.x)}:{Math.round(b.z)} · {b.w.toFixed(1)}×{b.h.toFixed(1)} м</small>
-              {b.busy && <small style={{ display: 'block', color: '#fbbf24' }}>«{b.text}» · ещё {b.leftMin} мин{b.mine ? ' · ваш' : ''}</small>}
+              {b.busy && <small style={{ display: 'block', color: '#fbbf24' }}>«{b.text}» · ещё {b.leftMin} мин · {b.mine ? 'ваш щит' : `заказчик ${b.who}`}</small>}
             </div>
             <b style={{ marginRight: 8 }}>{$(b.price)}/час</b>
             {!b.busy && <button className="ui-btn sm main" onClick={() => { setPicked(b.id); setText(''); setErr(null); }}>Арендовать</button>}

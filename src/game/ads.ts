@@ -95,6 +95,21 @@ export class AdsSystem {
     return true;
   }
   clear(id: string) { if (this.ads.delete(id)) { this.paint(id); this.save(); } }
+  /**
+   * Сервер прислал общий список объявлений — он главный: щиты видят все игроки.
+   * Локальные записи заменяются, чтобы не висели «свои» объявления после
+   * окончания аренды или снятия с другого устройства.
+   */
+  applyRemote(remote: Record<string, { text: string; tag: string; who: string; until: number }>) {
+    const now = Date.now();
+    this.ads.clear();
+    for (const [id, a] of Object.entries(remote ?? {})) {
+      if (!a || typeof a.text !== 'string' || !(a.until > now)) continue;
+      this.ads.set(id, { text: a.text, tag: (AD_TAGS.some((t) => t.id === a.tag) ? a.tag : 'biz') as AdTag, who: a.who, until: a.until });
+    }
+    for (const d of this.defs) this.paint(d.id);
+    this.save();
+  }
 
   update() {
     const now = Date.now();

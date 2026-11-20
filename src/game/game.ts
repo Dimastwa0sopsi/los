@@ -4420,6 +4420,18 @@ export class Game {
     this.peds.onlineMode = false; this.removeQuestPeds();
     this.net.onChange = null;
     this.net.onNews = (nm, txt) => this.toast(`📰 СМИ · ${nm}: ${txt}`);
+    // объявления на щитах общие: сервер держит их и рассылает всем
+    this.net.onAds = (ads) => this.ads?.applyRemote(ads);
+    this.net.onAdResult = (r) => {
+      if (r.ok) return;
+      // сервер отказал — убираем оптимистично поставленное объявление и возвращаем деньги
+      const price = this.ads?.def(r.id)?.price ?? 0;
+      if (this.ads?.ad(r.id)) {
+        this.ads.clear(r.id);
+        if (price > 0) { this.state.money += price; this.save(); }
+      }
+      this.toast('📰 СМИ: ' + (r.error ?? 'объявление не принято') + (price > 0 ? ` ($${price} возвращены)` : ''));
+    };
     this.net.onGift = (from, d) => {
       const who = this.net?.displayName(from) ?? 'Игрок';
       if (d.k === 'money' && Number(d.v) > 0) {
@@ -4820,10 +4832,13 @@ export class Game {
         mine: !!a && a.who === (this.state.nick ?? 'Вы'),
         text: a?.text ?? '',
         tag: a?.tag ?? 'biz',
+        who: a?.who ?? '',
         leftMin: a ? Math.max(0, Math.ceil((a.until - Date.now()) / 60000)) : 0,
       };
     });
   }
+  /** обновить список объявлений с сервера (в одиночной игре просто перерисовка) */
+  refreshAds() { this.net?.requestAds(); }
   /** аренда щита на час: деньги списываются только если текст прошёл модерацию */
   buyAd(id: string, text: string, tag: AdTag): { ok: boolean; error?: string } {
     const ads = this.ads;
@@ -4838,7 +4853,10 @@ export class Game {
     ads.place(id, chk.clean, tag, this.state.nick ?? 'Вы');
     this.sound.coin();
     this.toast(`📰 Реклама «${chk.clean}» на щите ${def.kind === 'city' ? 'в городе' : 'за городом'} на 1 час`);
-    if (this.net) this.net.sendNews(`щит ${def.kind === 'city' ? 'в городе' : 'на трассе'}: ${chk.clean}`);
+    if (this.net) {
+      // сервер проверит текст ещё раз и разошлёт объявление всем игрокам
+      this.net.sendAd(id, chk.clean, tag);
+    }
     return { ok: true };
   }
   /** снять свою рекламу досрочно (деньги не возвращаются) */
@@ -4847,6 +4865,7 @@ export class Game {
     if (!a) return;
     if (a.who !== (this.state.nick ?? 'Вы')) { this.toast('Это чужой щит — снять его нельзя'); return; }
     this.ads?.clear(id);
+    this.net?.sendAdDrop(id);
     this.toast('Щит освобождён');
   }
   /** ближайший щит к игроку (для подсказки «E» и наведения) */

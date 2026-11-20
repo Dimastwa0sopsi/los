@@ -128,6 +128,9 @@ export interface ChatMsg { name: string; text: string; color: string; t: number;
 export type NetStatus = 'connecting' | 'online' | 'reconnecting' | 'offline';
 
 /** данные игрока, пришедшие с сервера в login_success (деньги, координаты) */
+/** объявление на щите, как его хранит сервер */
+export interface RemoteAd { text: string; tag: string; who: string; until: number }
+
 export interface ServerPlayer {
   id?: number; name?: string; nick?: string; money?: number;
   x?: number; y?: number; z?: number; rot?: number; a?: number; gender?: string;
@@ -155,6 +158,8 @@ interface Msg {
   token?: string; pass?: string;
   /** что умеет сервер (наш сервер пересылает §-протокол и умеет админ-команды) */
   caps?: { state?: number; peds?: number; adm?: number; relay?: number };
+  /** реклама на щитах: полный список от сервера и ответ на покупку */
+  ads?: Record<string, RemoteAd>; ok?: boolean; error?: string;
   /** машиночитаемая причина отказа входа: banned / maintenance / device / replaced / name */
   code?: string;
   /** админ-команды: id модели авто для спавна и прочие параметры */
@@ -279,6 +284,12 @@ export class NetClient {
   onEvent: ((from: number, ev: NetEvent) => void) | null = null;
   onPeds: ((from: number, list: number[][], vehs: (string | number)[][]) => void) | null = null;
   onNews: ((name: string, text: string) => void) | null = null;
+  /** объявления на щитах: сервер прислал полный список (общий для всех игроков) */
+  onAds: ((ads: Record<string, RemoteAd>) => void) | null = null;
+  /** ответ на покупку щита: ok/причина */
+  onAdResult: ((r: { id: string; ok: boolean; error?: string }) => void) | null = null;
+  /** последние известные объявления (для панели СМИ) */
+  ads: Record<string, RemoteAd> = {};
   /** входящий перевод от другого игрока */
   onGift: ((from: number, g: { k: 'money' | 'item'; v: number | string; n: number; nick: string }) => void) | null = null;
   /** login_success: сервер прислал деньги/координаты (first — первый вход) */
@@ -418,6 +429,14 @@ export class NetClient {
         return;
       }
       case 'adm': this.onAdmin?.(String(m.act || ''), m); return;
+      case 'ads': {
+        const ads = (m.ads && typeof m.ads === 'object' ? m.ads : {}) as Record<string, RemoteAd>;
+        this.ads = ads; this.onAds?.(ads); return;
+      }
+      case 'ad_result': {
+        this.onAdResult?.({ id: String(m.id || ''), ok: !!m.ok, error: typeof m.error === 'string' ? m.error : undefined });
+        return;
+      }
       case 'init':
         this.legacy = true;
         if (typeof m.id === 'number') { this.id = m.id; }
@@ -633,6 +652,12 @@ export class NetClient {
     const t = text.slice(0, 200);
     this.send({ type: 'chat', text: this.legacy ? ME + t : `* ${this.nick}: ${t}` });
   }
+  /** покупка щита: сервер сам проверит текст, цену и занятость, имя берёт из сессии */
+  /** попросить у сервера актуальный список объявлений */
+  requestAds() { this.send({ type: 'ads' }); }
+  sendAd(id: string, text: string, tag: string) { this.send({ type: 'ad', id, text: text.slice(0, 120), tag }); }
+  /** снять своё объявление досрочно */
+  sendAdDrop(id: string) { this.send({ type: 'ad_drop', id }); }
   sendNews(text: string) {
     const t = text.slice(0, 200);
     this.send({ type: 'chat', text: this.legacy ? NEWS + t : `📰 ${this.nick}: ${t}` });
