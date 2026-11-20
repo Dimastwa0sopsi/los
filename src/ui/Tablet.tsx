@@ -163,6 +163,7 @@ function Home({ g, go }: P) {
       name: 'Приложения', ico: '🧩', items: [
         ...APPS.filter((a) => g.hasApp(a.id)).map((a) => ({ ico: a.icon, label: a.short, color: a.color, on: () => go(a.id as Scr), badge: a.id === 'tg' ? unread || undefined : undefined })),
         { ico: '🎁', label: 'Промокод', color: '#ec4899', on: () => go('promo') },
+        { ico: '📰', label: 'СМИ · реклама', color: '#0ea5e9', on: () => { close(); g.openPanel({ type: 'ads' }); } },
         { ico: '🛟', label: 'Поддержка', color: '#f43f5e', on: () => go('support') },
         { ico: '🌐', label: g.online ? 'Выйти' : 'Онлайн', color: g.online ? '#dc2626' : '#16a34a', on: () => (g.online ? g.leaveOnline() : g.openPanel({ type: 'onlineJoin' })) },
       ],
@@ -735,6 +736,7 @@ function AllServices({ g, go }: P) {
     { ico: '💃', label: 'Анимации', color: '#c026d3', on: () => g.openPanel({ type: 'emotes' }) },
     { ico: '📷', label: 'Камера', color: '#0f172a', on: () => g.startCamera('rear') },
     { ico: '🎁', label: 'Промокод', color: '#ec4899', on: () => go('promo') },
+        { ico: '📰', label: 'СМИ · реклама', color: '#0ea5e9', on: () => { close(); g.openPanel({ type: 'ads' }); } },
     { ico: '🛟', label: 'Поддержка', color: '#f43f5e', on: () => go('support') },
     { ico: '⚙️', label: 'Настройки', color: '#64748b', on: () => go('settings') },
     { ico: '🪪', label: 'Профиль', color: '#0f766e', on: () => go('profile') },

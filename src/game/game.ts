@@ -19,6 +19,8 @@ import { Input } from './input';
 import { K } from './keys';
 import { Weather } from './weather';
 import { ParkRides } from './rides';
+import { AdsSystem, AD_TAGS, type AdTag } from './ads';
+import { checkText } from './moderation';
 import { eyeSees, POLICE_EYE, PED_EYE, type Eye } from './police';
 import { Radio } from './radio';
 import { allMaterials, disposeTextures, mat, GFX, getTex } from './textures';
@@ -50,7 +52,7 @@ export type Panel =
   | { type: 'shop'; kind: ShopKind; title: string; items: string[] } | { type: 'kiosk'; id: number } | { type: 'market'; sellUid?: string }
   | { type: 'tuning'; uid: string } | { type: 'clothes' } | { type: 'barber' } | { type: 'hospital' } | { type: 'police'; title: string }
   | { type: 'property'; b: number; unit: number } | { type: 'garage'; id: number } | { type: 'vadmin'; village: string } | { type: 'factory' } | { type: 'bank' }
-  | { type: 'pc'; mode: 'office' | 'home' } | { type: 'officehr' } | { type: 'livestock' } | { type: 'dealer'; scooter?: boolean } | { type: 'trucker' } | { type: 'emotes'; dance?: boolean } | { type: 'passport' } | { type: 'trade' } | { type: 'tradeInvite' } | { type: 'plant'; key: string; basement: boolean } | { type: 'quest' } | { type: 'editor'; fresh: boolean } | { type: 'listing'; uid: string; slot: number } | { type: 'info'; title: string; text: string } | { type: 'map'; mode: 'waypoint' | 'taxi' | 'autopilot' } | { type: 'phone'; tab?: string } | { type: 'onlineJoin' } | { type: 'inventory' } | { type: 'promo' } | { type: 'settings' } | { type: 'help'; tab?: string } | { type: 'farm' } | { type: 'radio' } | { type: 'bar'; name?: string } | { type: 'ozgim' } | { type: 'casino'; name?: string } | { type: 'svc'; kind: SvcKind };
+  | { type: 'pc'; mode: 'office' | 'home' } | { type: 'officehr' } | { type: 'livestock' } | { type: 'dealer'; scooter?: boolean } | { type: 'trucker' } | { type: 'emotes'; dance?: boolean } | { type: 'passport' } | { type: 'trade' } | { type: 'tradeInvite' } | { type: 'plant'; key: string; basement: boolean } | { type: 'quest' } | { type: 'editor'; fresh: boolean } | { type: 'listing'; uid: string; slot: number } | { type: 'info'; title: string; text: string } | { type: 'map'; mode: 'waypoint' | 'taxi' | 'autopilot' } | { type: 'phone'; tab?: string } | { type: 'onlineJoin' } | { type: 'inventory' } | { type: 'promo' } | { type: 'settings' } | { type: 'help'; tab?: string } | { type: 'farm' } | { type: 'radio' } | { type: 'bar'; name?: string } | { type: 'ozgim' } | { type: 'casino'; name?: string } | { type: 'svc'; kind: SvcKind } | { type: 'ads' };
 /** городские услуги: мойка, шиномонтаж, доставка, парковка, автомат, ломбард, садок, стоянка, запчасти */
 export type SvcKind = 'wash' | 'tire' | 'food' | 'park' | 'slot' | 'pawn' | 'fish' | 'impound' | 'parts' | 'charge';
 interface Prompt { text: string; keys: string[]; act: () => void; r?: () => void; l?: () => void }
@@ -150,6 +152,8 @@ export class Game {
   combat!: Combat; rideRemote: { id: number; seat: number } | null = null;
   /** аттракционы парка: динамические модели + поездка игрока */
   rides: ParkRides | null = null;
+  /** реклама на щитах: тексты, сроки и картинки на панелях */
+  ads: AdsSystem | null = null;
   /** где полиция в последний раз видела игрока (GTA-стиль: погоня идёт по этой точке) */
   lastSeen: { x: number; z: number; t: number } | null = null;
   /** видит ли игрока хоть один полицейский прямо сейчас */
@@ -308,6 +312,8 @@ export class Game {
     this.W = await buildWorldMeshes(this.L, P);
     this.rides = new ParkRides(this.L.parkRides);
     this.scene.add(this.rides.group);
+    this.ads = new AdsSystem(this.L.billboards, this.W.billboards);
+    this.ads.onExpire = () => this.toast('⏳ Аренда щита закончилась — место снова свободно');
     if (this.disposed) return;
     this.scene.add(this.W.root);
     P(0.95, 'Жители и транспорт');
@@ -715,6 +721,7 @@ export class Game {
   private updateWorldSystems(dt: number) {
     const inside = !!this.interior;
     this.rides?.update(dt);
+    this.ads?.update();
     if (this.rideOn) this.updateRide(dt);
     // хмель выветривается, диско-свет переливается, если включён
     if (this.buzzT > 0) this.buzzT = Math.max(0, this.buzzT - dt);
@@ -2259,6 +2266,19 @@ export class Game {
       const rd = this.nearestRide(3.6);
       if (rd) return { text: `E — прокатиться: ${rd.name}${rd.price ? ` ($${rd.price})` : ''}`, keys: ['E'], act: () => this.boardRide(rd.id) };
     }
+    // рекламный щит: рядом — можно прочитать и арендовать место через СМИ
+    {
+      const bb = this.billboardNear(7);
+      if (bb) {
+        const a = this.ads?.ad(bb.id);
+        const price = `$${bb.price}/час`;
+        return {
+          text: a ? `E — щит: «${a.text}» · своё объявление (${price})` : `E — арендовать щит в СМИ (${price})`,
+          keys: ['E'],
+          act: () => this.openPanel({ type: 'ads' }),
+        };
+      }
+    }
     // сюжет: дядя Вася
     const qv = this.questPeds.vasya;
     if (qv && Math.hypot(qv.x - px, qv.z - pz) < 2.4 && this.state.quest && [0, 6, 9, 12].includes(this.state.quest.step)) return { text: 'E — поговорить с дядей Васей', keys: ['E'], act: () => this.talkVasya() };
@@ -3612,12 +3632,15 @@ export class Game {
     switch (cmd) {
       case '/me': if (!arg) { sys('Использование: /me действие'); return; } if (this.net) this.net.sendMe(arg); else this.pushLocal({ name: this.state.nick ?? 'Вы', text: arg, color: '#c084fc', kind: 'me', me: true }); return;
       case '/smi': case '/news': case '/сми': {
-        if (arg.length < 3) { sys('Использование: /smi текст объявления ($300)'); return; }
+        if (arg.length < 3) { sys('Использование: /smi текст объявления ($300) или /reklama — щит на час'); return; }
+        const chk = checkText(arg, 'news');
+        if (!chk.ok) { sys('СМИ не приняли текст: ' + chk.error); return; }
         if (this.state.money < 300) { sys('Объявление в СМИ стоит $300 — недостаточно денег'); return; }
         this.state.money -= 300; this.sound.coin();
-        if (this.net) this.net.sendNews(arg); else this.pushLocal({ name: this.state.nick ?? 'Вы', text: arg, color: '#facc15', kind: 'news', me: true });
+        if (this.net) this.net.sendNews(chk.clean); else this.pushLocal({ name: this.state.nick ?? 'Вы', text: chk.clean, color: '#facc15', kind: 'news', me: true });
         this.toast('📰 Объявление опубликовано в СМИ'); return;
       }
+      case '/reklama': case '/ads': case '/реклама': this.openPanel({ type: 'ads' }); return;
       case '/mm': this.openPanel({ type: 'passport' }); return;
       case '/lk': this.toggleCarLock(); return;
       case '/home': this.openPanel({ type: 'phone', tab: 'homes' }); return;
@@ -4781,6 +4804,58 @@ export class Game {
     for (const rd of this.L.parkRides) {
       const d = Math.hypot(rd.board.x - this.px, rd.board.z - this.pz);
       if (d < bd) { bd = d; best = rd; }
+    }
+    return best;
+  }
+  /* ───────── реклама на щитах ───────── */
+  /** все щиты с состоянием: где стоит, сколько стоит час, что уже висит */
+  adsList() {
+    const ads = this.ads;
+    if (!ads) return [];
+    return ads.defs.map((d) => {
+      const a = ads.ad(d.id);
+      return {
+        ...d,
+        busy: !!a,
+        mine: !!a && a.who === (this.state.nick ?? 'Вы'),
+        text: a?.text ?? '',
+        tag: a?.tag ?? 'biz',
+        leftMin: a ? Math.max(0, Math.ceil((a.until - Date.now()) / 60000)) : 0,
+      };
+    });
+  }
+  /** аренда щита на час: деньги списываются только если текст прошёл модерацию */
+  buyAd(id: string, text: string, tag: AdTag): { ok: boolean; error?: string } {
+    const ads = this.ads;
+    if (!ads) return { ok: false, error: 'Реклама недоступна' };
+    const def = ads.def(id);
+    if (!def) return { ok: false, error: 'Такого щита нет' };
+    if (ads.isBusy(id)) return { ok: false, error: 'Этот щит уже занят — выберите свободный' };
+    const chk = checkText(text, 'ad');
+    if (!chk.ok) return { ok: false, error: chk.error };
+    if (this.state.money < def.price) return { ok: false, error: `Аренда стоит $${def.price} — не хватает денег` };
+    this.state.money -= def.price;
+    ads.place(id, chk.clean, tag, this.state.nick ?? 'Вы');
+    this.sound.coin();
+    this.toast(`📰 Реклама «${chk.clean}» на щите ${def.kind === 'city' ? 'в городе' : 'за городом'} на 1 час`);
+    if (this.net) this.net.sendNews(`щит ${def.kind === 'city' ? 'в городе' : 'на трассе'}: ${chk.clean}`);
+    return { ok: true };
+  }
+  /** снять свою рекламу досрочно (деньги не возвращаются) */
+  dropAd(id: string) {
+    const a = this.ads?.ad(id);
+    if (!a) return;
+    if (a.who !== (this.state.nick ?? 'Вы')) { this.toast('Это чужой щит — снять его нельзя'); return; }
+    this.ads?.clear(id);
+    this.toast('Щит освобождён');
+  }
+  /** ближайший щит к игроку (для подсказки «E» и наведения) */
+  billboardNear(r = 9) {
+    if (!this.L.billboards) return null;
+    let best: typeof this.L.billboards[number] | null = null, bd = r;
+    for (const b of this.L.billboards) {
+      const d = Math.hypot(b.x - this.px, b.z - this.pz);
+      if (d < bd) { bd = d; best = b; }
     }
     return best;
   }

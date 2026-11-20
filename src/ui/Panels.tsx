@@ -9,6 +9,7 @@ import { CarPreview } from './CarPreview';
 import { LookPreview } from './LookPreview';
 import { repairCost, sellPrice, demand, carValue, type MarketOffer } from '../game/state';
 import { HelpPanel } from './Help';
+import { AdsPanel } from './AdsPanel';
 
 const $ = (n: number) => '$' + Math.round(n).toLocaleString('ru');
 
@@ -151,6 +152,7 @@ export function GamePanel({ g, panel, close }: { g: Game; panel: Panel; close: (
     case 'help': return <HelpPanel close={close} startTab={(panel.tab as 'start') ?? 'start'} mobile={!!g.mobile} />;
     case 'promo': return <Promo g={g} close={close} />;
     case 'svc': return <SvcPanel g={g} kind={panel.kind} close={close} />;
+    case 'ads': return <AdsPanel g={g} close={close} />;
     default: return null;
   }
 }

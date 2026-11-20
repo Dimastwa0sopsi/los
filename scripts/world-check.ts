@@ -129,6 +129,23 @@ try {
   console.log(`  бары: ${bars.length}, названий ${barNames.size}: ${[...barNames].join(' · ')}`);
   if (bars.length < 4) throw new Error(`баров ${bars.length}, нужно 4`);
   if (barNames.size < 4) throw new Error('у баров одинаковые названия');
+  // рекламные щиты: часть в городе, часть за городом, у каждого своя цена часа
+  {
+    const bb = L.billboards ?? [];
+    const city = bb.filter((b) => b.kind === 'city'), road = bb.filter((b) => b.kind === 'road');
+    console.log(`  рекламные щиты: ${bb.length} (в городе ${city.length}, за городом ${road.length})`);
+    if (!city.length) throw new Error('в городе нет рекламных щитов');
+    if (!road.length) throw new Error('за городом нет рекламных щитов');
+    if (bb.some((b) => !(b.price > 0))) throw new Error('у щита нет цены аренды');
+    // щиты не должны стоять друг на друге и внутри домов
+    for (const a of bb) for (const c of bb) {
+      if (a === c) continue;
+      if (Math.hypot(a.x - c.x, a.z - c.z) < 8) throw new Error(`щиты ${a.id} и ${c.id} налезают друг на друга`);
+    }
+    const inBuilding = bb.filter((b) => L.buildings.some((bd) =>
+      Math.abs(bd.x - b.x) < bd.w / 2 + 1 && Math.abs(bd.z - b.z) < bd.d / 2 + 1));
+    if (inBuilding.length) throw new Error(`щиты внутри домов: ${inBuilding.map((b) => b.id).join(', ')}`);
+  }
   // парк «Ракета»: 2×2 квартала, без внутренних дорог, с аттракционами, мороженым и прудом
   {
     const bp = L.bigParks.find((q) => q.name === 'Ракета');
@@ -182,6 +199,25 @@ try {
       if (!near) ghosts++;
     }
     console.log(`  парк: коллайдеров выше 1.2 м — ${solid.length}, «стен из воздуха» — ${ghosts}`);
+    if (ghosts > 0) throw new Error(`в парке ${ghosts} «стен из воздуха»`);
+    // в парке не должно быть светофоров: столбы на входах мешали гулять
+    const parkLights = L.nodes.filter((n) => n.light && n.gi !== undefined && n.gj !== undefined
+      && n.x > bp.x0 - 1 && n.x < bp.x1 + 1 && n.z > bp.z0 - 1 && n.z < bp.z1 + 1);
+    console.log(`  парк: светофоров внутри и по углам — ${parkLights.length}`);
+    if (parkLights.length) throw new Error(`в парке остались светофоры: ${parkLights.length}`);
+    // кусты: парк должен быть зелёным, но проходимым (у кустов нет коллайдеров)
+    const bushes = kind('bush');
+    console.log(`  парк: кустов — ${bushes}`);
+    if (bushes < 40) throw new Error(`в парке мало кустов: ${bushes}`);
+    // куст не должен попасть в пруд или на площадь у ракеты — иначе он «растёт» из воды
+    const pondProp = L.props.find((p) => p.t === 'pond' && inside(p.x, p.z));
+    const bushList = L.props.filter((p) => p.t === 'bush' && inside(p.x, p.z));
+    if (pondProp) {
+      const bad = bushList.filter((p) => Math.hypot(p.x - pondProp.x, p.z - pondProp.z) < (pondProp.h ?? 7.5) + 1);
+      if (bad.length) throw new Error(`кусты в пруду: ${bad.length}`);
+    }
+    const nearRocket = bushList.filter((p) => Math.hypot(p.x - (bp.x0 + bp.x1) / 2, p.z - (bp.z0 + bp.z1) / 2) < 17);
+    if (nearRocket.length) throw new Error(`кусты на площади у ракеты: ${nearRocket.length}`);
     if (ghosts > 0) throw new Error(`в парке ${ghosts} невидимых стен`);
   }
 } catch (e) {

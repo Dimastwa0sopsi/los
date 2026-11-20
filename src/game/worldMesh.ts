@@ -25,6 +25,8 @@ export interface WorldMeshes {
   /** створки ворот на петлях: один инстанс-меш, матрицы обновляет game.ts */
   gates: THREE.InstancedMesh | null;
   gateLeaves: GateLeaf[];
+  /** лицевые плоскости рекламных щитов: текстуру ставит game/ads.ts */
+  billboards: { id: string; mesh: THREE.Mesh }[];
 }
 /** створка ворот: петля (x,z), закрытый угол a, длина w, сторона открытия swing */
 export interface GateLeaf { x: number; z: number; a: number; w: number; swing: number; color: string; open: number }
@@ -479,6 +481,44 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
   // вертолётная площадка
   B(L.helipad.x, L.helipad.z).add('sign:H|#334155', T.plane, M(L.helipad.x, 0.17, L.helipad.z, 0, 7, 7, 1, -Math.PI / 2));
   await tick();
+  // ---------- рекламные щиты: каркас в чанки, лицевая панель — отдельным мешем ----------
+  const billboardFaces: WorldMeshes['billboards'] = [];
+  {
+    const faces = billboardFaces;
+    for (const bb of L.billboards ?? []) {
+      const b = B(bb.x, bb.z);
+      const ca = Math.cos(bb.rot), sa = Math.sin(bb.rot);
+      const nx = Math.sin(bb.rot), nz = Math.cos(bb.rot);   // нормаль панели
+      const panelY = 3.2;                              // низ панели на 3.2 м над землёй
+      const postH = panelY + bb.h + 0.6;
+      for (const sx of [-1, 1]) {
+        const px = bb.x + ca * sx * (bb.w / 2 - 0.7), pz = bb.z - sa * sx * (bb.w / 2 - 0.7);
+        b.add('c:#6b7280', T.cylB, M(px, 0, pz, 0, 0.26, postH, 0.26));
+        b.box('c:#4b5563', px, 0.18, pz, 0.9, 0.36, 0.9);   // бетонная пятка
+      }
+      // рама: верх, низ и боковины вокруг панели
+      const fy = panelY + bb.h / 2;
+      b.add('c:#374151', T.box, M(bb.x, fy + bb.h / 2 + 0.12, bb.z, bb.rot, bb.w + 0.4, 0.24, 0.34));
+      b.box('c:#374151', bb.x, panelY - 0.0, bb.z, bb.w + 0.4, 0.24, 0.34);
+      for (const sx of [-1, 1]) {
+        const ex = bb.x + ca * sx * (bb.w / 2 + 0.1), ez = bb.z - sa * sx * (bb.w / 2 + 0.1);
+        b.box('c:#374151', ex, panelY + bb.h / 2, ez, 0.24, bb.h, 0.34);
+      }
+      // задняя стенка (чтобы с изнанки щит не был «бумажным») и подсветка сверху
+      b.add('c:#4b5563', T.box, M(bb.x - nx * 0.18, panelY + bb.h / 2, bb.z - nz * 0.18, bb.rot, bb.w, bb.h, 0.14));
+      b.add('glow:#dbeafe', T.box, M(bb.x, panelY + bb.h + 0.2, bb.z, bb.rot, bb.w * 0.96, 0.1, 0.16));
+      // лицевая панель с рекламой
+      const geom = new THREE.PlaneGeometry(bb.w, bb.h);
+      const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.86, metalness: 0.02 });
+      const face = new THREE.Mesh(geom, mat);
+      face.position.set(bb.x + nx * 0.1, panelY + bb.h / 2, bb.z + nz * 0.1);
+      face.rotation.y = bb.rot;
+      face.name = 'billboard ' + bb.id;
+      root.add(face);
+      faces.push({ id: bb.id, mesh: face });
+    }
+  }
+  await tick();
   // ---------- объединение чанков ----------
   progress(0.72, 'Объединение геометрии');
   const chunks: WorldMeshes['chunks'] = [];
@@ -558,7 +598,7 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
     root.add(gates);
   }
   await tick();
-  return { root, chunks, lights, bulbs, wheat, wheatCells, garageGates, waters, gates, gateLeaves, shore };
+  return { root, chunks, lights, bulbs, wheat, wheatCells, garageGates, waters, gates, gateLeaves, shore, billboards: billboardFaces };
 }
 
 // ---------- многоуровневый паркинг ----------
