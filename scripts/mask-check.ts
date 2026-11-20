@@ -1,0 +1,24 @@
+import './domstub';
+import { Game } from '../src/game/game';
+import { ITEMS, SHOP_ITEMS, defaultLook } from '../src/game/data';
+import { newState, saveState, loadState } from '../src/game/state';
+let fails = 0;
+const test = (name: string, ok: boolean) => { console.log(`${ok ? '✓' : '✗'} ${name}`); if (!ok) fails++; };
+const g = Object.create(Game.prototype) as any;
+g.state = newState('m', { x: 0, z: 0, a: 0 });
+g.state.money = 100; g.player = { setLook: () => {} }; g.sound = { coin: () => {}, error: () => {} }; g.save = () => {}; g.toast = () => {}; g.netN = 1;
+test('маска в магазинах', ['shop24', 'supermarket', 'vshop'].every(k => SHOP_ITEMS[k as keyof typeof SHOP_ITEMS].includes('mask')) && ITEMS.mask.price > 0);
+g.toggleMask(); test('без покупки надеть нельзя', !g.state.look.mask);
+g.state.money = 0; g.buy('mask'); test('без денег не купить', !g.state.inventory.mask);
+g.state.money = 100; g.buy('mask'); test('покупка списывает деньги', g.state.money === 100 - ITEMS.mask.price && g.state.inventory.mask === 1);
+g.useItem('mask'); test('маска надевается из инвентаря и не расходуется', g.state.look.mask && g.state.inventory.mask === 1);
+g.useItem('mask'); test('маска снимается и остаётся в инвентаре', !g.state.look.mask && g.state.inventory.mask === 1);
+g.toggleMask(); g.dropItem('mask'); test('при выбрасывании последней маска снимается', !g.state.look.mask && !g.state.inventory.mask);
+g.state.inventory.mask = 1; g.toggleMask(); g.takeItem('mask'); test('при изъятии последней маска снимается', !g.state.look.mask);
+g.state.look = { ...defaultLook('m'), mask: true }; g.state.inventory.mask = 1;
+// Прогон миграции обычного сохранения через localStorage.
+const store = new Map<string, string>();
+(globalThis as any).localStorage = { setItem: (k: string, v: string) => store.set(k, v), getItem: (k: string) => store.get(k) ?? null, removeItem: (k: string) => store.delete(k) };
+saveState(g.state); const loaded = loadState(); test('маска и предмет сохраняются', !!loaded?.look.mask && loaded.inventory.mask === 1);
+g.state.inventory = {}; saveState(g.state); test('без предмета сохранённая маска снимается при загрузке', !loadState()?.look.mask);
+process.exit(fails ? 1 : 0);

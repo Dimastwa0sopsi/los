@@ -18,7 +18,7 @@ export class MapIndex {
   cell = 150;
   b = new Map<string, Building[]>(); e = new Map<string, REdge[]>();
   constructor(public L: WorldLayout) {
-    for (const bd of L.buildings) this.put(this.b, bd.x - bd.w / 2, bd.z - bd.d / 2, bd.x + bd.w / 2, bd.z + bd.d / 2, bd);
+    for (const bd of L.buildings) if (!bd.removed) this.put(this.b, bd.x - bd.w / 2, bd.z - bd.d / 2, bd.x + bd.w / 2, bd.z + bd.d / 2, bd);
     for (const ed of L.edges) { const a = L.nodes[ed.a], n = L.nodes[ed.b]; this.put(this.e, Math.min(a.x, n.x) - ed.w, Math.min(a.z, n.z) - ed.w, Math.max(a.x, n.x) + ed.w, Math.max(a.z, n.z) + ed.w, ed); }
   }
   private put<T>(m: Map<string, T[]>, x0: number, z0: number, x1: number, z1: number, v: T) {

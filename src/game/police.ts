@@ -44,3 +44,8 @@ export function eyeSees(col: Collision, eye: Eye, tx: number, tz: number, target
   const hit = col.ray(eye.x, eye.y, eye.z, dx / len, (targetEyeY - eye.y) / len, dz / len, len);
   return hit >= len - 0.6;      // стена ближе цели — не видит
 }
+
+/** Маска затрудняет распознавание пешего разыскиваемого, но не скрывает его вблизи. */
+export function recognitionEye(eye: Eye, maskedOnFoot: boolean): Eye {
+  return maskedOnFoot ? { ...eye, range: eye.range * 0.35, close: Math.min(eye.close, 5) } : eye;
+}

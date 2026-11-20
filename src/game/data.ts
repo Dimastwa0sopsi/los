@@ -27,6 +27,7 @@ export const ITEMS: Record<string, ItemDef> = {
   spare_wheel: { id: 'spare_wheel', name: 'Колесо в сборе', icon: '🛞', price: 180, part: 'wheel' },
   spare_glass: { id: 'spare_glass', name: 'Комплект стёкол', icon: '🪟', price: 260, part: 'glass' },
   spare_body: { id: 'spare_body', name: 'Кузовная деталь', icon: '🔩', price: 320, part: 'body' },
+  mask: { id: 'mask', name: 'Маска для лица', icon: '😷', price: 75 },
   medkit: { id: 'medkit', name: 'Аптечка', icon: '🩹', price: 60, health: 50 },
   pills: { id: 'pills', name: 'Обезболивающее', icon: '💊', price: 15, health: 20 },
   vitamins: { id: 'vitamins', name: 'Витамины', icon: '🧪', price: 12, health: 8, energy: 15 },
@@ -93,12 +94,12 @@ export const ITEMS: Record<string, ItemDef> = {
 
 export type ShopKind = 'shop24' | 'supermarket' | 'cafe' | 'pharmacy' | 'gunshop' | 'vshop' | 'gas' | 'mallfood' | 'fishshop';
 export const SHOP_ITEMS: Record<ShopKind, string[]> = {
-  shop24: ['water', 'cola', 'kvass', 'lemonade', 'coffee', 'bread', 'sandwich', 'hotdog', 'chips', 'chocolate', 'donut', 'gum', 'energy', 'cigarettes'],
-  supermarket: ['seed_tomato', 'seed_cucumber', 'seed_strawberry', 'water', 'cola', 'juice', 'smoothie', 'milk', 'bread', 'sausage', 'salo', 'cheese', 'eggs', 'pelmeni', 'pizza', 'apple', 'banana', 'grapes', 'watermelon', 'corn', 'honey', 'chocolate', 'icecream', 'chips', 'cigarettes'],
+  shop24: ['mask', 'water', 'cola', 'kvass', 'lemonade', 'coffee', 'bread', 'sandwich', 'hotdog', 'chips', 'chocolate', 'donut', 'gum', 'energy', 'cigarettes'],
+  supermarket: ['mask', 'seed_tomato', 'seed_cucumber', 'seed_strawberry', 'water', 'cola', 'juice', 'smoothie', 'milk', 'bread', 'sausage', 'salo', 'cheese', 'eggs', 'pelmeni', 'pizza', 'apple', 'banana', 'grapes', 'watermelon', 'corn', 'honey', 'chocolate', 'icecream', 'chips', 'cigarettes'],
   cafe: ['coffee', 'tea', 'burger', 'hotdog', 'pizza', 'soup', 'borscht', 'croissant', 'donut', 'cake', 'juice', 'lemonade'],
   pharmacy: ['medkit', 'pills', 'vitamins', 'bandage', 'antiseptic', 'sunscreen', 'water'],
   gunshop: ['knife', 'machete', 'seed_durman', 'pistol', 'revolver', 'smg', 'shotgun', 'rifle', 'sniper', 'ammo', 'ammo_m', 'shells', 'ammo_r'],
-  vshop: ['knife', 'seed_tomato', 'seed_potato', 'seed_cucumber', 'seed_strawberry', 'seed_sunflower', 'bread', 'milk', 'water', 'kvass', 'sausage', 'eggs', 'cheese', 'honey', 'apple', 'cigarettes', 'tea'],
+  vshop: ['mask', 'knife', 'seed_tomato', 'seed_potato', 'seed_cucumber', 'seed_strawberry', 'seed_sunflower', 'bread', 'milk', 'water', 'kvass', 'sausage', 'eggs', 'cheese', 'honey', 'apple', 'cigarettes', 'tea'],
   gas: ['water', 'cola', 'kvass', 'coffee', 'sandwich', 'hotdog', 'donut', 'chips', 'cigarettes', 'energy'],
   mallfood: ['burger', 'hotdog', 'sushi', 'pizza', 'donut', 'cola', 'lemonade', 'smoothie', 'icecream', 'coffee'],
   fishshop: ['rod', 'rod_pro', 'bait', 'lure', 'net', 'bucket', 'water', 'sandwich', 'kvass'],
@@ -258,6 +259,7 @@ export interface Tuning {
   rainbow?: boolean;
   /** государственный номер X000XX 00 */
   plate?: string;
+  plateFront?: boolean; plateBack?: boolean;
   /** установленный обвес (id из TUNE_CATALOG) */
   kit?: string | null;
 }
@@ -350,7 +352,7 @@ export function randomPlate(): string {
 // Внешность
 export interface Look {
   gender: 'm' | 'f'; skin: string; hair: string; hairColor: string; top: string; topColor: string; bottom: string; bottomColor: string; shoes: string;
-  eyes?: string; height?: number; build?: number; beard?: string; lips?: string; acc?: string;
+  eyes?: string; height?: number; build?: number; beard?: string; lips?: string; acc?: string; mask?: boolean;
   /** отдельные черты лица: форма брови, нос, губы и их цвет */
   brows?: string; browColor?: string; nose?: string; lipColor?: string;
   /** форма лица, форма глаз, ресницы и особые приметы (веснушки, шрам, родинка...) */

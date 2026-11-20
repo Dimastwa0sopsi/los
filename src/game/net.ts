@@ -96,6 +96,7 @@ export interface RemoteState {
   hp?: number;
   l?: [string, string, string, string, string, string, string, string, string]; // gender, skin, hair, hairColor, top, topColor, bottom, bottomColor, shoes
   lean?: number; wh?: number; lt?: number;
+  pn?: string; pf?: number; pb?: number;
   cr?: number;                                    // присед
   lk?: number;                                    // машина заперта
   em?: number;                                    // время начала эмоции
@@ -105,6 +106,7 @@ export interface RemoteState {
 }
 export interface Listing { slot: number; type: string; color: string; year: number; mil: number; cond: number; price: number; tun?: string }
 export type NetEvent =
+  | { e: 'social'; t: number; op: 'request' | 'accept' | 'decline'; action: 'handshake' }
   | { e: 'shot'; o: [number, number, number]; p: [number, number, number]; i: string }
   | { e: 'hit'; t: number; d: number; k: 'fist' | 'gun' | 'knife'; hx: number; hz: number; heavy?: boolean }
   | { e: 'dead'; by: number }

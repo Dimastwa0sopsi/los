@@ -44,7 +44,7 @@ export function InventoryGrid({ g }: { g: Game }) {
         <div className="mc-info">
           <span className="big">{it.icon}</span>
           <div className="grow"><b>{it.name} ×{s.inventory[sel]}</b><small>{stats(sel)}</small></div>
-          <button className="ui-btn sm main" onClick={() => use(sel)}>{it.weapon ? 'Взять в руки' : it.seed ? 'Как сажать?' : it.smoke ? 'Закурить' : it.drug ? 'Употребить' : 'Использовать'}</button>
+          <button className="ui-btn sm main" onClick={() => use(sel)}>{sel === 'mask' ? (s.look.mask ? 'Снять маску' : 'Надеть маску') : it.weapon ? 'Взять в руки' : it.seed ? 'Как сажать?' : it.smoke ? 'Закурить' : it.drug ? 'Употребить' : 'Использовать'}</button>
           {fridge && it.fridge && <button className="ui-btn sm" onClick={() => { g.toFridge(sel); r(); if (!g.getState().inventory[sel]) setSel(null); }}>→ ❄</button>}
           <button className="ui-btn sm ghost" onClick={() => { g.dropItem(sel); r(); if (!g.getState().inventory[sel]) setSel(null); }}>Выбросить</button>
         </div>

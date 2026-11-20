@@ -450,7 +450,9 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
     for (let x = f.x0; x < f.x1; x += 60) for (let z = f.z0; z < f.z1; z += 60) {
       const w = Math.min(60, f.x1 - x), d = Math.min(60, f.z1 - z);
       B(x + w / 2, z + d / 2).add('tex:soil', T.plane, M(x + w / 2, 0.02, z + d / 2, 0, w, d, 1, -Math.PI / 2), 6);
-      if (f !== F) B(x + w / 2, z + d / 2).add('tex:wheat', T.box, M(x + w / 2, 0.55, z + d / 2, 0, w - 1, 1.1, d - 1), 3);
+      // Ряды вместо сплошных высоких прямоугольных блоков.
+      if (f !== F) for (let rx = x + 1; rx < x + w - 0.5; rx += 2.6)
+        B(rx, z + d / 2).add('tex:wheat', T.box, M(rx, 0.52, z + d / 2, 0, 1.4, 1.04, d - 0.8), 3);
     }
   }
   await tick();
@@ -458,6 +460,7 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
   progress(0.3, 'Здания');
   const BUILD_STEP = 120;
   for (let i = 0; i < L.buildings.length; i++) {
+    if (L.buildings[i].removed) continue;
     if (L.buildings[i].kind === 'parkade') buildParkade(B(L.buildings[i].x, L.buildings[i].z), L.buildings[i]); else buildBuilding(B(L.buildings[i].x, L.buildings[i].z), L.buildings[i]);
     if (i % BUILD_STEP === 0) { progress(0.3 + (i / L.buildings.length) * 0.22, `Здания ${i}/${L.buildings.length}`); await tick(); }
   }
@@ -611,7 +614,10 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
   // ---------- поле пшеницы (работа) ----------
   progress(0.93, 'Поля');
   const cw = (F.x1 - F.x0) / F.cols, chh = (F.z1 - F.z0) / F.rows;
-  const wheat = new THREE.InstancedMesh(T.boxB, mat('tex:wheat'), F.cols * F.rows);
+  // Четыре узкие полосы в каждой убираемой ячейке, с видимой землёй между ними.
+  const rowParts = [-0.36, -0.12, 0.12, 0.36].map(x => new THREE.BoxGeometry(0.13, 1, 1).translate(x, 0.5, 0));
+  const wheatGeometry = mergeGeometries(rowParts)!; rowParts.forEach(part => part.dispose());
+  const wheat = new THREE.InstancedMesh(wheatGeometry, mat('tex:wheat'), F.cols * F.rows);
   const wheatCells: WorldMeshes['wheatCells'] = [];
   for (let r = 0; r < F.rows; r++) for (let c = 0; c < F.cols; c++) {
     const x = F.x0 + (c + 0.5) * cw, z = F.z0 + (r + 0.5) * chh;

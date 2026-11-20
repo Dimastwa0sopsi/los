@@ -19,6 +19,8 @@ export interface Building {
   beds?: { x: number; z: number }[];
   /** Дом, к участку которого относится баня. */
   bathOwner?: number;
+  /** Зарезервированный номер удалённого объекта для совместимости сохранений. */
+  removed?: boolean;
 }
 export type PropType = 'tree' | 'pine' | 'bush' | 'lamp' | 'bench' | 'hydrant' | 'trash' | 'swing' | 'slide' | 'sandbox' | 'carousel' |
   'fence' | 'bed' | 'banya' | 'porch' | 'gate' | 'umbrella' | 'towel' | 'lounger' | 'container' | 'tank' | 'crane' | 'dock' | 'booth' |
@@ -1418,7 +1420,7 @@ export function generateLayout(): WorldLayout {
         const hx = 1016 + k * 56, hz = 1560 + side * 14;
         const hb = addBuilding({ kind: 'vhouse', name: 'Дом · ' + VNAME, x: hx, z: hz, w: 10, d: 8.5, h: 5, door: doorFor(hx, hz, 10, 8.5, side > 0 ? 'n' : 's'), facade: rng.pick(['wood', 'wood', 'plaster']), roof: 'gable', enter: true, village: VNAME, price: 9000 + Math.round(rng.range(0, 7000) / 250) * 250, forSale: k % 2 === 0, color: rng.pick(['#7f1d1d', '#14532d', '#57534e']) });
         hb.cls = 'eco';
-        plotFence(hb, 5.0, 1.2, rng.pick(['#8b6b4a', '#a8a29e', '#e5e5e5']));
+        plotFence(hb, 3.0, 1.2, rng.pick(['#8b6b4a', '#a8a29e', '#e5e5e5']));
         driveway(hb.door, { z: 1560 + side * 4 }, 3.6, '#8b8b8b');
         for (let g = 0; g < 3; g++) addProp({ t: 'bed', x: hx + 6.5, z: hz - 3 + g * 3, w: 1.6, d: 2.4 });
         for (let c = 0; c < 4; c++) addProp({ t: 'chicken', x: hx - 3.1 + (c % 2) * 1.6, z: hz + side * 7.6 + Math.floor(c / 2) * 1.5, r: c });
@@ -1430,7 +1432,7 @@ export function generateLayout(): WorldLayout {
     addProp({ t: 'bench', x: 1040, z: 1600, r: 0.4 }, { w: 1.8, d: 0.6, h: 0.5 });
     addProp({ t: 'bench', x: 1086, z: 1600, r: -0.4 }, { w: 1.8, d: 0.6, h: 0.5 });
     addProp({ t: 'swing', x: 1140, z: 1604 }, { w: 3.2, d: 0.4, h: 2.2 });
-    addProp({ t: 'slide', x: 1152, z: 1604, r: Math.PI / 2 }, { w: 1, d: 3.6, h: 2 });
+    addProp({ t: 'slide', x: 1146, z: 1604, r: Math.PI / 2 }, { w: 1, d: 3.6, h: 2 });
     addProp({ t: 'sandbox', x: 1164, z: 1610 });
     addProp({ t: 'carousel', x: 1164, z: 1596 }, { w: 2.6, d: 2.6, h: 0.9 });
     for (let k = 0; k < 8; k++) addProp({ t: k % 2 ? 'pine' : 'tree', x: 1000 + k * 44, z: 1642, h: 1.05 + (k % 3) * 0.05, r: k }, { w: 0.6, d: 0.6, h: 3.2 });
@@ -1459,23 +1461,14 @@ export function generateLayout(): WorldLayout {
     truckDests.push({ name: 'Ольховка · ферма', x: 1290, z: 1636 });
   }
 
-  // ---------- животноводческая ферма «Зорька» ----------
-  const livestock: WorldLayout['livestock'] = { office: { x: 0, z: 0 }, feed: { x: 1612, z: 1178 }, troughs: [], coop: { x: 0, z: 0 }, crate: { x: 1662, z: 1166 } };
-  {
-    const fc = '#8b6b4a';
-    fence(1600, 1152, 1640, 1152, 1.3, fc); fence(1652, 1152, 1700, 1152, 1.3, fc); fence(1600, 1152, 1600, 1250, 1.3, fc); fence(1700, 1152, 1700, 1250, 1.3, fc); fence(1600, 1250, 1700, 1250, 1.3, fc);
-    fence(1618, 1196, 1668, 1196, 1.1, fc); // загон коров
-    addBuilding({ kind: 'barn', name: 'Коровник «Зорька»', x: 1632, z: 1222, w: 32, d: 16, h: 7.5, door: doorFor(1632, 1222, 32, 16, 'n'), facade: 'wood', roof: 'gable', enter: false, color: '#7f1d1d' });
-    const coop = addBuilding({ kind: 'coop', name: 'Курятник', x: 1684, z: 1188, w: 9, d: 8, h: 3.6, door: doorFor(1684, 1188, 9, 8, 'w'), facade: 'wood', roof: 'gable', enter: false, color: '#78350f' });
-    livestock.coop = { x: coop.door.x, z: coop.door.z };
-    const off = addBuilding({ kind: 'livestock', name: 'Ферма «Зорька»', x: 1622, z: 1164, w: 10, d: 6, h: 3.6, door: doorFor(1622, 1164, 10, 6, 'n'), facade: 'plaster', roof: 'gable', enter: false, color: '#15803d' });
-    livestock.office = { x: off.door.x, z: off.door.z };
-    for (let k = 0; k < 3; k++) { const t = { x: 1628 + k * 15, z: 1200 }; livestock.troughs.push({ x: t.x, z: t.z - 1.4 }); addProp({ t: 'trough', x: t.x, z: t.z }, { w: 2.6, d: 0.8, h: 0.7 }); }
-    for (let k = 0; k < 6; k++) addProp({ t: 'cow', x: 1624 + k * 8, z: 1206 + (k % 2) * 4, r: (k * 1.3) % 6.28 }, { w: 1.0, d: 1.0, h: 1.5 });
-    for (let k = 0; k < 10; k++) addProp({ t: 'chicken', x: 1676 + (k % 4) * 2.2, z: 1172 + Math.floor(k / 4) * 2.4, r: k });
-    for (let k = 0; k < 4; k++) addProp({ t: 'hay', x: 1608 + (k % 2) * 3, z: 1172 + Math.floor(k / 2) * 3 }, { w: 1.6, d: 1.6, h: 1.2 });
-    addProp({ t: 'pallet', x: livestock.crate.x, z: livestock.crate.z + 1.2 });
-  }
+  // Три номера бывших построек сохраняем как невидимые резервы, чтобы ID
+  // домов, купленных ранее, не изменились. Ферма и её рабочие объекты удалены.
+  const livestock: WorldLayout['livestock'] = { office: { x: 0, z: 0 }, feed: { x: 0, z: 0 }, troughs: [], coop: { x: 0, z: 0 }, crate: { x: 0, z: 0 } };
+  for (const [kind, name, x, z, w, d, h, face] of [
+    ['barn', 'Коровник «Зорька»', 1632, 1222, 32, 16, 7.5, 'n'],
+    ['coop', 'Курятник', 1684, 1188, 9, 8, 3.6, 'w'],
+    ['livestock', 'Ферма «Зорька»', 1622, 1164, 10, 6, 3.6, 'n'],
+  ] as const) addBuilding({ kind, name, x, z, w, d, h, door: doorFor(x, z, w, d, face), facade: 'wood', roof: 'gable', enter: false, removed: true }, true);
   // ---------- Егоровка: две прямые улицы и зелёный бульвар между ними ----------
   // Новые дома добавляются после существующих жилых зданий: их ID не меняются.
   {
@@ -1531,13 +1524,14 @@ export function generateLayout(): WorldLayout {
     const east = roadSeg(west, [[560, -210]], 'village', 8).at(-1)!;
     addEdge(east, sosnovkaLaneEnd, 'village', 8);
     roadSeg(west, [[300, -155], [380, -155]], 'village', 8);
+    roadSeg(villageEntryNode, [[300, -440], [580, -440]], 'village', 8);
     roadSeg(olkhovkaWest, [[960, 1520], [900, 1520]], 'village', 8);
   }
   // Прямая связка двух деревень, с узлами для навигации трафика.
   { const end = roadSeg(klenovkaEast, [[900, 1830], [950, 1700]], 'village', 8).at(-1)!; addEdge(end, olkhovkaWest, 'village', 8); }
 
   // пункты доставки дальнобойщика
-  truckDests.push({ name: 'Завод «Сталь»', x: 1600, z: 560 }, { name: 'Агрохолдинг «Нива»', x: 1470, z: 1140 }, { name: 'Ферма «Зорька»', x: 1646, z: 1140 });
+  truckDests.push({ name: 'Завод «Сталь»', x: 1600, z: 560 }, { name: 'Агрохолдинг «Нива»', x: 1470, z: 1140 });
   for (const b of buildings) if (b.kind === 'vshop') truckDests.push({ name: 'Сельмаг · ' + (b.village ?? ''), x: b.door.x, z: b.door.z });
   for (const b of buildings) if (b.kind === 'mall' || (b.kind === 'supermarket' && b.name.startsWith('Гипер'))) truckDests.push({ name: b.name, x: b.door.x, z: b.door.z });
   // ---------- Сегменты дорог для проверки свободных полос ----------
@@ -1982,6 +1976,7 @@ export function generateLayout(): WorldLayout {
     ...[330, 365, 400, 435, 470, 505, 540].map(x => ({ x, z: -192, village: 'Сосновка', face: 'n' as const, roadZ: -210 })),
     ...[850, 880].flatMap(x => [{ x, z: 1850, village: 'Кленовка', face: 'n' as const, roadZ: 1830 }, { x, z: 1810, village: 'Кленовка', face: 's' as const, roadZ: 1830 }]),
     ...[905, 935, 965].map(x => ({ x, z: 1500, village: 'Ольховка', face: 's' as const, roadZ: 1520 })),
+    ...[330, 370, 410, 450, 490, 530].map(x => ({ x, z: -458, village: 'Сосновка', face: 's' as const, roadZ: -440 })),
   ];
   newHomes.forEach((p, i) => {
     const w = [8.5, 10, 11][i % 3], d = [8, 9, 8.5][i % 3];
@@ -1998,6 +1993,22 @@ export function generateLayout(): WorldLayout {
   });
   for (const [x, z] of [...[310, 320, 330, 340, 350, 360, 370].map(x => [x, -141]), ...[908, 918, 928, 938, 948].map(x => [x, 1534])]) {
     clearVegetation(x, z, 9, 12); addGarage(x, z, 24000);
+  }
+
+  // Дополнительные леса отдельным генератором: он не меняет расположение
+  // старых зданий, дорог и наград в сохранённых мирах.
+  {
+    const treesRng = new RNG(WORLD_SEED + 6706);
+    const zones = [{ x: 180, z: -480, r: 170 }, { x: 1040, z: -480, r: 150 }, { x: 680, z: 1370, r: 130 }, { x: 1260, z: 1400, r: 115 }, { x: 1500, z: 180, r: 155 }];
+    for (const zone of zones) for (let k = 0; k < 170; k++) {
+      const a = treesRng.next() * Math.PI * 2, r = Math.sqrt(treesRng.next()) * zone.r;
+      const x = zone.x + Math.cos(a) * r, z = zone.z + Math.sin(a) * r;
+      if (x < -1100 || x > 1810 || z < -610 || z > 1910 || nearRoad(x, z, 8) || solidNear(x, z, 3)) continue;
+      if (Math.abs(x - riverCenter(z)) < riverHalf + 12 || inRect(x, z, beach, 20) || inRect(x, z, depot, 15) || inRect(x, z, ind, 15) || inRect(x, z, farm, 15) || farm.aiFields.some(f => inRect(x, z, f, 12))) continue;
+      if (buildings.some(b => !b.removed && Math.abs(x - b.x) < b.w / 2 + 14 && Math.abs(z - b.z) < b.d / 2 + 14)) continue;
+      if (garages.some(g => Math.abs(x - g.x) < g.w / 2 + 7 && Math.abs(z - g.z) < g.d / 2 + 7)) continue;
+      addProp({ t: treesRng.chance(0.6) ? 'pine' : 'tree', x, z, h: treesRng.range(1, 1.6) }, { w: 0.6, d: 0.6, h: 4 });
+    }
   }
 
 

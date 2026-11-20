@@ -45,8 +45,9 @@ export class Vehicle {
     this.spec = this.model.spec; this.role = role;
     if (owned) { this.owned = owned; this.condition = owned.condition; this.fuel = owned.fuel; this.mileage = owned.mileage; this.dirt = owned.dirt ?? 0; if (owned.missing.length) this.model.setMissing(owned.missing); }
     // номерной знак: у всех машин, у которых он физически есть
-    if (!this.model.tuning.plate && this.spec.body !== 'moto' && this.spec.body !== 'scooter' && this.spec.body !== 'heli' && this.spec.body !== 'combine' && this.spec.body !== 'quad') {
+    if (this.model.tuning.plate === undefined && this.spec.body !== 'moto' && this.spec.body !== 'scooter' && this.spec.body !== 'heli' && this.spec.body !== 'combine' && this.spec.body !== 'quad') {
       this.model.tuning.plate = randomPlate();
+      if (owned) owned.tuning.plate = this.model.tuning.plate;
     }
     this.model.updatePlate();
   }
@@ -522,27 +523,28 @@ export class AIDriver {
           if (od < myD - 1.2 && cross > 0.45) { target = Math.min(target, Math.max(0, (myD - 8) * 0.85)); break; }
         }
       }
-      // --- дистанция и торможение перед машиной впереди ---
+      // Дистанция зависит от скорости и реальных габаритов соседнего кузова.
       const fx = Math.sin(v.heading), fz = Math.cos(v.heading);
-      const check = (ox: number, oz: number, rad: number, ospeed = 0) => {
+      const check = (ox: number, oz: number, longRadius: number, sideRadius: number, alongSpeed = 0) => {
         const dx = ox - v.x, dz = oz - v.z;
         const f = dx * fx + dz * fz, l = dx * fz - dz * fx;
-        const lim = v.spec.len / 2 + 16;
-        if (f > 0 && f < lim && Math.abs(l) < 1.9 + rad) {
-          const gap = f - v.spec.len / 2 - rad - 2.6;
-          // если впереди едут — держим дистанцию, а не тараним; вплотную — стоим
-          target = Math.min(target, gap < 3 ? 0 : Math.max(0, gap * 0.85 + ospeed * 0.55));
-          if (gap < 2) v.shock = Math.max(v.shock, 0.25);
-        }
+        const look = Math.max(16, Math.abs(v.speed) * 1.6 + 8);
+        if (f <= 0 || f > v.spec.len / 2 + longRadius + look || Math.abs(l) > v.spec.wid / 2 + sideRadius + 0.35) return;
+        const gap = f - v.spec.len / 2 - longRadius - 2.5;
+        const safeSpeed = Math.max(0, alongSpeed) + Math.sqrt(2 * 3.5 * Math.max(0, gap - 2));
+        target = Math.min(target, gap < 2 ? 0 : safeSpeed);
+        if (gap < 1) v.shock = Math.max(v.shock, 0.25);
       };
       for (const o of ctx.vehicles) {
         if (o === v || !o.model.group.visible) continue;
-        const dd = Math.abs(o.x - v.x) + Math.abs(o.z - v.z);
-        if (dd > 34) continue;
-        const sameWay = Math.cos(angleDiff(o.heading, v.heading)) > 0.2;
-        check(o.x, o.z, Math.max(0.1, (o.spec.wid + v.spec.wid) / 2 + 0.1 - 1.6), sameWay ? Math.max(0, o.speed) : 0);
+        if (Math.abs(o.x - v.x) + Math.abs(o.z - v.z) > 80) continue;
+        const ofx = Math.sin(o.heading), ofz = Math.cos(o.heading);
+        const longitudinal = Math.abs(ofx * fx + ofz * fz), transverse = Math.abs(ofx * fz - ofz * fx);
+        const longRadius = o.spec.len / 2 * longitudinal + o.spec.wid / 2 * transverse;
+        const sideRadius = o.spec.len / 2 * transverse + o.spec.wid / 2 * longitudinal;
+        check(o.x, o.z, longRadius, sideRadius, o.speed * (ofx * fx + ofz * fz));
       }
-      if (!ctx.player.inVehicle) check(ctx.player.x, ctx.player.z, 0.5);
+      if (!ctx.player.inVehicle) check(ctx.player.x, ctx.player.z, 0.5, 0.5);
     }
     if (v.shock > 0) { v.shock -= dt; target = 0; }
     const diff = angleDiff(v.heading, desired);

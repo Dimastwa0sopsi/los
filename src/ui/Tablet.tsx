@@ -378,6 +378,7 @@ function Cars({ g, close }: P) {
             <div className="btns">
               {!l && <button className="ui-btn sm" onClick={() => { g.deliverCar(o.uid); close(); }}>Доставить ($150)</button>}
               {l && <button className="ui-btn sm" onClick={() => g.unlist(o.uid)}>Снять с продажи</button>}
+              <button className="ui-btn sm" onClick={() => { const text = g.vehicleDocument(o.uid); if (text) g.openPanel({ type: 'info', title: '📄 ПТС', text }); }}>📄 ПТС</button>
               <button className="ui-btn sm" onClick={() => { const v = g.ownedVehicleNear(o.uid); if (v) { g.destination = { x: v.x, z: v.z }; g.toast('Маршрут к машине проложен'); close(); } }}>📍 Найти</button>
             </div>
           </div>
@@ -414,7 +415,6 @@ function Jobs({ g, go, close }: P) {
       {g.job && <div className="tb-card">💼 <div className="grow"><b>Активная работа</b></div><button className="ui-btn sm danger" onClick={() => g.quitJob()}>Завершить</button></div>}
       <button className="tb-card" onClick={() => { g.startCourier(); close(); }}>📦 <div><b>Курьер</b><small>доставка посылок · $40–150</small></div></button>
       <button className="tb-card" onClick={() => { const b = g.L.buildings.find((x) => x.kind === 'office'); if (b) { g.destination = { x: b.door.x, z: b.door.z }; g.toast('Маршрут к бизнес-центру «ЛосТех» проложен'); close(); } }}>💻 <div><b>Офис «ЛосТех»</b><small>работа за компьютером: $45 за задачу + зарплата · {g.getState().officeJob ? 'вы приняты' : 'устройство в отделе кадров'}</small></div></button>
-      <button className="tb-card" onClick={() => { g.destination = { ...g.L.livestock.office }; g.toast('Маршрут к ферме «Зорька» проложен'); close(); }}>🐄 <div><b>Ферма «Зорька»</b><small>кормить коров, собирать яйца · $40–220 за цикл</small></div></button>
       <button className="tb-card" onClick={() => { g.destination = { ...g.L.depot.office }; g.toast('Маршрут к логистическому терминалу проложен'); close(); }}>🚚 <div><b>Дальнобойщик</b><small>грузы по городу и деревням · $300–1500 за рейс</small></div></button>
       <button className="tb-card" onClick={() => { g.destination = { ...g.L.industrial.office }; g.toast('Маршрут к проходной завода проложен'); close(); }}>🏭 <div><b>Завод</b><small>грузчик: $120 за рейс + бонус</small></div></button>
       <button className="tb-card" onClick={() => { g.destination = { x: g.L.farm.combineSpawn.x, z: g.L.farm.combineSpawn.z }; g.toast('Маршрут к комбайну проложен'); close(); }}>🌾 <div><b>Комбайн</b><small>$5 за участок поля</small></div></button>

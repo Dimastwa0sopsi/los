@@ -2,7 +2,7 @@
  *   npm run check:police
  */
 import { Collision } from '../src/game/collision';
-import { eyeSees, POLICE_EYE, PED_EYE } from '../src/game/police';
+import { eyeSees, recognitionEye, POLICE_EYE, PED_EYE } from '../src/game/police';
 
 // пустая сцена
 const open = new Collision([]);
@@ -28,6 +28,10 @@ t('стена перекрывает обзор', eyeSees(walled, eye(0), 0, 20)
 t('стена не мешает вплотную', eyeSees(walled, eye(Math.PI), 0, 3), true);
 t('пеший постовой не видит дальше 34 м', eyeSees(open, { x: 0, z: 0, y: 1.6, yaw: 0, ...PED_EYE }, 0, 45), false);
 t('пеший видит на 30 м', eyeSees(open, { x: 0, z: 0, y: 1.6, yaw: 0, ...PED_EYE }, 0, 30), true);
+t('маску не распознают издалека', eyeSees(open, recognitionEye(eye(0), true), 0, 30), false);
+t('в маске распознают вблизи', eyeSees(open, recognitionEye(eye(0), true), 0, 4), true);
+t('без маски дальность обычная', eyeSees(open, recognitionEye(eye(0), false), 0, 30), true);
+t('маска не позволяет видеть через стены', eyeSees(walled, recognitionEye(eye(0), true), 0, 15), false);
 // смещение вбок: не только ось Z
 t('видит по диагонали', eyeSees(open, eye(Math.PI / 4), 15, 15), true);
 
