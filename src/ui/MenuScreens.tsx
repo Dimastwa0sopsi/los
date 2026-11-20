@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import menuBg from '../assets/menu.jpg';
-import { type Settings, defaultSettings } from '../game/config';
+import { type Settings, defaultSettings, PAD_BUTTONS, PAD_DEFAULT, PAD_LABEL } from '../game/config';
+
+
 
 export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   return (
@@ -156,6 +158,22 @@ export function SettingsPanel({ value, onChange, onClose, inGame, onExit, onRese
         <label>Масштаб мини-карты</label><Range k="minimapZoom" min={0.5} max={3} step={0.1} fmt={(v) => v.toFixed(1) + '×'} />
         <label>Вращение мини-карты</label><Seg k="minimapRotate" opts={[[true, 'По камере'], [false, 'Север вверху']]} />
         <label>Подсказки в игре</label><Seg k="hints" opts={[['short', 'Коротко'], ['off', 'Выключены']]} />
+        <label>Кнопки справа на телефоне</label>
+        <Seg k="padStyle" opts={[['arc', 'Дугой'], ['grid', 'Сеткой 2×2']]} />
+        <p className="text-xs opacity-70">Нажмите кнопку, чтобы поставить её на панель или убрать. Всё, что не влезло, лежит под «⋯» прямо в игре.</p>
+        <div className="lg-pad-grid">
+          {PAD_BUTTONS.filter((b) => b.group === 'foot').map((b) => {
+            const on = (s.padFoot ?? PAD_DEFAULT.foot).includes(b.id);
+            return <button key={b.id} className={`lg-chip ${on ? 'on' : ''}`} onClick={() => set('padFoot', on ? (s.padFoot ?? PAD_DEFAULT.foot).filter((x) => x !== b.id) : [...(s.padFoot ?? PAD_DEFAULT.foot), b.id])}><span>{b.ico}</span>{PAD_LABEL[b.id] ?? b.id}</button>;
+          })}
+        </div>
+        <label>В машине на телефоне</label>
+        <div className="lg-pad-grid">
+          {PAD_BUTTONS.filter((b) => b.group === 'drive').map((b) => {
+            const on = (s.padDrive ?? PAD_DEFAULT.drive).includes(b.id);
+            return <button key={b.id} className={`lg-chip ${on ? 'on' : ''}`} onClick={() => set('padDrive', on ? (s.padDrive ?? PAD_DEFAULT.drive).filter((x) => x !== b.id) : [...(s.padDrive ?? PAD_DEFAULT.drive), b.id])}><span>{b.ico}</span>{PAD_LABEL[b.id] ?? b.id}</button>;
+          })}
+        </div>
         <p className="text-xs opacity-70">Всё обучение — в «Как играть?» (F1) и в меню «☰» на телефоне.</p>
         {onHelp && <button className="ui-btn sm" onClick={onHelp}>❓ Как играть?</button>}
       </div>}
