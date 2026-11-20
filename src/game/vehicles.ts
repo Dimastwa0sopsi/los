@@ -347,6 +347,8 @@ export class AIDriver {
   final: { x: number; z: number } | null = null;
   onArrive: (() => void) | null = null;
   obeyLights = true; speedMul = 1;
+  /** паника от перестрелки рядом: сколько секунд ещё гнать и с какой скоростью */
+  panicT = 0; panicSpeed = 0; panicFrom = { x: 0, z: 0 };
   chaseTarget: (() => { x: number; z: number }) | null = null;
   private replan = 0; arrived = false;
   setRoute(L: WorldLayout, from: number, to: number, final: { x: number; z: number } | null): boolean {
@@ -354,6 +356,12 @@ export class AIDriver {
     if (!p) return false;
     this.route = p; this.k = 0; this.mode = 'route'; this.final = final; this.arrived = false;
     return true;
+  }
+  /** перестрелка рядом: водитель жмёт газ и уходит от опасности, забыв про светофоры */
+  panic(x: number, z: number, sec = 7) {
+    this.panicT = Math.max(this.panicT, sec);
+    this.panicSpeed = 100 / 3.6;            // до 100 км/ч — «уйти от опасности»
+    this.panicFrom = { x, z };
   }
   private edgeKind(L: WorldLayout, a: number, b: number) { const e = L.adj[a].find((x) => x.n === b); return e ? L.edges[e.e].kind : 'city'; }
   private lanePt(L: WorldLayout, a: number, b: number, atB: boolean) {
@@ -365,6 +373,12 @@ export class AIDriver {
   }
   step(v: Vehicle, dt: number, ctx: AICtx): { desired: number; target: number } {
     const L = ctx.L;
+    // паника затихает: уехали достаточно далеко от места стрельбы — снова обычная езда
+    if (this.panicT > 0) {
+      this.panicT = Math.max(0, this.panicT - dt);
+      if (Math.hypot(v.x - this.panicFrom.x, v.z - this.panicFrom.z) > 160) this.panicT = 0;
+    }
+    const panic = this.panicT > 0;
     if (this.mode === 'idle') return this.apply(v, dt, v.heading, 0);
     if (this.mode === 'chase' && this.chaseTarget) {
       const t = this.chaseTarget();
@@ -418,16 +432,17 @@ export class AIDriver {
     // скорость
     let target = cruiseFor(kind) * this.speedMul;
     if (this.mode === 'chase') target = v.spec.maxSpeed * 0.7;
+    if (panic) target = Math.max(target, Math.min(this.panicSpeed, v.spec.maxSpeed));
     target = Math.min(target, v.spec.maxSpeed);
     const distB = Math.hypot(B.x - v.x, B.z - v.z);
     if (this.k + 2 < this.route.length) {
       const C = L.nodes[this.route[this.k + 2]], Bn = L.nodes[b], An = L.nodes[a];
       const turn = Math.abs(angleDiff(Math.atan2(Bn.x - An.x, Bn.z - An.z), Math.atan2(C.x - Bn.x, C.z - Bn.z)));
-      if (turn > 0.4) target = Math.min(target, Math.sqrt(6 * 6 + 2 * 5 * Math.max(0, distB - 4)));
+      if (turn > 0.4) target = Math.min(target, Math.sqrt(6 * 6 + 2 * 5 * Math.max(0, distB - 4)) * (panic ? 1.45 : 1));
     } else if (this.mode === 'route') target = Math.min(target, Math.sqrt(2 * 4 * Math.max(0, distB - 2)) + 1);
     // светофор
     const bn = L.nodes[b];
-    if (this.obeyLights && bn.light) {
+    if (this.obeyLights && !panic && bn.light) {
       const An = L.nodes[a];
       const ew = Math.abs(bn.x - An.x) > Math.abs(bn.z - An.z);
       const st = ctx.lightState(b, ew);

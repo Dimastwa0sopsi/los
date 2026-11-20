@@ -263,17 +263,25 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
   await tick();
   // ---------- поверхности кварталов ----------
   progress(0.24, 'Кварталы и тротуары');
-  // Квартал — это НЕ бетонная плита: газон на всю площадь, асфальт только на служебных
-  // кварталах (рынок, авторынок, парковки, гаражи, склад), тротуар — узким кольцом по краю.
-  // Раньше весь квартал заливался текстурой тротуара, из-за чего в городе не было травы.
-  const PAVED_BLOCKS = ['market', 'dealer', 'parking', 'parkade', 'garages', 'storage'];
+  // Квартал: в городе — асфальт (как в жизни: проезды, площадки, парковки), но не «плита»:
+  // по краю газонная полоса, внутри — пятна газона и земли, лунки под деревья. Парки,
+  // частный сектор и деревня остаются зелёными.
+  const GREEN_BLOCKS = ['park', 'private', 'farm', 'barn', 'coop', 'livestock', 'village', 'dacha', 'orchard'];
+  // детерминированный «шум» без RNG: одинаковый мир при каждой сборке
+  const hsh = (a: number, b: number, k: number) => {
+    const v = Math.sin(a * 127.1 + b * 311.7 + k * 74.7) * 43758.5453;
+    return v - Math.floor(v);
+  };
   for (const bl of L.blocks) {
     const x0 = bl.ox ?? bl.i * CELL + ROAD_W / 2, z0 = bl.oz ?? bl.j * CELL + ROAD_W / 2, s = CELL - ROAD_W;
     const cx = x0 + s / 2, cz = z0 + s / 2;
+    // кварталы большого парка рисуются одним куском ниже: иначе внутри парка
+    // остаются бордюры и тротуары от бывших четырёх кварталов
+    if (L.bigParks.some((q) => cx > q.x0 && cx < q.x1 && cz > q.z0 && cz < q.z1)) continue;
     const b = B(cx, cz);
-    const paved = PAVED_BLOCKS.includes(bl.type);
-    // основание квартала: газон (или асфальт на служебных) — с него и начинается вся поверхность
-    b.box(paved ? 'tex:asphalt' : 'tex:grass', cx, 0, cz, s, 0.15, s, 0, paved ? 6 : 4);
+    const green = GREEN_BLOCKS.includes(bl.type);
+    // основание квартала: асфальт в городе, газон в парках и частном секторе
+    b.box(green ? 'tex:grass' : 'tex:asphalt', cx, 0, cz, s, 0.15, s, 0, green ? 4 : 6);
     const cc = 'c:#c9c6bf';
     b.box(cc, cx, 0, z0 + 0.12, s, 0.18, 0.24); b.box(cc, cx, 0, z0 + s - 0.12, s, 0.18, 0.24);
     b.box(cc, x0 + 0.12, 0, cz, 0.24, 0.18, s); b.box(cc, x0 + s - 0.12, 0, cz, 0.24, 0.18, s);
@@ -283,6 +291,30 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
     b.add('tex:sidewalk', T.plane, M(cx, 0.158, z0 + s - sw / 2, 0, s, sw, 1, -Math.PI / 2), 2.5);
     b.add('tex:sidewalk', T.plane, M(x0 + sw / 2, 0.158, cz, 0, sw, s - 2 * sw, 1, -Math.PI / 2), 2.5);
     b.add('tex:sidewalk', T.plane, M(x0 + s - sw / 2, 0.158, cz, 0, sw, s - 2 * sw, 1, -Math.PI / 2), 2.5);
+    if (!green) {
+      // газонная полоса сразу за тротуаром — «немного земли» в асфальтовом городе
+      const verge = 1.6;
+      b.add('tex:grass', T.plane, M(cx, 0.1535, z0 + sw + verge / 2, 0, s - 2 * sw, verge, 1, -Math.PI / 2), 4);
+      b.add('tex:grass', T.plane, M(cx, 0.1535, z0 + s - sw - verge / 2, 0, s - 2 * sw, verge, 1, -Math.PI / 2), 4);
+      b.add('tex:grass', T.plane, M(x0 + sw + verge / 2, 0.1536, cz, 0, verge, s - 2 * sw - 2 * verge, 1, -Math.PI / 2), 4);
+      b.add('tex:grass', T.plane, M(x0 + s - sw - verge / 2, 0.1536, cz, 0, verge, s - 2 * sw - 2 * verge, 1, -Math.PI / 2), 4);
+      // пятна газона и земли внутри квартала: 4–6 штук, без наезда на полосу
+      const ix0 = x0 + sw + verge + 2, iz0 = z0 + sw + verge + 2;
+      const iw = s - 2 * (sw + verge + 2);
+      const n = 4 + Math.floor(hsh(bl.i, bl.j, 1) * 3);
+      for (let k = 0; k < n; k++) {
+        const px = ix0 + hsh(bl.i, bl.j, 10 + k) * iw, pz = iz0 + hsh(bl.i, bl.j, 40 + k) * iw;
+        const pw = 4 + hsh(bl.i, bl.j, 70 + k) * 7, pd = 4 + hsh(bl.i, bl.j, 90 + k) * 7;
+        const soil = hsh(bl.i, bl.j, 130 + k) > 0.74;
+        if (Math.hypot(px - cx, pz - cz) < 9) continue; // центр квартала — двор, там и так двор
+        b.add(soil ? 'tex:soil' : 'tex:grass', T.plane, M(px, 0.154 + k * 0.0004, pz, hsh(bl.i, bl.j, 160 + k) * 3.14, pw, pd, 1, -Math.PI / 2), 4);
+      }
+      // лунки под уличные деревья: маленькие пятна земли на тротуаре
+      for (const tt of [-16, -3, 4.5, 16]) {
+        b.add('tex:soil', T.plane, M(cx + tt, 0.159, z0 + 0.75, 0, 1.1, 1.1, 1, -Math.PI / 2), 2);
+        b.add('tex:soil', T.plane, M(cx + tt, 0.159, z0 + s - 0.75, 0, 1.1, 1.1, 1, -Math.PI / 2), 2);
+      }
+    }
     const ix = x0 + SIDEWALK, iz = z0 + SIDEWALK, is = s - SIDEWALK * 2;
     if (bl.type === 'park') {
       // дорожки парка поверх газона: две аллеи и кольцо
@@ -291,6 +323,23 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
       for (let k = 0; k < 16; k++) { const a0 = (k / 16) * Math.PI * 2, a1 = ((k + 1) / 16) * Math.PI * 2; stripQuad(b, 'tex:sidewalk', ix + is / 2 + Math.cos(a0) * 13, iz + is / 2 + Math.sin(a0) * 13, ix + is / 2 + Math.cos(a1) * 13, iz + is / 2 + Math.sin(a1) * 13, 3, 0.167, 3); }
     }
   }
+  // ---------- Парк «Ракета» (2×2 квартала) ----------
+  // Внутри — сплошной газон: дорожек нет, аттракционы стоят прямо на траве.
+  for (const bp of L.bigParks) {
+    const w = bp.x1 - bp.x0, d = bp.z1 - bp.z0;
+    const cx = (bp.x0 + bp.x1) / 2, cz = (bp.z0 + bp.z1) / 2;
+    const b = B(cx, cz);
+    b.box('tex:grass', cx, 0, cz, w, 0.15, d, 0, 4);
+    const cc = 'c:#c9c6bf';
+    b.box(cc, cx, 0, bp.z0 + 0.12, w, 0.18, 0.24); b.box(cc, cx, 0, bp.z1 - 0.12, w, 0.18, 0.24);
+    b.box(cc, bp.x0 + 0.12, 0, cz, 0.24, 0.18, d); b.box(cc, bp.x1 - 0.12, 0, cz, 0.24, 0.18, d);
+    const sw = SIDEWALK;
+    b.add('tex:sidewalk', T.plane, M(cx, 0.158, bp.z0 + sw / 2, 0, w, sw, 1, -Math.PI / 2), 2.5);
+    b.add('tex:sidewalk', T.plane, M(cx, 0.158, bp.z1 - sw / 2, 0, w, sw, 1, -Math.PI / 2), 2.5);
+    b.add('tex:sidewalk', T.plane, M(bp.x0 + sw / 2, 0.158, cz, 0, sw, d - 2 * sw, 1, -Math.PI / 2), 2.5);
+    b.add('tex:sidewalk', T.plane, M(bp.x1 - sw / 2, 0.158, cz, 0, sw, d - 2 * sw, 1, -Math.PI / 2), 2.5);
+  }
+
   // промзона, пляж, парковка, поля
   const ind = L.industrial;
   for (let x = ind.x0; x < ind.x1; x += CHUNK / 2) for (let z = ind.z0; z < ind.z1; z += CHUNK / 2) {
@@ -367,6 +416,7 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
     const bx0 = bl.ox ?? bl.i * CELL + ROAD_W / 2, bz0 = bl.oz ?? bl.j * CELL + ROAD_W / 2, bs = CELL - ROAD_W;
     return { x0: bx0, z0: bz0, x1: bx0 + bs, z1: bz0 + bs };
   });
+  for (const q of L.bigParks) blockRects.push(q);
   const liftAt = (x: number, z: number) =>
     blockRects.some((q) => x > q.x0 + 0.3 && x < q.x1 - 0.3 && z > q.z0 + 0.3 && z < q.z1 - 0.3) ? 0.15 : 0;
   for (let i = 0; i < L.props.length; i++) {
@@ -1183,6 +1233,159 @@ function buildProp(b: Batcher, p: Prop, lift = 0) {
       b.box('c:#334155', x - w * 0.62, 0.6, z, w * 0.28, 0.12, 0.16);
       break;
     }
+    // ---------- парк «Ракета»: аттракционы ----------
+    // арка входа с названием парка
+    case 'parkarch': {
+      const w = p.w ?? 13, h = p.h ?? 7;
+      for (const sx of [-1, 1]) {
+        b.box('c:#7f1d1d', x + sx * w / 2, 0, z, 0.7, h, 0.7);
+        b.box('c:#f8fafc', x + sx * w / 2, h - 0.7, z, 0.9, 0.24, 0.9);
+      }
+      b.box('c:#7f1d1d', x, h - 0.3, z, w + 0.7, 0.6, 0.7);
+      b.add(`sign:${p.c ?? 'ПАРК «РАКЕТА»'}|#7f1d1d`, T.box, M(x, h + 0.35, z, 0, w * 0.86, 1.0, 0.14));
+      b.add('glow:#fbbf24', T.box, M(x, h - 0.62, z + 0.4, 0, w * 0.9, 0.08, 0.1));
+      break;
+    }
+    // ракета-памятник: ступенчатый постамент, корпус с кольцами, нос-конус, сопла
+    case 'rocket': {
+      const H = p.h ?? 27;
+      b.add('c:#cbd5e1', T.cylB, M(x, 0.15, z, 0, 5.2, 0.9, 5.2), 2);
+      b.add('c:#94a3b8', T.cylB, M(x, 1.05, z, 0, 4.1, 0.45, 4.1), 2);
+      b.add('c:#e2e8f0', T.cylB, M(x, 1.5, z, 0, 2.6, H * 0.62, 2.6), 2);
+      for (const yy of [0.3, 0.55, 0.8]) b.add('c:#94a3b8', T.cylB, M(x, 1.5 + H * 0.62 * yy, z, 0, 2.62, 0.16, 2.62), 2);
+      b.add('c:#f8fafc', T.cone, M(x, 1.5 + H * 0.62, z, 0, 2.6, H * 0.38, 2.6), 2);
+      b.add('c:#dc2626', T.cone, M(x, 1.5 + H * 0.93, z, 0, 0.62, H * 0.07, 0.62), 2);
+      // стабилизаторы и сопла
+      for (let k = 0; k < 4; k++) {
+        const a = (k / 4) * Math.PI * 2 + Math.PI / 4;
+        b.add('c:#b91c1c', T.box, M(x + Math.cos(a) * 3.0, 3.0, z + Math.sin(a) * 3.0, -a, 0.22, 4.6, 2.3));
+        b.add('c:#334155', T.cylB, M(x + Math.cos(a) * 1.5, 1.5, z + Math.sin(a) * 1.5, 0, 0.42, 1.1, 0.42), 2);
+      }
+      // иллюминатор и надпись
+      b.add('glow:#7dd3fc', T.sphere, M(x, 4.4, z + 2.35, 0, 0.55, 0.55, 0.3));
+      b.add('sign:ВОСТОК|#f8fafc', T.box, M(x, 6.4, z + 2.5, 0, 2.6, 0.7, 0.06));
+      break;
+    }
+    // колесо обозрения: две A-образные опоры, обод из сегментов, спицы и кабинки
+    case 'ferris': {
+      const R = p.h ?? 12, cy = R + 2.4;
+      const rad = 'c:#e2e8f0', strut = 'c:#94a3b8';
+      for (const sz of [-1, 1]) {
+        for (const sx of [-1, 1]) b.add(strut, T.box, M(x + sx * 1.9, cy / 2, z + sz * 0.5, 0, 0.22, cy * 1.02, 0.22, 0, sx * 0.06));
+        b.add('c:#64748b', T.box, M(x, 0.5, z + sz * 1.6, 0, 5.2, 0.5, 0.9));
+      }
+      b.add('c:#475569', T.cyl, M(x, cy, z, 0, 0.42, 3.0, 0.42, 0, Math.PI / 2));
+      const SEG = 24;
+      for (let k = 0; k < SEG; k++) {
+        const a0 = (k / SEG) * Math.PI * 2, a1 = ((k + 1) / SEG) * Math.PI * 2;
+        const mx = (a0 + a1) / 2;
+        b.add(rad, T.box, M(x, cy + Math.sin(mx) * R, z + Math.cos(mx) * R, 0, 0.24, 0.3, (2 * Math.PI * R) / SEG + 0.16, mx, 0));
+      }
+      for (let k = 0; k < 8; k++) {
+        const a = (k / 8) * Math.PI * 2;
+        b.add(strut, T.box, M(x, cy + Math.sin(a) * R / 2, z + Math.cos(a) * R / 2, 0, 0.16, R, 0.16, a, 0));
+        // кабинка
+        const gx = x, gy = cy + Math.sin(a) * R - 0.9, gz = z + Math.cos(a) * R;
+        b.add(k % 2 ? 'c:#f97316' : 'c:#22c55e', T.box, M(gx, gy, gz, 0, 1.7, 1.5, 1.3));
+        b.add('c:#0f172a', T.box, M(gx, gy + 0.5, gz, 0, 1.5, 0.7, 0.1));
+      }
+      b.add('glow:#fbbf24', T.sphere, M(x, cy + R + 0.4, z, 0, 0.35, 0.35, 0.35));
+      break;
+    }
+    // карусель: платформа, пёстрый навес-шатёр, лошадки и фонарики
+    case 'carouselbig': {
+      const R = (p.w ?? 13) / 2, h = p.h ?? 8;
+      b.add('c:#b91c1c', T.cylB, M(x, 0.15, z, 0, R, 0.35, R), 2);
+      b.add('c:#f8fafc', T.cylB, M(x, 0.5, z, 0, R * 0.93, 0.12, R * 0.93), 2);
+      b.add('c:#eab308', T.cylB, M(x, 0.4, z, 0, 0.42, h - 0.6, 0.42), 2);
+      // навес: конус + полосы
+      b.add('c:#dc2626', T.cone, M(x, h - 2.4, z, 0, R * 1.02, 2.6, R * 1.02), 2);
+      for (let k = 0; k < 12; k++) {
+        const a = (k / 12) * Math.PI * 2;
+        b.add('c:#f8fafc', T.box, M(x + Math.cos(a) * R * 0.72, h - 2.1, z + Math.sin(a) * R * 0.72, -a, 0.5, 2.0, 0.14, 0, 0.36));
+      }
+      b.add('glow:#fbbf24', T.sphere, M(x, h + 0.35, z, 0, 0.4, 0.4, 0.4));
+      // лошадки
+      for (let k = 0; k < 6; k++) {
+        const a = (k / 6) * Math.PI * 2;
+        const hx = x + Math.cos(a) * R * 0.62, hz = z + Math.sin(a) * R * 0.62;
+        b.add(k % 2 ? 'c:#f8fafc' : 'c:#7c3aed', T.box, M(hx, 1.5, hz, -a, 1.5, 0.9, 0.55));
+        b.add('c:#f1f5f9', T.box, M(hx + Math.cos(a) * 0.75, 1.95, hz + Math.sin(a) * 0.75, -a, 0.55, 0.55, 0.4));
+        b.add('c:#eab308', T.box, M(hx, 1.05, hz, -a, 0.14, 0.9, 0.14));
+      }
+      break;
+    }
+    // башня свободного падения
+    case 'droptower': {
+      const H = p.h ?? 22;
+      b.add('c:#334155', T.cylB, M(x, 0.15, z, 0, 1.5, 0.5, 1.5), 2);
+      b.add('c:#64748b', T.box, M(x, 0.6, z, 0, 1.0, H - 0.6, 1.0));
+      b.add('c:#dc2626', T.box, M(x, H * 0.55, z, 0, 1.9, 0.9, 1.9));   // кабина
+      for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const)
+        b.add('c:#f8fafc', T.box, M(x + sx * 0.7, H * 0.55 + 0.75, z + sz * 0.7, 0, 0.3, 0.5, 0.3));
+      b.add('c:#1e293b', T.box, M(x, H, z, 0, 2.6, 0.7, 2.6));
+      b.add('glow:#ef4444', T.sphere, M(x, H + 0.7, z, 0, 0.34, 0.34, 0.34));
+      break;
+    }
+    // американские горки: две рельсы по профилю с горкой, опоры, станция и вагонетки
+    case 'coaster': {
+      const len = p.w ?? 52, H = p.h ?? 9;
+      const x0 = x - len / 2, x1 = x + len / 2;
+      const prof = (t: number) => 1.2 + Math.sin(Math.PI * Math.min(1, Math.max(0, t))) * H;   // горка посередине
+      const N2 = 26;
+      for (let k = 0; k < N2; k++) {
+        const t0 = k / N2, t1 = (k + 1) / N2;
+        const px0 = x0 + (x1 - x0) * t0, px1 = x0 + (x1 - x0) * t1;
+        const y0 = prof(t0), y1 = prof(t1);
+        const midx = (px0 + px1) / 2, midy = (y0 + y1) / 2, seg = Math.hypot(px1 - px0, y1 - y0) + 0.1;
+        const ang = Math.atan2(y1 - y0, px1 - px0);
+        for (const sz of [-0.65, 0.65]) {
+          b.add('c:#f59e0b', T.box, M(midx, midy, z + sz, 0, seg, 0.16, 0.16, 0, ang));
+          b.add('c:#fbbf24', T.box, M(midx, midy - 0.28, z + sz, 0, seg, 0.1, 0.1, 0, ang));
+        }
+        if (k % 2 === 0) b.add('c:#94a3b8', T.box, M(midx, midy / 2, z, 0, 0.24, midy, 1.5));
+      }
+      // станция и вагонетки
+      b.add('c:#7f1d1d', T.box, M(x0 + 3, 1.0, z, 0, 7, 0.3, 3.2, 0, 0.05));
+      for (let k = 0; k < 3; k++) {
+        const t = 0.12 + k * 0.05;
+        b.add(k === 0 ? 'c:#dc2626' : 'c:#1e293b', T.box, M(x0 + (x1 - x0) * t, prof(t) + 0.35, z, 0, 2.3, 0.75, 1.4, 0, Math.atan2(prof(t + 0.01) - prof(t), (x1 - x0) * 0.01)));
+      }
+      addFenceLine(b, x0, z - 1.9, x1, z - 1.9, 1.1);
+      break;
+    }
+    // мини-пруд: каменный бортик, вода, кувшинки и камыш
+    case 'pond': {
+      const R = p.h ?? 7.5;
+      // берег: невысокий земляной диск, внутри — вода, по кромке — камни (не сплошной блин!)
+      b.add('c:#5b5f52', T.cylB, M(x, 0.15, z, 0, R + 0.95, 0.08, R + 0.95), 2);
+      b.add('water', T.cylB, M(x, 0.19, z, 0, R, 0.14, R), 2);
+      for (let k = 0; k < 24; k++) {
+        const a = (k / 24) * Math.PI * 2;
+        b.add('c:#a8a29e', T.box, M(x + Math.cos(a) * (R + 0.1), 0.3, z + Math.sin(a) * (R + 0.1), -a, 1.1, 0.34, 0.62));
+      }
+      for (let k = 0; k < 14; k++) {
+        const a = (k / 14) * Math.PI * 2 + 0.2, rr = R * (0.35 + ((k * 17) % 10) / 18);
+        b.add('c:#166534', T.circle, M(x + Math.cos(a) * rr, 0.34, z + Math.sin(a) * rr, 0, 0.55, 0.55, 1, -Math.PI / 2));
+      }
+      for (let k = 0; k < 22; k++) {
+        const a = (k / 22) * Math.PI * 2, rr = R - 0.2;
+        b.add('c:#4d7c0f', T.cylB, M(x + Math.cos(a) * rr, 0.3, z + Math.sin(a) * rr, 0, 0.05, 0.9 + ((k * 7) % 5) / 10, 0.05));
+      }
+      break;
+    }
     default: break;
   }
+}
+
+/** простая оградка из столбиков и двух прожилин — для аттракционов */
+function addFenceLine(b: Batcher, x0: number, z0: number, x1: number, z1: number, h: number) {
+  const len = Math.hypot(x1 - x0, z1 - z0);
+  if (len < 0.5) return;
+  const n = Math.max(1, Math.round(len / 3));
+  for (let k = 0; k <= n; k++) {
+    const t = k / n;
+    b.add('c:#57534e', T.box, M(x0 + (x1 - x0) * t, h / 2, z0 + (z1 - z0) * t, 0, 0.12, h, 0.12));
+  }
+  for (const yy of [h * 0.45, h * 0.9]) b.add('c:#78716c', T.box, M((x0 + x1) / 2, yy, (z0 + z1) / 2, 0, len, 0.09, 0.09));
 }

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import menuBg from '../assets/menu.jpg';
-import { type Settings, defaultSettings } from '../game/config';
+import { type Settings, defaultSettings, PAD_BUTTONS, PAD_DEFAULT, PAD_LABEL } from '../game/config';
+
+
 
 export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   return (
@@ -62,13 +64,13 @@ export function HowTo({ onClose }: { onClose: () => void }) {
       <div className="lg-guide">
         <section><h3>🎯 Цель</h3><p>Живите в Лос-Городе: работайте, покупайте жильё, машины и бизнес, следите за сытостью, жаждой и бодростью. Стартовый капитал — $20 000.</p></section>
         <section><h3>⌨️ Управление на ПК</h3><ul>
-          <li><b>WASD</b> — ходьба / вождение (работает и в русской раскладке), <b>Shift</b> — бег, <b>Ctrl</b> — присесть / встать, <b>Пробел</b> — прыжок; в машине: <b>Пробел + руль</b> — дрифт (очки за занос, без денег)</li>
+          <li><b>WASD</b> — ходьба / вождение (работает и в русской раскладке), <b>Shift</b> — бег, <b>C</b> — присесть / встать, <b>Пробел</b> — прыжок; в машине: <b>Пробел + руль</b> — дрифт (очки за занос, без денег)</li>
           <li><b>Мышь</b> — камера (клик по игре захватывает курсор), <b>колесо</b> — отдаление</li>
           <li>Бой: <b>ЛКМ</b> — удар (серия из 3 ударов: джеб, кросс, хук), <b>ПКМ</b> — блок. С пистолетом: <b>ПКМ</b> — прицел из-за плеча, <b>ЛКМ</b> — выстрел, <b>R</b> — перезарядка</li>
           <li><b>E</b> — любое действие: войти, купить, говорить, а также сесть/выйти из транспорта, <b>F</b> — эмоции и танцы, <b>R</b> — работа у кассы, <b>L</b> — ограбление (нужен пистолет)</li>
           <li><b>1/2</b> — кулаки/пистолет, <b>Tab</b> — планшет, <b>Ё</b> — онлайн/соло, <b>C</b> или <b>Enter</b> — чат (в онлайне), <b>T</b> — радио в машине, <b>I</b> — инвентарь, <b>M</b> — карта, <b>]</b> (Ъ) — промокод, <b>Esc</b> — настройки, <b>PageUp/PageDown</b> — гидравлика (U — прыжок)</li>
           <li>В машине: <b>H</b> — фары, <b>Z</b> — автопилот (электромобили). Мотоцикл и самокат: держите <b>X</b> — вилли/мэньюал (W — выше, S — ниже, перебор = падение), <b>X + тормоз</b> — стоппи. Трюк дольше 1,2 с приносит деньги.</li>
-          <li><b>R</b> — сменить оружие, <b>G</b> — перезарядка, <b>F</b> — анимации и танцы (16 штук: танцы, поклон, честь, разминка и др.), <b>Ctrl</b> — присесть.</li>
+          <li><b>R</b> — смена на работе или смена оружия, <b>G</b> — перезарядка, <b>U</b> — музыка и радио, <b>/</b> — танцы, анимации — в телефоне (💃 Анимации), <b>C</b> — присесть.</li>
           <li><b>Q у стены</b> — прижаться к стене как в GTA: персонаж встаёт вплотную, а <b>A/D</b> двигают его вдоль стены. <b>Пробел</b> — оторваться от стены.</li>
           <li>Оружие: <b>1</b> — кулаки, <b>2–7</b> — пистолет, револьвер, пистолет-пулемёт, дробовик, автомат, снайперская винтовка (если куплены). В машине можно стрелять: <b>ПКМ</b> — прицел, <b>ЛКМ</b> — огонь (и водителю, и пассажиру).</li>
           <li>Передачи: механика — держите <b>Q</b> и жмите <b>1–5</b>, <b>Ё</b> или <b>6</b> — шестая, <b>Q+0</b> — нейтраль. Автомат: <b>Q+1</b> — нейтраль, <b>Q+2</b> — драйв. Тип коробки — в настройках. В нейтрали газ не разгоняет.</li>
@@ -156,6 +158,22 @@ export function SettingsPanel({ value, onChange, onClose, inGame, onExit, onRese
         <label>Масштаб мини-карты</label><Range k="minimapZoom" min={0.5} max={3} step={0.1} fmt={(v) => v.toFixed(1) + '×'} />
         <label>Вращение мини-карты</label><Seg k="minimapRotate" opts={[[true, 'По камере'], [false, 'Север вверху']]} />
         <label>Подсказки в игре</label><Seg k="hints" opts={[['short', 'Коротко'], ['off', 'Выключены']]} />
+        <label>Кнопки справа на телефоне</label>
+        <Seg k="padStyle" opts={[['arc', 'Дугой'], ['grid', 'Сеткой 2×2']]} />
+        <p className="text-xs opacity-70">Нажмите кнопку, чтобы поставить её на панель или убрать. Всё, что не влезло, лежит под «⋯» прямо в игре.</p>
+        <div className="lg-pad-grid">
+          {PAD_BUTTONS.filter((b) => b.group === 'foot').map((b) => {
+            const on = (s.padFoot ?? PAD_DEFAULT.foot).includes(b.id);
+            return <button key={b.id} className={`lg-chip ${on ? 'on' : ''}`} onClick={() => set('padFoot', on ? (s.padFoot ?? PAD_DEFAULT.foot).filter((x) => x !== b.id) : [...(s.padFoot ?? PAD_DEFAULT.foot), b.id])}><span>{b.ico}</span>{PAD_LABEL[b.id] ?? b.id}</button>;
+          })}
+        </div>
+        <label>В машине на телефоне</label>
+        <div className="lg-pad-grid">
+          {PAD_BUTTONS.filter((b) => b.group === 'drive').map((b) => {
+            const on = (s.padDrive ?? PAD_DEFAULT.drive).includes(b.id);
+            return <button key={b.id} className={`lg-chip ${on ? 'on' : ''}`} onClick={() => set('padDrive', on ? (s.padDrive ?? PAD_DEFAULT.drive).filter((x) => x !== b.id) : [...(s.padDrive ?? PAD_DEFAULT.drive), b.id])}><span>{b.ico}</span>{PAD_LABEL[b.id] ?? b.id}</button>;
+          })}
+        </div>
         <p className="text-xs opacity-70">Всё обучение — в «Как играть?» (F1) и в меню «☰» на телефоне.</p>
         {onHelp && <button className="ui-btn sm" onClick={onHelp}>❓ Как играть?</button>}
       </div>}

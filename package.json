@@ -8,7 +8,10 @@
     "build": "vite build",
     "preview": "vite preview",
     "check:world": "esbuild scripts/world-check.ts --bundle --platform=node --format=cjs --outfile=.check/world.cjs --log-level=error && node .check/world.cjs",
-    "check:terrain": "esbuild scripts/terrain-probe.ts --bundle --platform=node --format=cjs --outfile=.check/terrain.cjs --log-level=error && node .check/terrain.cjs"
+    "check:terrain": "esbuild scripts/terrain-probe.ts --bundle --platform=node --format=cjs --outfile=.check/terrain.cjs --log-level=error && node .check/terrain.cjs",
+    "check:keys": "esbuild scripts/keys-check.ts --bundle --platform=node --format=cjs --outfile=.check/keys.cjs --log-level=warning && node .check/keys.cjs",
+    "check:farm": "esbuild scripts/farm-check.ts --bundle --platform=node --format=cjs --outfile=.check/farm.cjs --log-level=error && node .check/farm.cjs",
+    "check:npc": "esbuild scripts/npc-check.ts --bundle --platform=node --format=cjs --outfile=.check/npc.cjs --log-level=error && node .check/npc.cjs"
   },
   "dependencies": {
     "clsx": "2.1.1",

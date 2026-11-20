@@ -324,6 +324,7 @@ export class Combat {
     const P0 = firstP ?? muzzle;
     g.net?.sendEvent({ e: 'shot', o: [r2(muzzle.x), r2(muzzle.y), r2(muzzle.z)], p: [r2(P0.x), r2(P0.y), r2(P0.z)], i: g.interiorKey() });
     g.peds.panic(g.px, g.pz, 30);
+    g.trafficPanic(g.px, g.pz, 55);   // водители рядом жмут газ и уходят от перестрелки
     if (!g.interior && g.policeNear(150)) g.addWanted(1, 'Стрельба');
   }
   private aimAssist(C: THREE.Vector3, dir: THREE.Vector3): THREE.Vector3 | null {

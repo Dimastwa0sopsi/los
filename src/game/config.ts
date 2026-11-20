@@ -94,7 +94,47 @@ export interface Settings {
   autoQuality: boolean;
   /** подсказки в игре: коротко (только действие) или совсем без них — всё в «Как играть?» */
   hints: 'short' | 'off';
+  /** правая панель на телефоне: какие кнопки стоят в дуге и как их раскладывать */
+  padStyle: 'arc' | 'grid';
+  padFoot: string[];
+  padDrive: string[];
 }
+
+/** кнопки правой панели на телефоне: id → подпись и иконка */
+export const PAD_BUTTONS: { id: string; ico: string; sub?: string; name?: string; tap?: string; group: 'foot' | 'drive' }[] = [
+  // пешком
+  { id: 'jump', ico: '⤒', sub: '', name: 'jump', group: 'foot' },
+  { id: 'crouch', ico: '🧎', name: 'crouch', group: 'foot' },
+  { id: 'block', ico: '🛡', name: 'block', group: 'foot' },
+  { id: 'weapon', ico: '⇄', name: 'weapon', group: 'foot' },
+  { id: 'cover', ico: '🧱', name: 'qmod', group: 'foot' },
+  { id: 'reload', ico: '⟳', name: 'reload', group: 'foot' },
+  // за рулём
+  { id: 'drift', ico: '↯', sub: 'дрифт', tap: 'drift', group: 'drive' },
+  { id: 'hydro', ico: '⏫', sub: 'гидро', tap: 'hydro', group: 'drive' },
+  { id: 'handbrake', ico: '🅿', sub: 'ручник', name: 'handbrake', group: 'drive' },
+  { id: 'lights', ico: '💡', name: 'lights', group: 'drive' },
+  { id: 'horn', ico: '📣', name: 'horn', group: 'drive' },
+  { id: 'hazard', ico: '⚠', name: 'hazard', group: 'drive' },
+  { id: 'gearUp', ico: '＋', name: 'gearUp', group: 'drive' },
+  { id: 'gearDown', ico: '－', name: 'gearDown', group: 'drive' },
+  { id: 'wheelie', ico: '🏍', sub: 'вили', name: 'wheelie', group: 'drive' },
+  { id: 'autopilot', ico: '🤖', name: 'autopilot', group: 'drive' },
+  { id: 'exit', ico: '🚪', sub: 'выйти', name: 'enter', group: 'drive' },
+];
+
+/** человеческие подписи кнопок правой панели телефона */
+export const PAD_LABEL: Record<string, string> = {
+  jump: 'Прыжок', crouch: 'Присед', block: 'Блок', weapon: 'Оружие', cover: 'Укрытие', reload: 'Перезарядка',
+  drift: 'Дрифт', hydro: 'Гидро', handbrake: 'Ручник', lights: 'Фары', horn: 'Сигнал', hazard: 'Аварийка',
+  gearUp: 'Передача +', gearDown: 'Передача −', wheelie: 'Вили', autopilot: 'Автопилот', exit: 'Выйти',
+};
+
+/** раскладка по умолчанию: важное в дуге, остальное — в «ещё» */
+export const PAD_DEFAULT = {
+  foot: ['jump', 'crouch', 'weapon', 'cover'],
+  drive: ['drift', 'handbrake', 'lights', 'horn', 'exit'],
+};
 export function defaultSettings(): Settings {
   const mob = isMobileDevice();
   return {
@@ -102,6 +142,7 @@ export function defaultSettings(): Settings {
     renderScale: mob ? 0.68 : 1, shadows: !mob, effects: !mob, traffic: mob ? 0.35 : 0.8,
     peds: mob ? 0.35 : 0.8, volume: 0.6, muted: false, sensitivity: 1, minimapZoom: 1.2,
     minimapRotate: true, transmission: 'auto', autoQuality: true, hints: 'short',
+    padStyle: 'arc', padFoot: [...PAD_DEFAULT.foot], padDrive: [...PAD_DEFAULT.drive],
   };
 }
 export function loadSettings(): Settings {

@@ -16,6 +16,7 @@ import { PedSystem, randomLook, type Ped } from './npc';
 import { buildInterior, interiorForBuilding, type Interior, type InteriorKind } from './interiors';
 import { Sound } from './audio';
 import { Input } from './input';
+import { K } from './keys';
 import { Weather } from './weather';
 import { Radio } from './radio';
 import { allMaterials, disposeTextures, mat, GFX, getTex } from './textures';
@@ -53,7 +54,7 @@ export type SvcKind = 'wash' | 'tire' | 'food' | 'park' | 'slot' | 'pawn' | 'fis
 interface Prompt { text: string; keys: string[]; act: () => void; r?: () => void; l?: () => void }
 interface Debris { obj: THREE.Object3D; vx: number; vy: number; vz: number; wx: number; wz: number; rest: boolean }
 type TruckOrder = { name: string; x: number; z: number; cargo: string; pay: number; dist: number };
-type Job = { type: 'bus'; line: number; next: number; riders: number; earned: number; bus: Vehicle; stage: 'toBus' | 'drive' } | { type: 'farm'; stage: 'pickup' | 'feed' | 'eggs' | 'crate'; trough: number; cycles: number } | { type: 'truck'; stage: 'toTruck' | 'drive' | 'return'; order: TruckOrder; drop: { x: number; z: number }; truck: Vehicle } | { type: 'factory'; stage: 'pickup' | 'load'; truck: number; trips: number } | { type: 'courier'; stage: 'pickup' | 'drop'; from: Building; to: Building; pay: number } | { type: 'combine'; earned: number; strips: boolean[] } | { type: 'shift'; b: number; served: number; cust: Ped | null; stage: 'enter' | 'wait' | 'leave'; t: number }
+type Job = { type: 'bus'; line: number; next: number; riders: number; earned: number; bus: Vehicle; stage: 'toBus' | 'drive' } | { type: 'farm'; stage: 'pickup' | 'feed' | 'eggs' | 'crate'; trough: number; fed: boolean[]; cycles: number } | { type: 'truck'; stage: 'toTruck' | 'drive' | 'return'; order: TruckOrder; drop: { x: number; z: number }; truck: Vehicle } | { type: 'factory'; stage: 'pickup' | 'load'; truck: number; trips: number } | { type: 'courier'; stage: 'pickup' | 'drop'; from: Building; to: Building; pay: number } | { type: 'combine'; earned: number; strips: boolean[] } | { type: 'shift'; b: number; served: number; cust: Ped | null; stage: 'enter' | 'wait' | 'leave'; t: number }
   | { type: 'doctor'; served: number; phase: 'idle' | 'pick' | 'treat'; need: number; timer: number; cust: Ped | null; t: number };
 
 export interface GameCallbacks {
@@ -628,37 +629,31 @@ export class Game {
   // ================= ГЛОБАЛЬНЫЕ КЛАВИШИ =================
   private globalKey(code: string) {
     if (this.intro) return;
-    if (code === 'Tab') { this.togglePanel({ type: 'phone' }); return; }
-    // Enter или C — чат
-    if ((code === 'Enter' || code === 'KeyC') && !this.panel && !this.camMode) { this.input.releaseAll(); this.input.unlock(); this.chatFocus?.(); return; }
-    // / — танцы: быстрый доступ к 12 танцам (F — все анимации)
-    if (code === 'Slash' && !this.camMode) {
+    if (code === K.phone) { this.togglePanel({ type: 'phone' }); return; }
+    // T — чат (Enter работает только как «отправить» внутри поля ввода)
+    if (code === K.chat && !this.panel && !this.camMode) { this.input.releaseAll(); this.input.unlock(); this.chatFocus?.(); return; }
+    // / — танцы: быстрый доступ к 12 танцам
+    if (code === K.dances && !this.camMode) {
       if (this.panel?.type === 'emotes' && this.panel.dance) { this.closePanel(); return; }
       if (!this.panel && !this.inVeh) { this.openPanel({ type: 'emotes', dance: true }); return; }
       if (!this.panel && this.inVeh) { this.toast('🕺 Танцевать можно пешком — выйдите из машины'); return; }
     }
-    // F — эмоции (открывает и закрывает колесо анимаций)
-    if (code === 'KeyF' && !this.camMode) {
-      if (this.panel?.type === 'emotes') { this.closePanel(); return; }
-      if (!this.panel && !this.inVeh) { this.openPanel({ type: 'emotes' }); return; }
-      if (!this.panel && this.inVeh) { this.toast('💃 Эмоции доступны пешком (F)'); return; }
-    }
-    // T — радио в машине (чат теперь на Enter/C)
-    if (code === 'KeyT' && !this.camMode) {
+    // F больше не открывает анимации: эмоции живут в телефоне и по /
+    // U — музыка: радио играет и в машине, и пешком
+    if (code === K.music && !this.camMode) {
       if (this.panel?.type === 'radio') { this.closePanel(); return; }
-      if (!this.panel && this.inVeh && !this.passenger) { this.openPanel({ type: 'radio' }); return; }
-      if (!this.panel) { this.toast('📻 Радио включается в машине (T)'); return; }
+      if (!this.panel) { this.openPanel({ type: 'radio' }); return; }
     }
-    if (code === 'Backquote' && !this.input.keys.has('KeyQ')) { if (!this.panel || this.panel.type === 'phone' || this.panel.type === 'onlineJoin') { if (this.panel?.type === 'onlineJoin') this.closePanel(); else this.toggleOnline(); } return; }
-    if (code === 'Escape' && this.camMode && !this.panel) { this.stopCamera(); return; }
+    if (code === K.online && !this.input.keys.has(K.cover)) { if (!this.panel || this.panel.type === 'phone' || this.panel.type === 'onlineJoin') { if (this.panel?.type === 'onlineJoin') this.closePanel(); else this.toggleOnline(); } return; }
+    if (code === K.pause && this.camMode && !this.panel) { this.stopCamera(); return; }
     // F1 — «Как играть?»: вся справка и обучение живут здесь, а не поверх игры
-    if (code === 'F1') { if (this.panel?.type === 'help') this.closePanel(); else this.openPanel({ type: 'help' }); return; }
-    if (code === 'Escape') { if (this.panel) this.closePanel(); else this.openPanel({ type: 'settings' }); return; }
-    if (this.panel && this.panel.type !== 'map') { if (code === 'KeyI' && this.panel.type === 'inventory') this.closePanel(); return; }
-    if (code === 'KeyV') { this.toggleFirstPerson(); return; }
-    if (code === 'KeyI') this.togglePanel({ type: 'inventory' });
-    else if (code === 'KeyM') this.togglePanel({ type: 'map', mode: 'waypoint' });
-    else if (code === 'BracketRight') this.togglePanel({ type: 'promo' });
+    if (code === K.help) { if (this.panel?.type === 'help') this.closePanel(); else this.openPanel({ type: 'help' }); return; }
+    if (code === K.pause) { if (this.panel) this.closePanel(); else this.openPanel({ type: 'settings' }); return; }
+    if (this.panel && this.panel.type !== 'map') { if (code === K.inventory && this.panel.type === 'inventory') this.closePanel(); return; }
+    if (code === K.camera) { this.toggleFirstPerson(); return; }
+    if (code === K.inventory) this.togglePanel({ type: 'inventory' });
+    else if (code === K.map) this.togglePanel({ type: 'map', mode: 'waypoint' });
+    else if (code === K.promo) this.togglePanel({ type: 'promo' });
   }
   togglePanel(p: Panel) { if (this.panel && this.panel.type === p.type) this.closePanel(); else this.openPanel(p); }
   openPanel(p: Panel) { this.panel = p; this.input?.releaseAll(); if (this.input) this.input.enabled = false; this.input?.unlock(); this.cb.onPanel(p); this.sound.click(); }
@@ -725,7 +720,8 @@ export class Game {
     const vehs = this.vehicles.filter((v) => Math.abs(v.speed) > 4 && Math.abs(v.x - this.px) + Math.abs(v.z - this.pz) < 150).map((v) => ({ x: v.x, z: v.z, speed: v.speed, r: v.spec.len / 2, mine: v === this.inVeh && !this.passenger }));
     this.peds.update(dt, performance.now() / 1000, {
       px: this.px, pz: this.pz, py: this.py, playerVisible: !this.inVeh && !this.rideRemote && this.state.health > 0, inside, viewDist: this.drawDist(),
-      suppress: (x, z) => this.suppressed(x, z), lightState: (n, ew) => this.lightState(n, ew), hitPlayer: (d, fx, fz, heavy) => this.combat.takeHit(d, fx, fz, { heavy }),
+      suppress: (x, z) => this.suppressed(x, z), lightState: (n, ew) => this.lightState(n, ew),
+      hitPlayer: (d, fx, fz, heavy) => { this.trafficPanic(fx, fz, 45); return this.combat.takeHit(d, fx, fz, { heavy }); },
       foePos: (id) => { const r = this.remotes.get(id); return r && r.visible && r.hp > 0 && !r.inVeh ? { x: r.x, z: r.z } : null; },
       hitFoe: (id, d, fx, fz, heavy) => this.net?.sendEvent({ e: 'hit', t: id, d: Math.round(d), k: 'fist', hx: r2(fx), hz: r2(fz), heavy }),
       obstacles: (x, z) => this.activeCol.query(x, z, 0.3).some((b) => b.y1 > 0.5), vehicles: vehs,
@@ -838,13 +834,13 @@ export class Game {
   private handleInput(dt: number) {
     const I = this.input;
     if (this.camMode) {
-      if (I.mouseClicked || I.pressed('Space') || I.vPressed('shutter')) this.takePhoto();
-      if (I.pressed('KeyV')) this.switchCamera();
+      if (I.mouseClicked || I.pressed(K.jump) || I.vPressed('shutter')) this.takePhoto();
+      if (I.pressed(K.camera)) this.switchCamera();
       const cs = this.settings.sensitivity * (this.mobile ? 0.006 : 0.0028);
       if (I.lookDX || I.lookDY) { this.camYaw -= I.lookDX * cs; this.camPitch = clamp(this.camPitch + I.lookDY * cs, -0.6, 0.9); }
       return;
     }
-    const qHeld = I.down('KeyQ') || I.vDown('qmod');
+    const qHeld = I.down(K.cover) || I.vDown('qmod');
     const v = this.inVeh;
     // оружие
     if (!qHeld) {
@@ -867,31 +863,31 @@ export class Game {
         if (I.vPressed('gearUp')) { if (this.settings.transmission === 'manual') v.gear = Math.min(6, v.gear + 1); else v.autoMode = 'D'; this.sound.gear(); }
         if (I.vPressed('gearDown')) { if (this.settings.transmission === 'manual') v.gear = Math.max(0, v.gear - 1); else v.autoMode = 'N'; this.sound.gear(); }
       }
-      if (I.pressed('KeyH') || I.vPressed('lights')) { v.model.setLights(!v.model.lightsOn); v.lightsUserOff = !v.model.lightsOn; }
-      if (I.pressed('KeyK') || I.vPressed('race')) this.startRace();
-      if (I.pressed('KeyN') || I.vPressed('horn')) {
+      if (I.pressed(K.lights) || I.vPressed('lights')) { v.model.setLights(!v.model.lightsOn); v.lightsUserOff = !v.model.lightsOn; }
+      if (I.pressed(K.race) || I.vPressed('race')) this.startRace();
+      if (I.pressed(K.horn) || I.vPressed('horn')) {
         this.sound.horn();
         this.peds.panic(v.x, v.z, 22);
       }
-      if (I.pressed('KeyO') || I.vPressed('hazard')) {
+      if (I.pressed(K.hazard) || I.vPressed('hazard')) {
         v.model.setHazard(!v.model.hazards);
         this.toast(v.model.hazards ? 'Аварийка включена' : 'Аварийка выключена');
         this.sound.click();
       }
-      if (I.pressed('KeyZ') || I.vPressed('autopilot')) this.toggleAutopilot();
+      if (I.pressed(K.autopilot) || I.vPressed('autopilot')) this.toggleAutopilot();
     }
     // E — универсальная клавиша действия: сесть/выйти из транспорта ИЛИ контекстное действие.
     // Если на это нажатие произошёл вход/выход — контекст не дёргаем, чтобы не было двойных срабатываний.
-    const wantAct = I.pressed('KeyE') || I.vPressed('enter');
+    const wantAct = I.pressed(K.interact) || I.vPressed('enter');
     const vehBefore = this.inVeh, rideBefore = this.rideRemote;
     if (wantAct) { if (this.inVeh) this.exitVehicle(); else if (this.rideRemote) this.exitRemoteRide(); else this.tryEnterVehicle(); }
     const switched = this.inVeh !== vehBefore || this.rideRemote !== rideBefore;
-    const eKey = ((!switched && I.pressed('KeyE')) && !(v && v.isHeli)) || I.vPressed('interact');
+    const eKey = ((!switched && I.pressed(K.interact)) && !(v && v.isHeli)) || I.vPressed('interact');
     if (eKey && this.prompt) this.prompt.act();
-    if ((I.pressed('KeyR') || I.vPressed('work')) && this.prompt?.r) this.prompt.r();
-    else if (I.pressed('KeyR') && !this.lying) this.cycleWeapon();
-    // эмоции переехали на F (см. globalKey — работает даже при открытой панели)
-    if ((I.pressed('KeyL') || I.vPressed('rob')) && this.prompt?.l) this.prompt.l();
+    if ((I.pressed(K.work) || I.vPressed('work')) && this.prompt?.r) this.prompt.r();
+    else if (I.pressed(K.work) && !this.lying) this.cycleWeapon();
+    // эмоции открываются из телефона и по / (отдельной клавиши больше нет)
+    if ((I.pressed(K.rob) || I.vPressed('rob')) && this.prompt?.l) this.prompt.l();
     if (I.vPressed('phone')) this.togglePanel({ type: 'phone' });
     if (I.vPressed('inventory')) this.togglePanel({ type: 'inventory' });
     if (I.vPressed('map')) this.togglePanel({ type: 'map', mode: 'waypoint' });
@@ -909,7 +905,7 @@ export class Game {
     const I = this.input; const cb = this.combat;
     if (!cb.driveBy) { cb.updateFx(0); return; }
     const panelOpen = !!this.panel;
-    cb.update(dt, { attack: !panelOpen && (I.mouseClicked || I.vPressed('attack') || I.vDown('fire')), hold: !panelOpen && (I.mouseDown || I.vDown('fire')), alt: I.rmb || I.vDown('aim'), reload: I.pressed('KeyG') || I.vPressed('reload'), moving: true, moveDir: null });
+    cb.update(dt, { attack: !panelOpen && (I.mouseClicked || I.vPressed('attack') || I.vDown('fire')), hold: !panelOpen && (I.mouseDown || I.vDown('fire')), alt: I.rmb || I.vDown('aim'), reload: I.pressed(K.reload) || I.vPressed('reload'), moving: true, moveDir: null });
     if (this.player.item !== this.weapon) this.player.setItem(this.weapon);
     if (cb.aiming || performance.now() - cb.lastShotT < 1200) {
       const rel = clamp(angleDiff(v.heading, this.camYaw), -1.9, 1.9);
@@ -969,11 +965,11 @@ export class Game {
     const mv = I.move();
     if (this.wallJumpT > 0) this.wallJumpT = Math.max(0, this.wallJumpT - dt);
     // Q — встать спиной к стене / выйти из укрытия (как в GTA V)
-    if (I.pressed('KeyQ') || I.vPressed('qmod')) {
+    if (I.pressed(K.cover) || I.vPressed('qmod')) {
       if (this.coverOn) this.exitCover();
       else if (!this.panel && !this.carrying && !this.crouch) this.enterCover();
     }
-    if (I.pressed('ControlLeft') || I.vPressed('crouch')) { this.crouch = !this.crouch; } // C отдан чату — присед на Ctrl
+    if (I.pressed(K.crouch) || I.vPressed('crouch')) { this.crouch = !this.crouch; } // присед — C
     let run = (I.down('ShiftLeft') || I.vDown('run')) && !this.carrying;
     if (run && this.crouch && (I.down('ShiftLeft'))) this.crouch = false;
     if (this.crouch) run = false;
@@ -1032,7 +1028,7 @@ export class Game {
     // прыжок и гравитация
     const ground = this.activeCol.groundAt(this.px, this.pz, this.py, 0.45, 0.25);
     const onGround = this.py <= ground + 0.05;
-    if (onGround && (I.pressed('Space') || I.vPressed('jump'))) {
+    if (onGround && (I.pressed(K.jump) || I.vPressed('jump'))) {
       if (this.coverOn) {
         // отскок из укрытия: прыжок с шагом от стены (Пробел)
         const out = this.wall ? { x: this.wall.nx, z: this.wall.nz } : { x: Math.sin(this.pa), z: Math.cos(this.pa) };
@@ -1048,8 +1044,8 @@ export class Game {
     if (this.py <= ground) { this.py = ground; this.pvy = 0; }
     if (inWater) {
       const pool = !this.interior ? this.poolAt(this.px, this.pz) : null;
-      // держимся у поверхности; нажатый присед (Ctrl / кнопка) уводит ко дну
-      const diveKey = I.down('ControlLeft') || I.vDown('crouch');
+      // держимся у поверхности; зажатый присед (C / кнопка) уводит ко дну
+      const diveKey = I.down(K.crouch) || I.down('ControlLeft') || I.vDown('crouch');
       this.diveT = clamp(this.diveT + (diveKey ? dt * 1.9 : -dt * 1.5), 0, 1);
       const surf = this.waterSurfaceAt(this.px, this.pz) - this.py - 0.16;
       const bottom = surf - Math.max(0, Math.min(depth, 3.6) - 0.5);
@@ -1059,7 +1055,7 @@ export class Game {
       this.dip += (target - this.dip) * Math.min(1, dt * 5);
       if (!this.swimHinted && !pool && depth > 1.6) {
         this.swimHinted = true;
-        this.toast('🏊 Глубоко! Зажмите Ctrl (кнопка «присед») — нырнуть ко дну');
+        this.toast('🏊 Глубоко! Зажмите C (кнопка «присед») — нырнуть ко дну');
       }
     } else if (wading) {
       // бредём по дну: ступни стоят на грунте под водой
@@ -1073,7 +1069,7 @@ export class Game {
     // бой
     const attack = (I.mouseClicked || I.vPressed('attack') || (cb.gunOut && I.vDown('fire'))) && !this.carrying;
     const alt = I.rmb || I.vDown('block');
-    const reload = I.pressed('KeyG') || I.vPressed('reload');
+    const reload = I.pressed(K.reload) || I.vPressed('reload');
     if (I.vPressed('aim')) cb.mobileAim = !cb.mobileAim;
     cb.update(dt, { attack, hold: (I.mouseDown || I.vDown('fire')) && !this.carrying, alt, reload, moving: mag > 0.05, moveDir: mag > 0.05 ? Math.atan2(dx, dz) : null });
     if (cb.aiming || (cb.gunOut && performance.now() - cb.lastShotT < 900)) this.pa += angleDiff(this.pa, this.camYaw) * Math.min(1, dt * 18);
@@ -1247,7 +1243,7 @@ export class Game {
   exitVehicle(force = false) {
     this.cruise = 0;
     this.driftAssist = false;
-    this.radio.stop();
+    // музыка не глохнет при выходе из машины: радио играет и пешком (U)
     const v = this.inVeh; if (!v) return;
     if (!force) {
       if (v.isHeli && !heliLanded(v, this.col)) { this.toast('Сначала посадите вертолёт'); return; }
@@ -1292,10 +1288,10 @@ export class Game {
       return;
     }
     const mv = I.move();
-    let throttle = Math.max(0, Math.max(mv.y, I.vDown('gas') ? 1 : 0, I.down('KeyW') || I.down('ArrowUp') ? 1 : 0));
+    let throttle = Math.max(0, Math.max(mv.y, I.vDown('gas') ? 1 : 0, I.down(K.forward) || I.down('ArrowUp') ? 1 : 0));
     const brake = Math.max(0, Math.max(-mv.y, I.vDown('brake') ? 1 : 0));
     // круиз-контроль: J или кнопка в спидометре — держим скорость сами
-    if ((I.pressed('KeyJ') || I.vPressed('cruise')) && !v.isHeli && !v.isScooter) {
+    if ((I.pressed(K.cruise) || I.vPressed('cruise')) && !v.isHeli && !v.isScooter) {
       this.cruise = this.cruise > 0 ? 0 : Math.max(4.5, Math.abs(v.speed));
       this.toast(this.cruise > 0 ? `Круиз-контроль: ${Math.round(this.cruise * 3.6)} км/ч` : 'Круиз-контроль выключен');
       this.sound.gear();
@@ -1308,8 +1304,8 @@ export class Game {
     }
     const steer = clamp(mv.x + (I.vDown('steerR') ? 1 : 0) - (I.vDown('steerL') ? 1 : 0), -1, 1);
     let up = 0;
-    if (v.isHeli) { if (I.down('KeyQ') || I.vDown('up')) up += 1; if (I.down('KeyE') || I.vDown('down')) up -= 1; }
-    const wheelie = (I.down('KeyX') || I.vDown('wheelie')) && v.canStunt;
+    if (v.isHeli) { if (I.down(K.heliUp) || I.vDown('up')) up += 1; if (I.down(K.heliDown) || I.vDown('down')) up -= 1; }
+    const wheelie = (I.down(K.wheelie) || I.vDown('wheelie')) && v.canStunt;
     let res: DriveResult = { impact: 0, nx: 0, nz: 0 };
     if (this.autopilot && v.ai) {
       if (brake > 0.5 || Math.abs(steer) > 0.5) { this.setAutopilot(false); this.toast('Автопилот отключён'); }
@@ -1321,14 +1317,14 @@ export class Game {
         v.gear = v.speed < 0.5 ? 1 : Math.min(6, 1 + Math.floor(v.speed / (v.spec.maxSpeed / 6)));
       }
     }
-    // гидравлика: PageUp/PageDown — высота подвески, U — прыжок кузова
+    // гидравлика: PageUp/PageDown — высота подвески, Y — прыжок кузова (U занят музыкой)
     if (v.canHydro) {
-      if (I.pressed('KeyU') || I.vPressed('hydroJump')) { v.hydroJump(); this.sound.gear(); }
+      if (I.pressed(K.hydroJump) || I.vPressed('hydroJump')) { v.hydroJump(); this.sound.gear(); }
       if (I.pressed('PageUp') || I.vPressed('hydroUp')) this.hydroUp();
       if (I.pressed('PageDown') || I.vPressed('hydroDown')) this.hydroDown();
     }
     v.updateHydro(dt);
-    const hbKey = I.down('Space') || I.vDown('handbrake');
+    const hbKey = I.down(K.handbrake) || I.vDown('handbrake');
     const assistHb = this.driftAssist && Math.abs(v.speed) > 8 && Math.abs(steer) > 0.15;
     const buzzWobble = this.buzzT > 0 ? Math.sin(performance.now() / 260) * 0.05 * Math.min(1, this.buzzT / 20) : 0;
     const steerIn = clamp((this.driftAssist ? steer * 1.25 : steer) + buzzWobble, -1, 1);
@@ -2203,9 +2199,19 @@ export class Game {
     // работа: ферма «Зорька»
     if (this.job?.type === 'farm') {
       const j = this.job, F = this.L.livestock;
-      if (j.stage === 'pickup' && Math.hypot(F.feed.x - px, F.feed.z - pz) < 3) return { text: 'E — взять мешок корма', keys: ['E'], act: () => { j.stage = 'feed'; this.carrying = true; this.toast(`Насыпьте корм в кормушку №${j.trough + 1}`); } };
-      if (j.stage === 'feed') { const t = F.troughs[j.trough]; if (Math.hypot(t.x - px, t.z - pz) < 2.4) return { text: `E — насыпать корм (кормушка №${j.trough + 1})`, keys: ['E'], act: () => this.farmStep() }; }
-      if (j.stage === 'eggs' && Math.hypot(F.coop.x - px, F.coop.z - pz) < 2.8) return { text: 'E — собрать яйца в курятнике', keys: ['E'], act: () => { j.stage = 'crate'; this.carrying = true; this.toast('Отнесите лоток с яйцами к ящику у конторы'); } };
+      if (j.stage === 'pickup' && Math.hypot(F.feed.x - px, F.feed.z - pz) < 3) {
+        const next = j.fed.findIndex((f) => !f);
+        return { text: 'E — взять мешок корма', keys: ['E'], act: () => { j.stage = 'feed'; j.trough = next < 0 ? 0 : next; this.carrying = true; this.toast(`Насыпьте корм в кормушку №${j.trough + 1}`); } };
+      }
+      if (j.stage === 'feed') {
+        // ближайшая пустая кормушка
+        let best = -1, bd = 2.9;
+        // кормушка — это поилка с коллайдером: считаем расстояние до её центра,
+        // а не до точки у стены, иначе подойти «с юга» было невозможно
+        F.troughs.forEach((t, i) => { if (j.fed[i]) return; const d = Math.hypot(t.x - px, t.z + 1.4 - pz); if (d < bd) { bd = d; best = i; } });
+        if (best >= 0) return { text: `E — насыпать корм (кормушка №${best + 1})`, keys: ['E'], act: () => this.farmStep(best) };
+      }
+      if (j.stage === 'eggs' && Math.hypot(F.coop.x - px, F.coop.z - pz) < 3.6) return { text: 'E — собрать яйца в курятнике', keys: ['E'], act: () => { j.stage = 'crate'; this.carrying = true; this.toast('Отнесите лоток с яйцами к ящику у конторы'); } };
       if (j.stage === 'crate' && Math.hypot(F.crate.x - px, F.crate.z - pz) < 2.6) return { text: 'E — сдать яйца', keys: ['E'], act: () => this.farmStep() };
     }
     // работа
@@ -2247,7 +2253,12 @@ export class Game {
         const ok = this.state.money >= 50000;
         return { text: ok ? `E — ${b.name}: добро пожаловать 🕴` : `🕴 Фейсконтроль: вход при $${(50000).toLocaleString('ru')} на руках`, keys: ['E'], act: () => { if (!ok) { this.sound.error(); this.toast('🕴 Охранник скрещивает руки: «Дресс-код простой — пятьдесят тысяч в кармане»'); } else this.enterBuilding(b); } };
       }
-      if (b.kind === 'livestock') return { text: 'E — Ферма «Зорька»: работа на ферме', keys: ['E'], act: () => this.openPanel({ type: 'livestock' }) };
+      if (b.kind === 'livestock') {
+        const zorka = b.name.includes('Зорька');
+        return zorka
+          ? { text: 'E — Ферма «Зорька»: работа на ферме', keys: ['E'], act: () => this.openPanel({ type: 'livestock' }) }
+          : { text: `E — ${b.name}: сюда привозят корм`, keys: ['E'], act: () => this.toast('🪧 Это коровник деревни. Работа на ферме «Зорька» — у конторы на юго-востоке города') };
+      }
       if (b.kind === 'farm') return { text: 'E — Агрохолдинг: работа на комбайне', keys: ['E'], act: () => this.openPanel({ type: 'farm' }) };
       if (b.enter) {
         if (b.kind === 'house' || b.kind === 'vhouse') {
@@ -2647,6 +2658,19 @@ export class Game {
     j.served++; j.stage = 'leave'; this.state.money += 35; this.sound.coin();
     if (j.served >= 5) { this.state.money += 80; this.toast('Смена завершена! $35×5 + бонус $80'); if (j.cust) { const c = j.cust; setTimeout(() => this.peds.peds.includes(c) && this.peds.removePed(c), 3000); } this.job = null; }
     else this.toast(`Покупатель обслужен: +$35 (${j.served}/5)`);
+  }
+  /** Перестрелка рядом: НПС за рулём жмёт газ до 100 км/ч, уходит от опасности
+   *  и не смотрит на светофоры. Когда уехал далеко или время вышло — снова обычная езда. */
+  trafficPanic(x: number, z: number, r = 50) {
+    let n = 0;
+    for (const v of this.vehicles) {
+      if (!v.ai || v === this.inVeh || v.role !== 'traffic') continue;
+      if (Math.hypot(v.x - x, v.z - z) > r) continue;
+      v.ai.panic(x, z, 6 + Math.random() * 4);
+      if (v.dummy) v.model.setHazard(true);
+      n++;
+    }
+    return n;
   }
   /** пед под перекрестием (лучим из камеры) */
   private aimPed(maxD = 40): import('./npc').Ped | null {
@@ -3182,7 +3206,12 @@ export class Game {
   /** цель маршрута GPS */
   gpsTarget(): { x: number; z: number; job: boolean } | null {
     const qt = !this.job && !this.destination ? this.questTarget() : null; if (qt) return { ...qt, job: true };
-    if (this.job?.type === 'farm') { const j = this.job, F = this.L.livestock; const p = j.stage === 'pickup' ? F.feed : j.stage === 'feed' ? F.troughs[j.trough] : j.stage === 'eggs' ? F.coop : F.crate; return { ...p, job: true }; }
+    if (this.job?.type === 'farm') {
+      const j = this.job, F = this.L.livestock;
+      const next = j.fed.findIndex((f) => !f);
+      const p = j.stage === 'pickup' ? F.feed : j.stage === 'feed' ? F.troughs[next < 0 ? 0 : next] : j.stage === 'eggs' ? F.coop : F.crate;
+      return { ...p, job: true };
+    }
     if (this.job?.type === 'truck') { const j = this.job; const p = j.stage === 'toTruck' ? { x: j.truck.x, z: j.truck.z } : j.stage === 'drive' ? j.drop : { x: 1220, z: 488 }; return { ...p, job: true }; }
     if (this.job?.type === 'factory') { const p = this.job.stage === 'pickup' ? this.L.industrial.pickup : { x: this.L.industrial.trucks[this.job.truck].x, z: 570.5 }; return { ...p, job: true }; }
     if (this.job?.type === 'courier') { const b = this.job.stage === 'pickup' ? this.job.from : this.job.to; return { x: b.door.x, z: b.door.z, job: true }; }
@@ -3949,18 +3978,25 @@ export class Game {
   }
   startFarmJob() {
     if (this.job) { this.toast('Сначала завершите текущую работу'); return; }
-    this.job = { type: 'farm', stage: 'pickup', trough: 0, cycles: 0 }; this.closePanel();
+    this.job = { type: 'farm', stage: 'pickup', trough: 0, fed: [false, false, false], cycles: 0 }; this.closePanel();
     this.toast('🐄 Работа на ферме: возьмите мешок корма у стогов сена (метка)');
   }
-  private farmStep() {
+  private farmStep(trough = -1) {
     const j = this.job; if (!j || j.type !== 'farm') return;
     this.carrying = false;
     if (j.stage === 'feed') {
-      this.state.money += 40; this.sound.coin();
-      if (j.trough < 2) { j.trough++; j.stage = 'pickup'; this.toast(`+$40. Следующий мешок — в кормушку №${j.trough + 1}`); }
-      else { j.stage = 'eggs'; this.toast('+$40. Коровы накормлены! Теперь соберите яйца в курятнике'); }
+      // кормить можно любую ещё пустую кормушку: раньше игра требовала строго «следующую»
+      // по счёту, и если игрок путал порядок — подсказка просто исчезала
+      const free = trough >= 0 && !j.fed[trough] ? trough : j.fed.findIndex((f) => !f);
+      if (free < 0) { j.stage = 'eggs'; return; }
+      j.fed[free] = true;
+      this.state.money += 40; this.sound.coin(); this.save();
+      const left = j.fed.filter((f) => !f).length;
+      if (left > 0) { j.stage = 'pickup'; j.trough = j.fed.findIndex((f) => !f); this.toast(`+$40. Осталось кормушек: ${left}. Возьмите следующий мешок у стогов`); }
+      else { j.stage = 'eggs'; j.trough = 0; this.toast('+$40. Коровы накормлены! Теперь соберите яйца в курятнике'); }
     } else if (j.stage === 'crate') {
-      j.cycles++; this.state.money += 70 + 150; this.sound.coin(); j.trough = 0; j.stage = 'pickup';
+      j.cycles++; this.state.money += 70 + 150; this.sound.coin(); this.save();
+      j.trough = 0; j.fed = [false, false, false]; j.stage = 'pickup';
       this.toast(`🥚 Яйца сданы: +$70 и бонус за цикл $150 (циклов: ${j.cycles}). Продолжайте или завершите работу в планшете`);
     }
   }

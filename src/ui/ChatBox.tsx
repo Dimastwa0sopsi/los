@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import type { Game } from '../game/game';
 
-/** мини-окно чата: Enter — написать, 50 команд: /help, /cmds, /pay, /give, /sellhouse … */
+/** мини-окно чата: T — открыть, Enter — отправить. 50 команд: /help, /cmds, /pay, /give, /sellhouse … */
 export function ChatBox({ g, mobile, online }: { g: Game; mobile: boolean; online: boolean }) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
@@ -58,7 +58,7 @@ export function ChatBox({ g, mobile, online }: { g: Game; mobile: boolean; onlin
           {mobile && <button className="x" onPointerDown={(e) => { e.preventDefault(); close(); }}>✕</button>}
         </div>
       ) : mobile ? <button className="chat-open" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); openNow(); }}>💬</button>
-        : <button className="chat-open pc" onClick={openNow} title="Чат (Enter)">💬</button>}
+        : null}
     </div>
   );
 }
