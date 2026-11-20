@@ -151,7 +151,7 @@ export class Combat {
         else { g.sound.punch(); this.blood(ped.x, ped.y + 1.55, ped.z, 3); }
         if (knife) this.blood(ped.x, ped.y + 1.1, ped.z, 4);
       }
-      if (res === 'down' && !g.interior && g.policeNear(80)) g.addWanted(knife ? 2 : 1, knife ? 'Нападение с ножом' : 'Нападение на прохожего');
+      if (res === 'down' && !g.interior && g.policeWitness(80)) g.addWanted(knife ? 2 : 1, knife ? 'Нападение с ножом' : 'Нападение на прохожего');
     }
     for (const r of g.remoteTargets()) {
       const d = Math.hypot(r.x - g.px, r.z - g.pz);

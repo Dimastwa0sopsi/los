@@ -19,6 +19,7 @@ import { Input } from './input';
 import { K } from './keys';
 import { Weather } from './weather';
 import { ParkRides } from './rides';
+import { eyeSees, POLICE_EYE, PED_EYE, type Eye } from './police';
 import { Radio } from './radio';
 import { allMaterials, disposeTextures, mat, GFX, getTex } from './textures';
 import { T, M } from './geom';
@@ -141,7 +142,7 @@ export class Game {
   netPose: { p: string; k: number; pt: number } = { p: 'idle', k: 0, pt: 0 };
   /** админ-заморозка из Colab-панели: персонаж не двигается, камера работает */
   admFreeze = false;
-  crouch = false; editorYaw = 0; chatFocus: (() => void) | null = null;
+  crouch = false; editorYaw = 0; chatFocus: (() => void) | null = null; viewOffsetOn = false;
   rideDist = 0; private pedNetT = 0; private bazaarT = 0;
   private pendingBuy: { slot: number; price: number; seller: number; t: number } | null = null;
   /** сколько стоим на остановке (посадка пассажиров) */
@@ -149,6 +150,10 @@ export class Game {
   combat!: Combat; rideRemote: { id: number; seat: number } | null = null;
   /** аттракционы парка: динамические модели + поездка игрока */
   rides: ParkRides | null = null;
+  /** где полиция в последний раз видела игрока (GTA-стиль: погоня идёт по этой точке) */
+  lastSeen: { x: number; z: number; t: number } | null = null;
+  /** видит ли игрока хоть один полицейский прямо сейчас */
+  seenNow = false;
   rideOn: { id: string; name: string; t: number; dur: number } | null = null;
   lying = false; carrying = false; autopilot = false; destination: { x: number; z: number } | null = null;
   job: Job | null = null; taxi: { v: Vehicle; stage: 'coming' | 'waiting' | 'riding' | 'arrived' | 'leaving'; dist: number; t: number } | null = null;
@@ -1164,7 +1169,7 @@ export class Game {
     if (v.role === 'aicombine') { this.toast('Комбайн занят работой'); return; }
     if (v.role === 'job' && v.spec.body === 'combine') { this.startCombineJob(); }
     if (v.role === 'traffic' || v.role === 'police') {
-      if (v.role === 'police') this.addWanted(2, 'Угон полицейской машины'); else if (this.policeNear(60)) this.addWanted(1, 'Угон автомобиля');
+      if (v.role === 'police') this.addWanted(2, 'Угон полицейской машины'); else if (this.policeWitness(60)) this.addWanted(1, 'Угон автомобиля');
       v.ai = null; v.role = 'traffic'; v.sirens = false; v.speed = 0;
       if (v.dummy) { // водитель выброшен из машины
         v.removeDummy();
@@ -1551,9 +1556,43 @@ export class Game {
     v.model.animate(v.speed * dt, 0); v.sync();
   }
   // ================= ПОЛИЦИЯ =================
+  /** все глаза полиции: патрульные машины и пешие постовые */
+  private policeEyes(): Eye[] {
+    const out: Eye[] = [];
+    for (const v of this.vehicles) {
+      if (v.role !== 'police' || !v.model.group.visible) continue;
+      if (!v.hasDriver && !v.ai) continue;
+      out.push({ x: v.x, z: v.z, y: v.y + 1.55, yaw: v.heading, ...POLICE_EYE });
+    }
+    for (const p of this.peds.peds) {
+      if (p.role !== 'police' || p.state === 'down' || p.state === 'knocked' || p.state === 'gone') continue;
+      out.push({ x: p.x, z: p.z, y: p.y + 1.6, yaw: p.a, ...PED_EYE });
+    }
+    return out;
+  }
+  /** видит ли полиция точку (по умолчанию — игрока) своим сектором обзора */
+  policeSees(tx = this.px, tz = this.pz): boolean {
+    if (this.interior) return false;
+    for (const e of this.policeEyes()) if (eyeSees(this.col, e, tx, tz, this.py + 1.2)) return true;
+    return false;
+  }
+  /** был ли игрок на глазах у полицейского не дальше range — «свидетель преступления» */
+  policeWitness(range: number) {
+    if (this.interior) return false;
+    for (const e of this.policeEyes()) {
+      if (Math.hypot(e.x - this.px, e.z - this.pz) > range) continue;
+      if (eyeSees(this.col, e, this.px, this.pz, this.py + 1.2)) return true;
+    }
+    return false;
+  }
+
   private updatePolice(dt: number) {
     const s = this.state;
     const chasers = this.vehicles.filter((v) => v.role === 'police' && v.sirens);
+    // что полиция видит прямо сейчас: это и есть «поле зрения как в GTA V»
+    this.seenNow = s.wanted > 0 ? this.policeSees() : false;
+    if (s.wanted > 0 && this.seenNow) this.lastSeen = { x: this.px, z: this.pz, t: 0 };
+    if (this.lastSeen) this.lastSeen.t += dt;
     if (s.wanted > 0 && !this.interior) {
       if (chasers.length < s.wanted) {
         const nodes = this.L.nodes.filter((n) => { const d = Math.hypot(n.x - this.px, n.z - this.pz); return d > 110 && d < 220; });
@@ -1561,17 +1600,35 @@ export class Game {
           const n = nodes[Math.floor(this.rng.next() * nodes.length)];
           const v = new Vehicle('police', 'police'); v.place(n.x + 3, n.z + 3, 0); v.hasDriver = true; v.addDummyDriver();
           v.ai = new AIDriver(); v.ai.mode = 'chase'; v.ai.obeyLights = false; v.ai.route = [n.id, this.L.adj[n.id][0].n];
-          v.ai.chaseTarget = () => ({ x: this.inVeh ? this.inVeh.x : this.px, z: this.inVeh ? this.inVeh.z : this.pz });
+          v.ai.chaseTarget = () => {
+            if (this.seenNow || !this.lastSeen) return { x: this.inVeh ? this.inVeh.x : this.px, z: this.inVeh ? this.inVeh.z : this.pz };
+            return { x: this.lastSeen.x, z: this.lastSeen.z };      // потеряли из виду — идём по следу
+          };
           v.sirens = true; this.addVehicle(v);
         }
       }
-      const near = chasers.some((v) => Math.hypot(v.x - this.px, v.z - this.pz) < 120);
-      if (near) this.noPoliceT = 0; else this.noPoliceT += dt;
-      if (this.noPoliceT > 30) { s.wanted--; this.noPoliceT = 0; this.toast(s.wanted ? `Розыск снижен: ${'★'.repeat(s.wanted)}` : 'Вы ушли от погони'); }
+      // розыск спадает только когда полиция потеряла вас из виду (и не слышит сиреной рядом)
+      if (this.seenNow) this.noPoliceT = 0;
+      else this.noPoliceT += dt;
+      if (this.noPoliceT > 22) {
+        s.wanted--; this.noPoliceT = 0;
+        if (!s.wanted) this.lastSeen = null;
+        this.toast(s.wanted ? `Розыск снижен: ${'★'.repeat(s.wanted)}` : 'Вы ушли от погони — полиция потеряла след');
+      }
+      // пешие постовые: увидели разыскиваемого — идут на задержание
+      if (this.seenNow) {
+        for (const p of this.peds.peds) {
+          if (p.role !== 'police' || p.state === 'down' || p.state === 'knocked') continue;
+          const d = Math.hypot(p.x - this.px, p.z - this.pz);
+          if (d < 24 && p.state !== 'fight') { p.state = 'fight'; p.timer = 90; p.foe = undefined; p.attackCd = 0.8; }
+          else if (d > 42 && p.state === 'fight') { p.state = 'walk'; p.timer = 0; }
+        }
+      }
       // задержание
       const slow = this.inVeh ? Math.abs(this.inVeh.speed) < 1.5 : true;
       const close = chasers.some((v) => Math.hypot(v.x - this.px, v.z - this.pz) < 7.5 && Math.abs(v.speed) < 3);
-      if (slow && close) this.bustT += dt; else this.bustT = Math.max(0, this.bustT - dt);
+      const copNear = close || this.peds.peds.some((p) => p.role === 'police' && p.state !== 'down' && Math.hypot(p.x - this.px, p.z - this.pz) < 3.2);
+      if (slow && copNear && (this.seenNow || close)) this.bustT += dt; else this.bustT = Math.max(0, this.bustT - dt);
       if (this.bustT > 3) this.busted();
     } else this.bustT = 0;
     if (s.wanted === 0) for (const v of chasers) { v.sirens = false; v.model.sirens(0); v.ai!.mode = 'wander'; v.ai!.obeyLights = true; v.ai!.route = [nearestNodeFast(this.L, v.x, v.z)]; v.ai!.route.push(this.L.adj[v.ai!.route[0]][0].n); v.ai!.k = 0; v.model.rebuild(); }
@@ -4835,6 +4892,7 @@ export class Game {
     return pos;
   }
   private updateCamera(dt: number) {
+    if (this.viewOffsetOn && this.panel?.type !== 'editor') { this.camera.clearViewOffset(); this.viewOffsetOn = false; }
     if (this.firstPerson && !this.camMode && this.panel?.type !== 'editor') {
       const v = this.inVeh;
       let px = this.px, py = this.py, pz = this.pz, yaw = this.camYaw;
@@ -4891,9 +4949,22 @@ export class Game {
     if (this.panel?.type === 'editor') {
       const a = this.pa + this.editorYaw;
       const wide = window.innerWidth > window.innerHeight;
-      const t = new THREE.Vector3(this.px + (wide ? -Math.cos(a) * 0.55 : 0), this.py + (wide ? 1.05 : 0.75), this.pz + (wide ? Math.sin(a) * 0.55 : 0));
-      this.camera.position.set(this.px + Math.sin(a) * 2.7, this.py + 1.25, this.pz + Math.cos(a) * 2.7);
-      this.camera.lookAt(t); this.followSky(dt);
+      const t = new THREE.Vector3(this.px, this.py + (wide ? 1.0 : 0.95), this.pz);
+      this.camera.position.set(this.px + Math.sin(a) * 2.7, this.py + 1.2, this.pz + Math.cos(a) * 2.7);
+      this.camera.lookAt(t);
+      // панель редактора занимает правую полосу (или низ экрана на телефоне) —
+      // сдвигаем кадр так, чтобы персонаж оставался в свободной части экрана
+      const size = this.renderer.getSize(new THREE.Vector2());
+      const W = size.x || window.innerWidth, H = size.y || window.innerHeight;
+      if (wide) {
+        const panelW = Math.min(400, W * 0.46) + 16;
+        this.camera.setViewOffset(W, H, panelW * 0.5, 0, W, H);
+      } else {
+        const panelH = H * 0.56;
+        this.camera.setViewOffset(W, H, W * 0.06, panelH * 0.62, W, H);
+      }
+      this.viewOffsetOn = true;
+      this.followSky(dt);
       this.player.root.position.set(this.px, this.py, this.pz); this.player.root.rotation.set(0, this.pa, 0); this.player.pose('idle', performance.now() / 1000);
       return;
     }
