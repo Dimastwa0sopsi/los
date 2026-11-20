@@ -1,6 +1,10 @@
 /* Проверка всех интерьеров: каждый тип собирается, спавн не в стене, выход
  * достижим, все точки действий доступны, свет есть. Ловит «мёртвые» комнаты,
  * где игрок застревает между мебелью и стеной.
+ *
+ * Вторая часть — про переделку 0.6.0: у каждого помещения должен быть тамбур
+ * со свободным проходом от входа, свои светильники внутри стен, вывески и
+ * разумное число объектов (чтобы не просаживать кадры).
  *   npm run check:interiors
  */
 import './domstub';
@@ -56,6 +60,18 @@ for (const kind of KINDS) {
   if (!inside(it.spawn.x, it.spawn.z)) problems.push('спавн вне границ');
   if (solidAt(it, it.spawn.x, it.spawn.z, it.spawn.y ?? 0, (it.spawn.y ?? 0) + 1.8)) problems.push('спавн в стене/мебели');
   if (!it.lights.length) problems.push('нет света');
+  // лампы должны быть внутри комнаты, а не за стеной и не в полу
+  const badLight = it.lights.filter((l) => {
+    const p = l.position;
+    return p.x < b.x0 - 0.3 || p.x > b.x1 + 0.3 || p.z < b.z0 - 0.3 || p.z > b.z1 + 0.3 || p.y < 0.6 || p.y > b.h + 0.3;
+  }).length;
+  if (badLight) problems.push(`светильников вне комнаты: ${badLight}`);
+  const area = (b.x1 - b.x0) * (b.z1 - b.z0);
+  const needFix = Math.max(1, Math.floor(area / 40));
+  if (it.stats.fixtures < needFix) problems.push(`мало светильников: ${it.stats.fixtures} на ${Math.round(area)} м²`);
+  if (it.stats.signs < 4) problems.push(`мало вывесок: ${it.stats.signs}`);
+  if (it.stats.doors < 1) problems.push('нет дверей');
+  if (it.stats.meshes > 400) problems.push(`слишком много объектов: ${it.stats.meshes}`);
   const exit = it.acts.find((a) => a.action === 'exit');
   if (!exit) problems.push('нет выхода');
 
@@ -88,9 +104,24 @@ for (const kind of KINDS) {
   const isolated = free ? 1 - open / free : 0;
   if (isolated > 0.28) problems.push(`${Math.round(isolated * 100)}% площади недоступно`);
 
+  // дверной проём и площадка перед ним должны быть свободны, иначе в тамбур не войти
+  const cxm = (b.x0 + b.x1) / 2;
+  let blockedEntry = 0;
+  for (let z = b.z1 - 0.9; z < b.z1 - 0.1; z += CELL / 2) for (let x = cxm - 1.2; x < cxm + 1.2; x += CELL / 2) {
+    if (solidAt(it, x, z, 0, 1.8)) blockedEntry++;
+  }
+  if (blockedEntry) problems.push(`дверной проём заставлен (${blockedEntry} клеток)`);
+  // и сам спавн не должен стоять в мебели с запасом по радиусу
+  let spawnRing = 0;
+  for (let a = 0; a < 8; a++) {
+    const x = it.spawn.x + Math.cos((a / 8) * Math.PI * 2) * 0.55, z = it.spawn.z + Math.sin((a / 8) * Math.PI * 2) * 0.55;
+    if (solidAt(it, x, z, 0, 1.8)) spawnRing++;
+  }
+  if (spawnRing > 2) problems.push(`у спавна тесно (${spawnRing}/8)`);
+
   const size = `${(b.x1 - b.x0).toFixed(0)}×${(b.z1 - b.z0).toFixed(0)} м`;
   if (problems.length) { fail++; console.log(`  ✗ ${kind.padEnd(12)} ${size}: ${problems.join('; ')}`); }
-  else console.log(`  ✓ ${kind.padEnd(12)} ${size}, точек действий ${it.acts.length}, свет ${it.lights.length}`);
+  else console.log(`  ✓ ${kind.padEnd(12)} ${size}, действий ${String(it.acts.length).padStart(2)}, светильников ${it.stats.fixtures}, вывесок ${String(it.stats.signs).padStart(2)}, объектов ${it.stats.meshes}`);
   it.dispose();
 }
 console.log(fail ? `\n✗ проблемных интерьеров: ${fail}` : '\n✓ все интерьеры проходимы и освещены');
