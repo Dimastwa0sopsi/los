@@ -125,6 +125,13 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
   const v = hud.vehicle;
 
   useEffect(() => { bindGlobalRelease(); return releaseAll; }, []);
+  // повернули в горизонталь — подсказка больше не нужна
+  useEffect(() => {
+    const onRot = () => { if (window.innerWidth > window.innerHeight) { setRot(false); try { localStorage.setItem(ROT_KEY, '1'); } catch { /* */ } } };
+    window.addEventListener('resize', onRot);
+    window.addEventListener('orientationchange', onRot);
+    return () => { window.removeEventListener('resize', onRot); window.removeEventListener('orientationchange', onRot); };
+  }, []);
 
   const hideRot = () => { setRot(false); try { localStorage.setItem(ROT_KEY, '1'); } catch { /* */ } };
 
@@ -243,9 +250,10 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
 
       {/* портрет: подсказка повернуть телефон (один раз) */}
       {rot && (
-        <div className="mui-rot" onPointerDown={() => hideRot()}>
+        <div className="mui-rot">
           <span>📱↻</span>
-          <div><b>Поверните телефон горизонтально</b><small>Кнопок станет заметно больше и они не будут мешать друг другу · нажмите, чтобы скрыть</small></div>
+          <div><b>Поверните телефон горизонтально</b><small>Кнопок станет больше и они не будут мешать друг другу</small></div>
+          <button className="mui-rot-x" onPointerDown={(e) => { e.preventDefault(); hideRot(); }}>✕</button>
         </div>
       )}
 
