@@ -8,6 +8,7 @@ import menuBg from '../assets/menu.jpg';
 import { type JoinLaunch } from './OnlineJoin';
 import { activateAccountSave, currentAccount, updateAccount } from '../game/accounts';
 import { warmServer, ensureServer } from '../game/discovery';
+import { APP_BUILD, APP_VERSION, versionShort } from '../version';
 
 const NICK_KEY = 'losgorod_nick';
 const GENDER_KEY = 'losgorod_gender';
@@ -64,6 +65,11 @@ export function AuthScreen({ onLaunch }: { onLaunch: (l: JoinLaunch) => void }) 
             {busy ? '⏳' : '▶ Играть'}
           </button>
         </div>
+      </div>
+
+      {/* версия сборки внизу экрана: у каждого обновления свой номер */}
+      <div className="auth-ver" title={`Сборка ${APP_BUILD}`}>
+        <i />{versionShort()}<span>· сборка {APP_BUILD}</span>
       </div>
     </div>
   );

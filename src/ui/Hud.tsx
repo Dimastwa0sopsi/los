@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { Game, HudState } from '../game/game';
 import { Modal } from './MenuScreens';
 import { toWorld } from '../game/mapdraw';
+import { APP_BUILD, APP_BUILD_ID, APP_VERSION, versionShort } from '../version';
+import { CHANGES } from '../changelog';
 
 const STATUS: Record<string, string> = { online: 'в сети', connecting: 'подключение…', reconnecting: 'переподключение…', offline: 'нет связи' };
 
@@ -59,9 +61,40 @@ function Speedo({ kmh, rpm, gear, heli, alt, fuel, name, lights, auto, cruise, d
   );
 }
 
+/** плашка версии внизу экрана: номер, дата сборки, по клику — список обновлений */
+function VersionChip({ mobile, onOpen }: { mobile: boolean; onOpen: () => void }) {
+  return (
+    <button className={`hx-ver ${mobile ? 'mob' : ''}`} onClick={onOpen} title={`Лос-Город ${APP_VERSION} · сборка ${APP_BUILD} (${APP_BUILD_ID})`}>
+      <i />
+      <b>{versionShort()}</b>
+      {!mobile && <small>сборка {APP_BUILD}</small>}
+    </button>
+  );
+}
+
+/** окно «Что нового»: список обновлений из CHANGELOG.md */
+export function ChangelogModal({ onClose }: { onClose: () => void }) {
+  const list = CHANGES;
+  return (
+    <Modal title={`Обновления · v${APP_VERSION}`} onClose={onClose} wide>
+      <p className="hx-ver-note">Текущая сборка: <b>{APP_BUILD}</b> · <code>{APP_BUILD_ID}</code></p>
+      <div className="hx-ver-list">
+        {list.length === 0 && <p>Список обновлений пуст.</p>}
+        {list.map((e, i) => (
+          <section key={e.version} className={i === 0 ? 'on' : ''}>
+            <h3><b>v{e.version}</b><span>{e.date}</span>{i === 0 && <em>у вас</em>}</h3>
+            <ul>{e.items.map((t, k) => <li key={k}>{t}</li>)}</ul>
+          </section>
+        ))}
+      </div>
+    </Modal>
+  );
+}
+
 export function Hud({ g, hud, mobile }: { g: Game; hud: HudState; mobile: boolean }) {
   const mini = useRef<HTMLCanvasElement>(null);
   const [, force] = useState(0);
+  const [verOpen, setVerOpen] = useState(false);
   useEffect(() => {
     const c = mini.current; if (!c) return;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -152,6 +185,10 @@ export function Hud({ g, hud, mobile }: { g: Game; hud: HudState; mobile: boolea
       {hud.drift > 40 && <div className="hx-drift"><b>{hud.drift}</b><small>ДРИФТ</small></div>}
 
       {hud.prompt && g.settings.hints !== 'off' && <Prompt text={hud.prompt} short={g.settings.hints === 'short'} />}
+
+      {/* версия внизу экрана: каждая сборка помечена номером и датой */}
+      <VersionChip mobile={mobile} onOpen={() => { setVerOpen(true); }} />
+      {verOpen && <ChangelogModal onClose={() => setVerOpen(false)} />}
     </div>
   );
 }

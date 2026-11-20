@@ -1,7 +1,7 @@
 {
   "name": "react-vite-tailwind",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.4.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -14,7 +14,12 @@
     "check:npc": "esbuild scripts/npc-check.ts --bundle --platform=node --format=cjs --outfile=.check/npc.cjs --log-level=error && node .check/npc.cjs",
     "check:rides": "esbuild scripts/rides-check.ts --bundle --platform=node --format=cjs --outfile=.check/rides.cjs --log-level=error && node .check/rides.cjs",
     "check:police": "esbuild scripts/police-check.ts --bundle --platform=node --format=cjs --outfile=.check/police.cjs --log-level=error && node .check/police.cjs",
-    "check:interiors": "esbuild scripts/interiors-check.ts --bundle --platform=node --format=cjs --outfile=.check/interiors.cjs --log-level=error && node .check/interiors.cjs"
+    "check:interiors": "esbuild scripts/interiors-check.ts --bundle --platform=node --format=cjs --outfile=.check/interiors.cjs --log-level=error && node .check/interiors.cjs",
+    "bump": "npm version patch --no-git-tag-version && node -e \"const p=require('./package.json');console.log('Версия игры:',p.version,'— добавьте запись в CHANGELOG.md')\"",
+    "bump:minor": "npm version minor --no-git-tag-version",
+    "bump:major": "npm version major --no-git-tag-version",
+    "check:server": "esbuild scripts/server-check.ts --bundle --platform=node --format=cjs --outfile=.check/server.cjs --log-level=error && node .check/server.cjs",
+    "check:version": "esbuild scripts/version-check.ts --bundle --platform=node --format=cjs --outfile=.check/version.cjs --log-level=error && node .check/version.cjs"
   },
   "dependencies": {
     "clsx": "2.1.1",

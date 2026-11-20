@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import menuBg from '../assets/menu.jpg';
 import { type Settings, defaultSettings, PAD_BUTTONS, PAD_DEFAULT, PAD_LABEL } from '../game/config';
+import { APP_BUILD, APP_BUILD_ID, APP_VERSION } from '../version';
+import { LATEST } from '../changelog';
 
 
 
@@ -181,6 +183,11 @@ export function SettingsPanel({ value, onChange, onClose, inGame, onExit, onRese
         <label>Плотность трафика</label><Range k="traffic" min={0} max={1} step={0.05} fmt={(v) => Math.round(v * 100) + '%'} />
         <label>Количество пешеходов</label><Range k="peds" min={0} max={1} step={0.05} fmt={(v) => Math.round(v * 100) + '%'} />
         <p className="text-xs opacity-70">Часть настроек применяется при следующем запуске мира.</p>
+        <div className="lg-about">
+          <b>Лос-Город v{APP_VERSION}</b>
+          <span>сборка {APP_BUILD} · {APP_BUILD_ID}</span>
+          <span>{LATEST ? `${LATEST.items.length} изменений в этом обновлении` : 'список обновлений пуст'}</span>
+        </div>
       </div>}
       <div className="lg-settings" style={{ display: 'none' }}>
         <label>Режим управления</label><Seg k="control" opts={[['auto', 'Авто'], ['pc', 'ПК'], ['mobile', 'Телефон']]} />

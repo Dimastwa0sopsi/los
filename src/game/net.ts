@@ -189,6 +189,70 @@ export function probeServer(url = getServerUrl(), timeout = CONNECT_TIMEOUT): Pr
   });
 }
 
+/**
+ * Подробная диагностика сервера для окна «Нет связи».
+ * WebSocket-ошибка сама по себе ничего не объясняет, поэтому дополнительно
+ * дёргаем HTTP-ручку /version и смотрим, что именно ответило:
+ *   ok        — сервер жив и это наш сервер (можно жать «Повторить вход»);
+ *   dead      — туннель не отвечает вовсе (Colab заснул / ngrok отключился);
+ *   notserver — туннель отвечает, но игрового сервера за ним нет (типичный 404);
+ *   blocked   — HTTP отвечает, а WebSocket не пускают (прокси, антивирус, сеть).
+ */
+export interface ServerDiag {
+  reason: 'ok' | 'dead' | 'notserver' | 'blocked' | 'nohttp';
+  url: string;
+  http?: number;
+  build?: string;
+  version?: string;
+  online?: number;
+  uptime?: number;
+  detail: string;
+  /** короткая строка для окна ошибки */
+  text: string;
+}
+
+/** https-адрес той же машины: wss://x → https://x */
+function httpOf(url: string) {
+  return url.replace(/^wss:\/\//i, 'https://').replace(/^ws:\/\//i, 'http://').replace(/\/+$/, '');
+}
+
+export async function diagnoseServer(url = getServerUrl(), timeout = 4500): Promise<ServerDiag> {
+  const http = httpOf(url);
+  const base: ServerDiag = { reason: 'dead', url, detail: 'нет ответа', text: 'Сервер не отвечает' };
+  if (typeof fetch !== 'function') return { ...base, reason: 'nohttp', detail: 'в этом браузере нет fetch' };
+  const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+  const timer = ctrl ? setTimeout(() => ctrl.abort(), timeout) : 0;
+  try {
+    const r = await fetch(`${http}/version?t=${Date.now()}`, { cache: 'no-store', signal: ctrl?.signal });
+    const type = r.headers.get('content-type') || '';
+    if (r.ok && type.includes('json')) {
+      const j = (await r.json()) as { ok?: boolean; server?: string; build?: string; version?: string; online?: number; uptime?: number };
+      if (j && j.server === 'los-gorod') {
+        const secs = j.uptime ?? 0;
+        const up = secs > 3600 ? `${Math.round(secs / 3600)} ч` : secs > 60 ? `${Math.round(secs / 60)} мин` : `${Math.round(secs)} с`;
+        return {
+          reason: 'ok', url, http: r.status, build: j.build, version: j.version, online: j.online, uptime: secs,
+          detail: `игровой сервер на связи · сборка ${j.build ?? '?'} · аптайм ${up}`,
+          text: 'Сервер отвечает, но подключение не установилось — нажмите «Повторить вход»',
+        };
+      }
+      return { reason: 'notserver', url, http: r.status, detail: 'по адресу отвечает не игровой сервер', text: 'Адрес туннеля ведёт не на игровой сервер' };
+    }
+    // 404/HTML — туннель жив, а сервера за ним нет: самый частый случай
+    return {
+      reason: 'notserver', url, http: r.status,
+      detail: `туннель отвечает, но сервера за ним нет (HTTP ${r.status})`,
+      text: 'Сервер не запущен: туннель ngrok работает, а игровой сервер за ним — нет. Перезапустите серверную ячейку в Colab',
+    };
+  } catch {
+    return {
+      reason: 'dead', url,
+      detail: 'туннель не отвечает (Colab заснул или ngrok отключён)',
+      text: 'Туннель сервера не отвечает. Запустите серверную ячейку в Colab и нажмите «Постоянная ссылка»',
+    };
+  } finally { if (timer) clearTimeout(timer); }
+}
+
 export class NetClient {
   ws: WebSocket | null = null;
   id: number | null = null;
