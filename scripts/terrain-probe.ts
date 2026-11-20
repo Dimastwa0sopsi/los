@@ -55,6 +55,8 @@ async function main() {
     { label: 'поле за городом', x: 900, z: 1500, want: isGrass, why: 'за городом должна быть трава' },
     { label: 'луг у реки', x: -500, z: 500, want: isGrass, why: 'у реки должна быть трава' },
     { label: 'двор деревни', x: 601, z: 1730, want: (k) => isGrass(k) || k.startsWith('road:'), why: 'в деревне должна быть трава или дорога' },
+    { label: 'деревня: у улицы', x: 610, z: 1735, want: (k) => isGrass(k) || k.startsWith('road:'), why: 'у деревенской улицы должна быть трава' },
+    { label: 'деревня: палисадник', x: 592, z: 1690, want: (k) => isGrass(k) || k.startsWith('road:') || k.startsWith('c:'), why: 'у дома должна быть трава' },
     { label: 'дорога-шоссе', x: 30, z: 540, want: (k) => k.startsWith('road:'), why: 'на шоссе должно быть полотно' },
     { label: 'дорога-город', x: 330, z: 540, want: (k) => k.startsWith('road:'), why: 'на городской улице должно быть полотно' },
   ];

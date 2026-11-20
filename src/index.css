@@ -1093,3 +1093,15 @@ button.tb-card:hover { background: rgba(255,255,255,.09); } button.tb-card:activ
   .hlp-tab { padding: 7px 10px; font-size: 12px; }
   .hlp-body { max-height: 60vh; }
 }
+
+/* ---- компактный спидометр на телефоне: пилюля сверху по центру, ничего не перекрывает ---- */
+.hx-sp-pill {
+  position: absolute; left: 50%; top: calc(10px + var(--safe-t)); transform: translateX(-50%);
+  display: flex; align-items: baseline; gap: 7px; padding: 6px 15px; border-radius: 15px;
+  background: var(--g2); border: 1px solid var(--edge); box-shadow: var(--shadow-card);
+  backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px); pointer-events: none;
+}
+.hx-sp-pill b { font-family: var(--disp); font-size: 27px; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
+.hx-sp-pill small { font-size: 10px; color: var(--mut); }
+.hx-sp-pill em { font-style: normal; font-weight: 900; color: #b9a8ff; font-size: 15px; }
+.hx-sp-pill span { font-size: 10.5px; color: var(--mut); }
