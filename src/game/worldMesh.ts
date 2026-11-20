@@ -193,10 +193,35 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
   // ---------- дороги ----------
   progress(0.18, 'Дороги и разметка');
   const isCity = (id: number) => L.nodes[id].gi !== undefined;
+  // у каждого узла — направления и полуширины асфальтовых дорог: по ним подрезаем просёлки,
+  // чтобы земля не залезала на асфальт (в Сосновке был «пятак» грунта посреди улицы)
+  const pavedAt = new Map<number, { dx: number; dz: number; half: number }[]>();
+  for (const e of L.edges) {
+    if (e.kind === 'dirt') continue;
+    const A = L.nodes[e.a], Bn = L.nodes[e.b];
+    const dl = Math.hypot(Bn.x - A.x, Bn.z - A.z) || 1;
+    const dx = (Bn.x - A.x) / dl, dz = (Bn.z - A.z) / dl;
+    const p1 = pavedAt.get(e.a); if (p1) p1.push({ dx, dz, half: e.w / 2 }); else pavedAt.set(e.a, [{ dx, dz, half: e.w / 2 }]);
+    const p2 = pavedAt.get(e.b); if (p2) p2.push({ dx: -dx, dz: -dz, half: e.w / 2 }); else pavedAt.set(e.b, [{ dx: -dx, dz: -dz, half: e.w / 2 }]);
+  }
+  /** на сколько отступить просёлку от узла, чтобы не лезть на поперечный асфальт */
+  const dirtTrim = (node: number, dx: number, dz: number) => {
+    let t = 0;
+    for (const p of pavedAt.get(node) ?? []) {
+      if (Math.abs(p.dx * dx + p.dz * dz) > 0.55) continue;     // почти вдоль асфальта — не подрезаем
+      t = Math.max(t, p.half + 0.15);
+    }
+    return t;
+  };
   for (const e of L.edges) {
     const a = L.nodes[e.a], b = L.nodes[e.b];
     let ax = a.x, az = a.z, bx = b.x, bz = b.z;
     const len = Math.hypot(bx - ax, bz - az); const ux = (bx - ax) / len, uz = (bz - az) / len;
+    if (e.kind === 'dirt') {
+      const ta = dirtTrim(e.a, ux, uz);
+      const tb = dirtTrim(e.b, -ux, -uz);
+      if (ta + tb < len - 2) { ax += ux * ta; az += uz * ta; bx -= ux * tb; bz -= uz * tb; }
+    }
     if (isCity(e.a)) { ax += ux * ROAD_W / 2; az += uz * ROAD_W / 2; }
     if (isCity(e.b)) { bx -= ux * ROAD_W / 2; bz -= uz * ROAD_W / 2; }
     // три дизайна городского полотна: чередуются по кварталам, чтобы асфальт не был одинаковым
@@ -701,28 +726,43 @@ function buildProp(b: Batcher, p: Prop) {
     case 'sandbox': b.add('c:#a16207', T.box, M(x, 0.12, z, 0, 3, 0.25, 3)); b.add('tex:sand', T.box, M(x, 0.15, z, 0, 2.7, 0.22, 2.7), 3); break;
     case 'carousel': b.add('c:#dc2626', T.cylB, M(x, 0.2, z, 0, 1.3, 0.12, 1.3)); b.add('c:#facc15', T.cylB, M(x, 0.3, z, 0, 0.06, 0.9, 0.06)); b.add('c:#2563eb', T.torus, M(x, 1.1, z, 0, 0.6, 0.6, 0.6, Math.PI / 2)); break;
     case 'pool': {
+      // 3D-чаша: дно и стенки в плитке, вода — прозрачная плоскость, видно дно и ноги
       const pw = p.w ?? 10, pd = p.d ?? 5;
-      // чаша: дно и стенки видны сквозь воду
-      b.add('c:#cfd8dc', T.box, M(x, -0.85, z, r, pw, 0.12, pd));
-      for (const s of [-1, 1]) {
-        b.add('c:#b8c6cc', T.box, M(x + s * pw / 2, -0.4, z, r, 0.14, 0.9, pd));
-        b.add('c:#b8c6cc', T.box, M(x, -0.4, z + s * pd / 2, r, pw, 0.9, 0.14));
+      const rimTop = p.h ?? 0.34;                 // верх бортика над землёй
+      const surfY = rimTop - 0.14;                // уровень воды в чаше
+      const bottom = surfY - 1.5;                 // глубина 1.5 м — плаваем и ныряем
+      const wallT = 0.16;
+      // дно
+      b.add('tex:pooltile', T.box, M(x, bottom, z, r, pw, 0.16, pd), 2);
+      // стенки чаши
+      for (const sd of [-1, 1]) {
+        b.add('tex:pooltile', T.box, M(x + sd * (pw / 2 - wallT / 2), bottom + 0.08 + (rimTop - bottom) / 2, z, r, wallT, rimTop - bottom, pd), 2);
+        b.add('tex:pooltile', T.box, M(x, bottom + 0.08 + (rimTop - bottom) / 2, z + sd * (pd / 2 - wallT / 2), r, pw, rimTop - bottom, wallT), 2);
       }
-      // борт: четыре плиточные полосы вокруг чаши (воду не накрывают)
-      const rw = 0.5;
-      b.add('c:#e7e5e4', T.box, M(x, 0.17, z - pd / 2 - rw / 2, r, pw + rw * 2, 0.34, rw));
-      b.add('c:#e7e5e4', T.box, M(x, 0.17, z + pd / 2 + rw / 2, r, pw + rw * 2, 0.34, rw));
-      b.add('c:#e7e5e4', T.box, M(x - pw / 2 - rw / 2, 0.17, z, r, rw, 0.34, pd));
-      b.add('c:#e7e5e4', T.box, M(x + pw / 2 + rw / 2, 0.17, z, r, rw, 0.34, pd));
-      // вода: тонкая плоскость у самого верха чаши
-      b.add('water', T.box, M(x, 0.26, z, r, pw, 0.1, pd), 6);
-      b.add('c:#f1f5f9', T.box, M(x, 0.345, z - pd / 2 - 0.25, r, pw + 1.0, 0.06, 0.5));
-      b.add('c:#f1f5f9', T.box, M(x, 0.345, z + pd / 2 + 0.25, r, pw + 1.0, 0.06, 0.5));
-      b.add('c:#f1f5f9', T.box, M(x - pw / 2 - 0.25, 0.345, z, r, 0.5, 0.06, pd + 1.0));
-      b.add('c:#f1f5f9', T.box, M(x + pw / 2 + 0.25, 0.345, z, r, 0.5, 0.06, pd + 1.0));
-      // подсветка воды ночью
-      b.add('glow:#38bdf8', T.box, M(x, -0.3, z, r, pw * 0.9, 0.04, 0.06));
-      b.add('glow:#38bdf8', T.box, M(x, -0.3, z, r, 0.06, 0.04, pd * 0.9));
+      // слив в глубокой части
+      b.add('c:#334155', T.circle, M(x + pw * 0.18, bottom + 0.09, z, 0, 0.34, 0.34, 1, -Math.PI / 2));
+      b.add('c:#64748b', T.circle, M(x + pw * 0.18, bottom + 0.1, z, 0, 0.42, 0.42, 1, -Math.PI / 2));
+      // ступеньки-сходы в воду (видны сквозь воду)
+      for (let k = 0; k < 4; k++) {
+        const sy = surfY - 0.18 - k * 0.34;
+        b.add('tex:pooltile', T.box, M(x - pw * 0.28, sy, z + pd / 2 - 0.5 - k * 0.42, r, 1.6, 0.12, 0.42), 1);
+      }
+      // бортик: плита по периметру (воду не накрывает)
+      const rw = 0.55;
+      b.add('c:#e7e5e4', T.box, M(x, rimTop / 2, z - pd / 2 - rw / 2, r, pw + rw * 2, rimTop, rw));
+      b.add('c:#e7e5e4', T.box, M(x, rimTop / 2, z + pd / 2 + rw / 2, r, pw + rw * 2, rimTop, rw));
+      b.add('c:#e7e5e4', T.box, M(x - pw / 2 - rw / 2, rimTop / 2, z, r, rw, rimTop, pd));
+      b.add('c:#e7e5e4', T.box, M(x + pw / 2 + rw / 2, rimTop / 2, z, r, rw, rimTop, pd));
+      // светлая кромка бортика
+      b.add('c:#f1f5f9', T.box, M(x, rimTop + 0.03, z - pd / 2 - 0.25, r, pw + 1.0, 0.06, 0.5));
+      b.add('c:#f1f5f9', T.box, M(x, rimTop + 0.03, z + pd / 2 + 0.25, r, pw + 1.0, 0.06, 0.5));
+      b.add('c:#f1f5f9', T.box, M(x - pw / 2 - 0.25, rimTop + 0.03, z, r, 0.5, 0.06, pd + 1.0));
+      b.add('c:#f1f5f9', T.box, M(x + pw / 2 + 0.25, rimTop + 0.03, z, r, 0.5, 0.06, pd + 1.0));
+      // вода: тонкая прозрачная плоскость у самого верха чаши
+      b.add('poolWater', T.plane, M(x, surfY, z, r, pw - 0.14, pd - 0.14, 1, -Math.PI / 2), 5);
+      // подсветка чаши ночью
+      b.add('glow:#38bdf8', T.box, M(x, bottom + 0.5, z, r, pw * 0.9, 0.05, 0.06));
+      b.add('glow:#38bdf8', T.box, M(x, bottom + 0.5, z, r, 0.06, 0.05, pd * 0.9));
       break;
     }
     case 'poolstep': {

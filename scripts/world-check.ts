@@ -92,6 +92,12 @@ try {
   if (!flag || !tops.length || flag.h < tops[0].h) throw new Error('пасхалка-флаг не на самом высоком доме');
   console.log(`  пасхалка: флаг на «${tops[0].name}» (${tops[0].h.toFixed(0)} м, квартал ${Math.round(tops[0].x)},${Math.round(tops[0].z)})`);
   if (L.busStops.length < 15) throw new Error('слишком мало автобусных остановок');
+  // самокаты: стойки в городе и у магазина «Вжух Store»
+  const shop = L.buildings.filter((b) => b.kind === 'scootershop');
+  const nearShop = L.scooterDocks.filter((d) => shop.some((b) => Math.hypot(d.x - b.door.x, d.z - b.door.z) < 12));
+  console.log(`  электросамокаты: стоек ${L.scooterDocks.length} (у «Вжух Store» ${nearShop.length})`);
+  if (L.scooterDocks.length < 8) throw new Error('мало станций электросамокатов');
+  if (nearShop.length < 1) throw new Error('у магазина самокатов нет стоек аренды');
 } catch (e) {
   console.error('✗ генерация мира упала:', (e as Error).message);
   process.exit(1);

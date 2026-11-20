@@ -140,6 +140,7 @@ export const EMOTES: { id: string; name: string; icon: string; dance?: boolean }
   { id: 'think', name: 'Задуматься', icon: '🤔' }, { id: 'stretch', name: 'Разминка', icon: '🙆' }, { id: 'cheer', name: 'Радость', icon: '🙌' },
 ];
 export const SCOOTER_RATE = 9; // в минуту
+export const HYDRO_PRICE = 48000;  // комплект гидравлической подвески в автомагазине
 export type BodyKind = 'sedan' | 'hatch' | 'suv' | 'pickup' | 'van' | 'truck' | 'semi' | 'bus' | 'sport' | 'moto' | 'quad' | 'heli' | 'combine' | 'scooter';
 export interface VSpec {
   id: string; name: string; body: BodyKind; len: number; wid: number; hei: number;

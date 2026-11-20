@@ -7,6 +7,8 @@ export interface OwnedVehicle {
   pos: { x: number; z: number; a: number } | null; missing: string[]; paid: number; locked?: boolean;
   /** загрязнение кузова 0 (чисто) … 1 (по уши в грязи) — смывается на автомойке */
   dirt?: number;
+  /** куплен и установлен комплект гидравлической подвески */
+  hydro?: boolean;
 }
 /** услуги города: залоги в ломбарде, садок, платная парковка, штрафстоянка */
 export interface PawnTicket { id: string; item: string; n: number; pay: number; buy: number; t: number }

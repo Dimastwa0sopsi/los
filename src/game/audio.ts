@@ -98,6 +98,8 @@ export class Sound {
   error() { this.tone(200, 0.2, 0.12, 'square'); }
   door() { this.burst(0.2, 300, 0.4); }
   gear() { this.tone(300, 0.04, 0.1, 'square'); }
+  /** хрум-хрум: перекус */
+  eat() { this.tone(520, 0.07, 0.1, 'triangle'); this.tone(640, 0.08, 0.08, 'triangle', 0.08); }
   /** хлопок выхлопа («отстрел») */
   backfire() { this.burst(0.1, 620, 0.55); this.tone(85, 0.09, 0.3, 'square'); }
   dispose() {
