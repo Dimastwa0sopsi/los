@@ -6,7 +6,7 @@ import { ensureServer } from '../game/discovery';
 import { Modal } from './MenuScreens';
 
 /** текст, который показываем, если сервер не отвечает */
-export const SERVER_DOWN_TEXT = 'Сервер отключен разработчиком. Пока поиграть нельзя.';
+export const SERVER_DOWN_TEXT = 'Сервер отключен, заходите позже';
 
 export type JoinLaunch = { mode: 'solo' | 'online'; nick: string; gender: 'm' | 'f' };
 
@@ -15,7 +15,7 @@ export function ServerDownModal({ text, onMenu, onRetry, onSolo }: { text?: stri
   return (
     <div className="lg-modal-back" onPointerDown={(e) => e.stopPropagation()}>
       <div className="lg-modal" style={{ width: 'min(440px, 100%)' }}>
-        <div className="lg-modal-head"><h2>⚠️ Нет связи</h2></div>
+        <div className="lg-modal-head"><h2>⚠️ Нет связи к серверу!</h2></div>
         <div className="lg-modal-body">
           <p style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.45, textAlign: 'center', margin: '6px 0 4px' }}>{text && text.trim() ? text : SERVER_DOWN_TEXT}</p>
           {onRetry && (
@@ -96,7 +96,7 @@ export function OnlineJoin({ variant = 'start', g, initial, onLaunch, onClose, o
       <>
         <Modal title="🌐 Онлайн" onClose={onClose ?? (() => {})}>
           <p className="opacity-80 text-sm mb-3">
-            Онлайн — общий мир с другими игроками. У каждого ника свой прогресс и своя привязка к устройству: под чужим ником войти нельзя. Баланс онлайна хранится на сервере: новый ник начинает с $20 000, локальные соло-деньги в онлайн не переносятся.
+            .
           </p>
           {info?.exists && (
             <div className="lg-card mb-3">
@@ -108,10 +108,10 @@ export function OnlineJoin({ variant = 'start', g, initial, onLaunch, onClose, o
           <div className="flex flex-col gap-2 mt-4">
             {!alreadyOnline && (
               <button className="lg-btn lg-btn-main" disabled={!valid || busy} style={{ opacity: valid && !busy ? 1 : 0.5 }} onClick={goOnline}>
-                {busy ? 'Подключение…' : '🌐 Войти в онлайн'}
+                {busy ? 'Подключение…' : 'Войти в онлайн'}
               </button>
             )}
-            <button className="lg-btn" onClick={goSolo}>{alreadyOnline ? '🎮 Выйти в соло' : '🎮 Соло (локальная игра)'}</button>
+            <button className="lg-btn" onClick={goSolo}>{alreadyOnline ? '🎮 соло' : '🎮 локальная игра'}</button>
           </div>
           {alreadyOnline && <p className="text-xs opacity-60 mt-2">Ё — выйти из онлайна</p>}
         </Modal>
