@@ -152,12 +152,27 @@ function createAuctionStore(db) {
     db.prepare("UPDATE auction_lots SET status=?,finished_at=? WHERE id=?").run(lot.bidder ? 'sold' : 'unsold', now, id);
     return true;
   });
+  // Ограниченный публичный снимок: не выдаём сохранённое имущество, холодильник,
+  // инвентарь или другие персональные поля из asset_json.
+  function publicLots(now = Date.now()) {
+    return db.prepare(`SELECT id,kind,asset_key,asset_json,start_price,step,ends_at,bid,bidder,seller
+      FROM auction_lots WHERE status='active' AND ends_at>? ORDER BY ends_at,id LIMIT 100`).all(now).map(lot => {
+      let vehicleType = '';
+      if (lot.kind === 'vehicle') {
+        try { const item = JSON.parse(lot.asset_json).item; if (typeof item?.type === 'string' && /^[a-z0-9_-]{1,40}$/.test(item.type)) vehicleType = item.type; } catch { /* повреждённый лот показывается без модели */ }
+      }
+      return { id: lot.id, kind: lot.kind, assetKey: lot.asset_key, vehicleType,
+        seller: lot.seller, startPrice: lot.start_price, step: lot.step,
+        endsAt: lot.ends_at, bid: lot.bid, bidder: lot.bidder };
+    });
+  }
   return {
     list: (name, revision, kind, key, price, requestId, now = Date.now()) => listTx(name, revision, kind, key, price, requestId, now),
     bid: (name, revision, id, bid, requestId, now = Date.now()) => bidTx(name, revision, id, bid, requestId, now),
     finish: (id, now = Date.now()) => finishTx(id, now),
     due: (now = Date.now()) => db.prepare("SELECT id FROM auction_lots WHERE status='active' AND ends_at<=? ORDER BY ends_at,id").all(now).map(x => x.id),
     get: id => getLot.get(id),
+    publicLots,
     active: () => db.prepare("SELECT id,seller,kind,asset_key,start_price,step,ends_at,bidder,bid FROM auction_lots WHERE status='active' ORDER BY ends_at,id").all(),
   };
 }

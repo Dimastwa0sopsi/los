@@ -52,7 +52,7 @@ export interface Remote { plate: string; crouch: boolean; listings: Vehicle[]; l
 export type Panel =
   | { type: 'context'; choices: { label: string; run: () => void }[] }
   | { type: 'shop'; kind: ShopKind; title: string; items: string[] } | { type: 'kiosk'; id: number } | { type: 'market'; sellUid?: string }
-  | { type: 'cityhall' } | { type: 'tuning'; uid: string } | { type: 'clothes' } | { type: 'barber' } | { type: 'hospital' } | { type: 'police'; title: string }
+  | { type: 'cityhall' } | { type: 'auction' } | { type: 'tuning'; uid: string } | { type: 'clothes' } | { type: 'barber' } | { type: 'hospital' } | { type: 'police'; title: string }
   | { type: 'property'; b: number; unit: number } | { type: 'garage'; id: number } | { type: 'vadmin'; village: string } | { type: 'factory' } | { type: 'bank' }
   | { type: 'pc'; mode: 'office' | 'home' } | { type: 'officehr' } | { type: 'livestock' } | { type: 'dealer'; scooter?: boolean } | { type: 'trucker' } | { type: 'emotes'; dance?: boolean } | { type: 'passport' } | { type: 'trade' } | { type: 'tradeInvite' } | { type: 'plant'; key: string; basement: boolean } | { type: 'quest' } | { type: 'editor'; fresh: boolean } | { type: 'listing'; uid: string; slot: number } | { type: 'info'; title: string; text: string } | { type: 'map'; mode: 'waypoint' | 'taxi' | 'autopilot' } | { type: 'phone'; tab?: string } | { type: 'onlineJoin' } | { type: 'inventory' } | { type: 'promo' } | { type: 'settings' } | { type: 'help'; tab?: string } | { type: 'farm' } | { type: 'radio' } | { type: 'bar'; name?: string } | { type: 'ozgim' } | { type: 'casino'; name?: string } | { type: 'svc'; kind: SvcKind } | { type: 'ads' };
 /** городские услуги: мойка, шиномонтаж, доставка, парковка, автомат, ломбард, садок, стоянка, запчасти */
@@ -2578,7 +2578,7 @@ export class Game {
     if (action.startsWith('mallshop:')) { const [, k, i] = action.split(':'); return { text: 'E — ' + label, keys: ['E'], act: () => this.enterMallShop(b, k as InteriorKind, +i) }; }
     const simple: Record<string, () => void> = {
       clothes: () => this.openPanel({ type: 'clothes' }), barber: () => this.openPanel({ type: 'barber' }), hospital: () => this.openPanel({ type: 'hospital' }),
-      auction: () => this.openPanel({ type: 'info', title: 'Городской аукцион', text: 'Аукцион пока не открыт: серверные ставки и передача имущества ещё проходят проверку. Деньги не списываются.' }),
+      auction: () => this.openPanel({ type: 'auction' }),
       police: () => this.openPanel({ type: 'police', title: 'Полиция' }), cityhall: () => this.openPanel({ type: 'cityhall' }), bank: () => this.openPanel({ type: 'bank' }),
       dealer: () => this.openPanel({ type: 'dealer' }), factory: () => this.openPanel({ type: 'factory' }), vadmin: () => this.openPanel({ type: 'vadmin', village: b.village ?? '' }),
       'service-info': () => this.openPanel({ type: 'info', title: 'Автосервис', text: 'Подъезжайте на своей машине к воротам автосервиса и нажмите E — откроется меню ремонта и тюнинга.' }),
