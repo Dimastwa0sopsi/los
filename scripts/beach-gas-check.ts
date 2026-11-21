@@ -9,5 +9,5 @@ const clear = (x0: number, x1: number, z0: number, z1: number) => !L.colliders.s
 check(clear(-84, -72, 438, 453), 'место автобуса занято');
 check(clear(-45, -39, 487, 499), 'боковой въезд АЗС загорожен');
 check(clear(-65, -61, 511, 514), 'вход в магазин АЗС загорожен');
-check(station?.id === L.buildings.length - 1, 'новое здание должно сохранять существующие ID');
+check(station?.id === L.buildings.length - 2, 'новое здание должно сохранять существующие ID');
 console.log('✓ АЗС с магазином и колонками, боковой въезд, новое место автобуса, стабильные ID зданий');

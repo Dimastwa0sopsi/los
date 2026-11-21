@@ -209,7 +209,7 @@ def step_files():
         say('⬇️', f'server.js обновлён с {mirror} ({len(fresh) // 1024} КБ)')
     else:
         say('✅', f'server.js уже свежий ({len(fresh) // 1024} КБ)')
-    for module in ('moderation.cjs', 'ads.cjs', 'account-auth.cjs', 'account-store.cjs'):
+    for module in ('moderation.cjs', 'ads.cjs', 'account-auth.cjs', 'account-store.cjs', 'account-revisions.cjs'):
         contents, mirror = download(module, min_size=200)
         with open(os.path.join(GAME_DIR, module), 'w', encoding='utf-8') as f:
             f.write(contents)

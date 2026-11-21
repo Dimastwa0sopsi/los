@@ -23,7 +23,7 @@ export interface Interior {
   dispose: () => void;
 }
 export type EntrStyle = 'glass' | 'wood' | 'metal';
-export type InteriorKind = 'shop24' | 'supermarket' | 'cafe' | 'pharmacy' | 'gunshop' | 'clothes' | 'barber' | 'police' | 'hospital' | 'cityhall' | 'bank' | 'fishshop' |
+export type InteriorKind = 'shop24' | 'supermarket' | 'cafe' | 'pharmacy' | 'gunshop' | 'clothes' | 'barber' | 'police' | 'hospital' | 'cityhall' | 'bank' | 'auction' | 'fishshop' |
   'dealer' | 'service' | 'mall' | 'hall' | 'apt_eco' | 'apt_mid' | 'apt_lux' | 'house_city' | 'house_village' | 'vshop' | 'vpharmacy' | 'vguntruck' | 'vadmin' | 'checkpoint' | 'fire' | 'gas' | 'mallfood' | 'basement' | 'banya' | 'truckoffice' | 'office' | 'scootershop' | 'greenhouse' | 'bar' | 'ozgim' | 'mine' | 'casino';
 
 export const WALLS = {
@@ -826,6 +826,21 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
       ib.light(0, H - 0.4, -2, 1.6, 0xfff3d6, 24); ib.light(0, H - 0.4, 7, 1.4, 0xfff3d6, 22); ib.light(12, H - 0.5, -4, 1.2, 0xffffff, 16);
       break;
     }
+    // ---------------- АУКЦИОН ----------------
+    case 'auction': {
+      S(16, 12, 4.2); ib.room(W, D, H, 'tex:floortile', WALLS.beige);
+      ib.f('c:#334155', 0, 0, -3.5, 8, 1.05, 1.0, true);
+      ib.f('c:#cbd5e1', 0, 1.05, -3.5, 8.1, 0.08, 1.1, false);
+      ib.plane('sign:ГОРОДСКОЙ АУКЦИОН|#1e3a5f', 0, 2.9, -D / 2 + 0.14, 7.4, 0.8, 0);
+      ib.plane('sign:ЛОТЫ И СТАВКИ|#0f766e', -4.8, 2.0, -D / 2 + 0.16, 2.2, 0.8, 0);
+      ib.act(0, -2.0, 2.0, 'Аукцион: лоты и ставки', 'auction');
+      ib.npc(1, -4.3, 0, 'clerk');
+      ib.sofa(-5, 2, 2.5, Math.PI / 2, '#334155');
+      ib.sofa(5, 2, 2.5, -Math.PI / 2, '#334155');
+      ib.plant(-7.2, -5); ib.plant(7.2, -5);
+      ib.light(0, H - 0.4, 0, 1.6, 0xffffff, 20);
+      break;
+    }
     // ---------------- БАНК ----------------
     case 'bank': {
       S(16, 11, 4.2); ib.room(W, D, H, 'tex:floortile', WALLS.beige);
@@ -1502,7 +1517,7 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
 export function interiorForBuilding(kind: string, cls?: string): InteriorKind | null {
   const m: Record<string, InteriorKind> = {
     shop24: 'shop24', supermarket: 'supermarket', cafe: 'cafe', pharmacy: 'pharmacy', gunshop: 'gunshop', clothes: 'clothes', barber: 'barber',
-    police: 'police', hospital: 'hospital', cityhall: 'cityhall', bank: 'bank', dealer: 'dealer', service: 'service', mall: 'mall', apartment: 'hall',
+    police: 'police', hospital: 'hospital', cityhall: 'cityhall', bank: 'bank', auction: 'auction', dealer: 'dealer', service: 'service', mall: 'mall', apartment: 'hall',
     house: 'house_city', vhouse: 'house_village', vshop: 'vshop', vpharmacy: 'vpharmacy', vguntruck: 'vguntruck', vadmin: 'vadmin',
     checkpoint: 'checkpoint', fire: 'fire', gas: 'gas', depot: 'truckoffice', office: 'office', scootershop: 'scootershop', fishshop: 'fishshop',
     banya: 'banya', greenhouse: 'greenhouse', bar: 'bar', ozgim: 'ozgim', mine: 'mine', casino: 'casino',

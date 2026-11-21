@@ -849,7 +849,7 @@ function buildBuilding(b: Batcher, bd: Building) {
     b.add('c:#6b7280', T.box, M(fx + ox * 0.05, 2.5, fz + oz * 0.05, a, 6, 5, 0.12)); // ворота цеха
   }
   // вывеска
-  const signed = ['shop24', 'supermarket', 'cafe', 'pharmacy', 'gunshop', 'clothes', 'barber', 'mall', 'dealer', 'service', 'gas', 'police', 'hospital', 'fire', 'cityhall', 'bank', 'vshop', 'vadmin', 'checkpoint', 'farm', 'market', 'warehouse', 'factory', 'fishshop'];
+  const signed = ['shop24', 'supermarket', 'cafe', 'pharmacy', 'gunshop', 'clothes', 'barber', 'mall', 'dealer', 'service', 'gas', 'police', 'hospital', 'fire', 'cityhall', 'bank', 'auction', 'vshop', 'vadmin', 'checkpoint', 'farm', 'market', 'warehouse', 'factory', 'fishshop'];
   if (signed.includes(bd.kind)) {
     const sw = Math.min(w, d, 14) * (bd.kind === 'mall' || bd.kind === 'cityhall' || bd.kind === 'factory' ? 1.6 : 0.9);
     const sy = bd.roof === 'gable' ? h * 0.62 - 0.9 : Math.min(h - 1.2, bd.kind === 'mall' ? 12 : 3.6);

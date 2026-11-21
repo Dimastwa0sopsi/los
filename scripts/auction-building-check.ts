@@ -1,0 +1,16 @@
+import './domstub';
+import { generateLayout } from '../src/game/worldgen';
+import { buildInterior, interiorForBuilding } from '../src/game/interiors';
+import { segDist } from '../src/game/config';
+const L = generateLayout(), b = L.buildings.find(x => x.kind === 'auction');
+const assert = (condition: unknown, msg: string) => { if (!condition) throw Error(msg); };
+assert(b && b.enter && b.id === L.buildings.length - 1, 'здание не найдено или изменились ID');
+if (!b) throw Error('здание не найдено');
+assert(Math.hypot(b.x - 510, b.z - 512) < 30, 'аукцион далеко от центра');
+assert(!L.buildings.some(o => o.id !== b.id && !o.removed && Math.abs(o.x-b.x) < (o.w+b.w)/2 && Math.abs(o.z-b.z) < (o.d+b.d)/2), 'здание перекрывает другое здание');
+assert(!L.colliders.some(c => c.tag !== 'b'+b.id && c.y1>0.5 && b.door.x>c.x0-.5 && b.door.x<c.x1+.5 && b.door.z>c.z0-.5 && b.door.z<c.z1+.5), 'вход заблокирован');
+assert(!L.roadSegments.some(s => segDist(b.x,b.z,s.ax,s.az,s.bx,s.bz).d < s.w/2+3), 'здание стоит на дороге');
+assert(interiorForBuilding(b.kind) === 'auction', 'нет интерьера');
+const interior = buildInterior('auction');
+assert(interior.acts.some(a => a.action === 'auction') && interior.acts.some(a => a.action === 'exit'), 'нет стойки или выхода');
+console.log('✓ аукционный зал в центре: свободный вход, интерьер и стойка; ID зданий сохранены');
