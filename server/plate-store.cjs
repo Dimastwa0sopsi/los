@@ -3,6 +3,7 @@
  * защиты account_save от перезаписи реестра и согласования передач автомобилей. */
 const { randomInt } = require('node:crypto');
 const { normalizeLogin, MAX_STATE_BYTES } = require('./account-store.cjs');
+const { createRevisionHistory } = require('./account-revisions.cjs');
 const PRICE = 5000;
 const LETTERS = 'АВЕКМНОРСТУХ';
 function plate() { return `${LETTERS[randomInt(12)]}${String(randomInt(1000)).padStart(3, '0')}${LETTERS[randomInt(12)]}${LETTERS[randomInt(12)]}${String(randomInt(1,100)).padStart(2,'0')}`; }
@@ -14,6 +15,7 @@ function createPlateStore(db, generator = plate) {
     CREATE TABLE IF NOT EXISTS plate_requests (
       account_key TEXT NOT NULL, request_id TEXT NOT NULL, vehicle_uid TEXT NOT NULL,
       number TEXT NOT NULL, revision INTEGER NOT NULL, PRIMARY KEY(account_key,request_id));`);
+  const history = createRevisionHistory(db);
   const account = db.prepare('SELECT state_json,revision FROM accounts WHERE login_key=?');
   const update = db.prepare('UPDATE accounts SET state_json=?,revision=revision+1,save_id=NULL WHERE login_key=? AND revision=?');
   const byRequest = db.prepare('SELECT * FROM plate_requests WHERE account_key=? AND request_id=?');
@@ -46,6 +48,8 @@ function createPlateStore(db, generator = plate) {
     Object.assign(cars[0].tuning, { plate: num, plateFront: true, plateBack: true });
     const json = JSON.stringify(state); if (Buffer.byteLength(json, 'utf8') > MAX_STATE_BYTES) fail('state_too_large');
     if (!update.run(json, key, revision).changes) fail('conflict');
+    history.record(key, revision, row.state_json);
+    history.record(key, revision + 1, json);
     db.prepare('INSERT INTO plate_requests VALUES (?,?,?,?,?)').run(key, requestId, uid, num, revision + 1);
     return { number: num, revision: revision + 1, replay: false };
   });
