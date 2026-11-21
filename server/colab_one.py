@@ -27,6 +27,7 @@ PORT     = 7860
 NODE_VER = 'v20.18.1'
 PYN      = '7.2.3'          # версия pyngrok, с которой дружит Colab
 REPO     = 'https://github.com/Dimastwa0sopsi/los.git'
+BRANCH   = os.environ.get('LOS_BRANCH', 'main')
 
 def say(icon, *m): print(f'{icon} \033[1m{" ".join(map(str, m))}\033[0m')
 
@@ -95,13 +96,13 @@ json.dump(cfg, open(CFG_F, 'w'))
 
 # ── свежий код игры (подтягивается при каждом Run) ─────────────────────────
 APP = LG + '/app'
-say('⬇️', 'Обновляю код игры с GitHub (ветка main)…')
+say('⬇️', f'Обновляю код игры с GitHub (ветка {BRANCH})…')
 if os.path.isdir(APP + '/.git'):
     run(f"git -C '{APP}' remote set-url origin {REPO}", quiet=True)
-    out = run(f"git -C '{APP}' fetch --depth 1 origin main && git -C '{APP}' reset --hard FETCH_HEAD")
+    out = run(f"git -C '{APP}' fetch --depth 1 origin '{BRANCH}' && git -C '{APP}' reset --hard FETCH_HEAD")
 else:
     shutil.rmtree(APP, ignore_errors=True)
-    out = run(f"git clone --depth 1 -b main {REPO} '{APP}'")
+    out = run(f"git clone --depth 1 -b '{BRANCH}' {REPO} '{APP}'")
 APP_BUILD = run(f"git -C '{APP}' log -1 --format='%h %cd' --date=format:'%d.%m.%Y %H:%M'",
                 quiet=True).strip()
 try:
@@ -265,7 +266,7 @@ def public_ok():
 
 
 def start_tunnel():
-    """Поднять ngrok по плану: постоянный домен → случайный адрес."""
+    """Поднять ngrok на постоянном домене; случайная ссылка не заменяет его."""
     say('🌐', 'Туннель ngrok…')
     try:
         ngrok.kill()
@@ -273,6 +274,8 @@ def start_tunnel():
         pass
     last = ''
     for step in CL.tunnel_plan(dom):
+        if dom and not step.get('domain'):
+            continue  # клиент настроен на постоянный домен, случайный адрес не подходит
         try:
             kwargs = {k: v for k, v in step.items() if k != 'try'}
             t = ngrok.connect(PORT, 'http', **kwargs)
@@ -329,6 +332,18 @@ def heal(max_rounds=3):
 
 # 1) глушим прошлый запуск и освобождаем порт
 kill_server()
+
+# Перед первой миграцией копируем старую базу SQLite целиком, включая WAL.
+import sqlite3
+old_db = LG + '/data/game.db'
+backup_db = LG + '/data/game-before-accounts.db'
+if os.path.exists(old_db) and not os.path.exists(backup_db):
+    try:
+        with sqlite3.connect(old_db) as src, sqlite3.connect(backup_db) as dst:
+            src.backup(dst)
+        say('💾', 'Резервная копия прежней базы:', backup_db)
+    except Exception as e:
+        die('❌', 'Не удалось создать резервную копию базы:', e)
 
 # 2) туннель
 tunnel = start_tunnel()

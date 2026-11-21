@@ -15,6 +15,7 @@ const t = (name: string, ok: boolean, extra = '') => {
 
 async function main() {
 const W = await buildWorldMeshes(L, () => {});
+t('прибой имеет прозрачный материал, а не фиолетовый fallback', !!W.shore && W.shore.userData.matKey === 'foam' && (W.shore.material as THREE.MeshLambertMaterial).transparent && (W.shore.material as THREE.MeshLambertMaterial).color.getHex() !== 0xff00ff);
 t('чанки мира собраны', W.chunks.length > 100, `${W.chunks.length}`);
 t('щитов в геометрии столько же, сколько в лейауте', W.billboards.length === L.billboards.length, `${W.billboards.length}`);
 t('у щитов есть лицевые панели', W.billboards.every((b) => b.mesh && b.mesh.isMesh));

@@ -49,20 +49,21 @@ try {
     const a = L.nodes[e.a], b = L.nodes[e.b];
     return (a.x === ax && a.z === az && b.x === bx && b.z === bz) || (b.x === ax && b.z === az && a.x === bx && a.z === bz);
   });
-  if (!edgeAt(540, -300, 560, -262)) throw new Error('концы улиц Сосновки не соединены');
+  if (!edgeAt(540, -340, 560, -302)) throw new Error('концы улиц Сосновки не соединены');
   if (!edgeAt(610, -290, 660, -290)) throw new Error('нет дороги Сосновка — Егоровка');
   if (edgeAt(780, -350, 780, -290)) throw new Error('посередине Егоровки осталась дорога');
   if (!L.buildings.some(b => b.kind === 'vshop' && b.village === 'Ольховка' && b.w >= 20)) throw new Error('нет большого сельмага Ольховки');
   if (!L.props.some(p => p.t === 'fountain' && p.x > 680 && p.x < 880 && p.z < -290 && p.z > -350)) throw new Error('нет фонтана Егоровки');
-  const start = L.nodes.find(n => n.x === 560 && n.z === -262)!;
+  const start = L.nodes.find(n => n.x === 560 && n.z === -302)!;
   const finish = L.nodes.find(n => n.x === 680 && n.z === -290)!;
   const visited = new Set([start.id]), queue = [start.id];
   while (queue.length) for (const e of L.adj[queue.shift()!] || []) if (!visited.has(e.n)) { visited.add(e.n); queue.push(e.n); }
   if (!visited.has(finish.id)) throw new Error('Егоровка не соединена с Сосновкой');
   if (new Set(L.buildings.map(b => b.id)).size !== L.buildings.length || L.buildings.some((b, i) => b.id !== i)) throw new Error('неуникальные ID зданий');
   if (L.garages.length < 34 || new Set(L.garages.map(g => g.id)).size !== L.garages.length) throw new Error('недостаточно гаражей или повторяются ID');
+  if (!L.villages.some(v => v.name === 'Сосновка' && v.sz === -340 && v.ez === -340)) throw new Error('Сосновка не отодвинута от города');
   if (L.buildings.filter(b => b.kind === 'vhouse' && b.village === 'Сосновка').length < 22) throw new Error('нет новых домов Сосновки');
-  if (L.props.some(p => ['bench', 'path', 'towel'].includes(p.t) && p.x >= 544 && p.x <= 590 && p.z >= -300 && p.z <= -263)) throw new Error('декорации мешают новой дороге');
+  if (L.props.some(p => ['bench', 'path', 'towel'].includes(p.t) && p.x >= 544 && p.x <= 590 && p.z >= -340 && p.z <= -303)) throw new Error('декорации мешают новой дороге');
   const klen = L.nodes.find(n => n.x === 820 && n.z === 1830)!;
   const olh = L.nodes.find(n => n.x === 994 && n.z === 1560)!;
   const reached = new Set([klen.id]), q = [klen.id];

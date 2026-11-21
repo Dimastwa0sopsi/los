@@ -30,7 +30,9 @@
     "check:tuning": "esbuild scripts/tuning-check.ts --bundle --platform=node --format=cjs --outfile=.check/tuning.cjs --log-level=error --loader:.png=empty --define:import.meta.env={} && node .check/tuning.cjs",
     "check:plates": "esbuild scripts/plates-check.ts --bundle --platform=node --format=cjs --outfile=.check/plates.cjs --log-level=error --loader:.png=empty --define:import.meta.env={} && node .check/plates.cjs",
     "check:mask": "esbuild scripts/mask-check.ts --bundle --platform=node --format=cjs --outfile=.check/mask.cjs --log-level=error --loader:.png=empty --define:import.meta.env={} && node .check/mask.cjs",
-    "check:money-sync": "esbuild scripts/money-sync-check.ts --bundle --platform=node --format=cjs --outfile=.check/money-sync.cjs --log-level=error --loader:.png=empty --define:import.meta.env={} && node .check/money-sync.cjs"
+    "check:money-sync": "esbuild scripts/money-sync-check.ts --bundle --platform=node --format=cjs --outfile=.check/money-sync.cjs --log-level=error --loader:.png=empty --define:import.meta.env={} && node .check/money-sync.cjs",
+    "check:road-surfaces": "esbuild scripts/road-surface-check.ts --bundle --platform=node --format=cjs --outfile=.check/road-surfaces.cjs --log-level=error && node .check/road-surfaces.cjs",
+    "check:sosnovka": "esbuild scripts/sosnovka-check.ts --bundle --platform=node --format=cjs --outfile=.check/sosnovka.cjs --log-level=error && node .check/sosnovka.cjs"
   },
   "dependencies": {
     "clsx": "2.1.1",

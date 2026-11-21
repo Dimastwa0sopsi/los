@@ -153,13 +153,13 @@ interface Msg {
   money?: number; player?: ServerPlayer;
   players?: PlayersListEntry[] | Record<string, LegacyPlayer | PlayersListEntry>;
   x?: number; z?: number; rot?: number;
-  act?: string; reason?: string;
+  act?: string; reason?: string; accountState?: unknown; accountRevision?: number; accountSaveId?: string; revision?: number; accounts?: number;
   /** 🎁 выдача предметов из панели Colab: режим, id предмета, количество */
   mode?: string; item?: string; qty?: number;
   /** авторизация онлайна: токен устройства и пароль-подсказка */
   token?: string; pass?: string;
   /** что умеет сервер (наш сервер пересылает §-протокол и умеет админ-команды) */
-  caps?: { state?: number; peds?: number; adm?: number; relay?: number };
+  caps?: { state?: number; peds?: number; adm?: number; relay?: number; accounts?: number };
   /** реклама на щитах: полный список от сервера и ответ на покупку */
   ads?: Record<string, RemoteAd>; ok?: boolean; error?: string;
   /** машиночитаемая причина отказа входа: banned / maintenance / device / replaced / name */
@@ -296,7 +296,14 @@ export class NetClient {
   /** входящий перевод от другого игрока */
   onGift: ((from: number, g: { k: 'money' | 'item'; v: number | string; n: number; nick: string }) => void) | null = null;
   /** login_success: сервер прислал деньги/координаты (first — первый вход) */
-  onLogin: ((p: ServerPlayer, first: boolean) => void) | null = null;
+  onLogin: ((p: ServerPlayer, first: boolean, state?: unknown) => void) | null = null;
+  onSaveError: ((text: string) => void) | null = null;
+  private revision: number | null = null;
+  private flight: { json: string; revision: number; id: string } | null = null;
+  private pending: string | null = null;
+  private conflict = false;
+  private handshake = false;
+  get accountSaved() { return !this.flight && !this.pending && !this.conflict && this.authenticated; }
   /** {type:'error'} — бан/кик: показать текст и отключиться */
   onError: ((text: string) => void) | null = null;
   /** сервер недоступен (не удалось подключиться) */
@@ -316,14 +323,12 @@ export class NetClient {
   money = 0;
   /** токен устройства для этого ника */
   token = '';
-  constructor(public nick: string, public gender: 'm' | 'f' = 'm', public url = getServerUrl()) {
-    this.token = onlineToken(nick);
-  }
+  constructor(public nick: string, public gender: 'm' | 'f' = 'm', public url = getServerUrl(), private credentials?: { mode: 'login' | 'register'; password: string; backup?: string }) {}
   /** локальное зеркало серверного баланса (только для отправки save) */
   setMoney(v: number) { this.money = Math.max(0, Math.min(2147483647, Math.round(v))); }
   private loginMsg() {
     // никах денег: новый ник создаётся сервером с чистым стартовым капиталом
-    return { type: 'login', name: this.nick, gender: this.gender, token: this.token };
+    return { type: 'login', name: this.nick, gender: this.gender, ...this.credentials, mode: this.loggedOnce ? 'login' : this.credentials?.mode };
   }
 
   get legacyServer() { return this.legacy; }
@@ -348,8 +353,9 @@ export class NetClient {
     ws.onopen = () => {
       window.clearTimeout(this.connectTimer);
       this.status = 'online'; this.retry = 0; this.everConnected = true;
-      // протокол: сразу логинимся
-      this.send(this.loginMsg());
+      // Пароль отправляется только серверу, подтвердившему поддержку аккаунтов.
+      this.handshake = false;
+      this.connectTimer = window.setTimeout(() => { if (this.ws === ws && !this.handshake) this.die('Обновите сервер Colab: безопасный вход не поддерживается'); }, CONNECT_TIMEOUT);
       this.sys('Подключено к серверу');
       this.onChange?.();
     };
@@ -387,7 +393,7 @@ export class NetClient {
     this.onChange?.();
   }
   /** попытка снова войти после ошибки (кнопка «Повторить» в окне) */
-  retryLogin() { this.dead = false; this.want = false; this.rejoin = 0; this.kicked = null; this.connect(); }
+  retryLogin() { const ws = this.ws; this.ws = null; try { ws?.close(); } catch { /* */ } this.authenticated = false; this.dead = false; this.want = true; this.rejoin = 0; this.retry = 0; this.kicked = null; this.open(); }
   /** окончательно отключаемся: текстом бана или «сервер недоступен» */
   private die(text: string | null) {
     this.dead = true; this.want = false;
@@ -407,7 +413,16 @@ export class NetClient {
     try { m = JSON.parse(raw) as Msg; } catch { return; }
     const now = performance.now();
     switch (m.type) {
-      case 'login_success': this.onLoginSuccess(m, now); return;
+      case 'hello':
+        if (m.accounts !== 1 || this.handshake || !this.credentials) return;
+        this.handshake = true; window.clearTimeout(this.connectTimer); this.send(this.loginMsg()); return;
+      case 'login_success':
+        if (!this.handshake || !m.caps?.accounts || !Number.isSafeInteger(m.accountRevision)) { this.die('Сервер не поддерживает безопасные аккаунты'); return; }
+        this.onLoginSuccess(m, now); return;
+      case 'account_saved':
+        if (!this.flight) return;
+        if (!m.ok || m.revision !== this.flight.revision + 1) { this.conflict = true; this.onSaveError?.('Сохранение отклонено. Не выходите: проверьте соединение и обратитесь к администратору.'); return; }
+        this.revision = m.revision; this.flight = null; this.flushAccount(); return;
       case 'players_list': this.applyPlayers(m.players, now, false); return;
       case 'chat': this.onChatMsg(m, now); return;
       case 'error': {
@@ -457,6 +472,13 @@ export class NetClient {
     // поз и мест в авто. Теперь включаем сразу по caps, а если сервер старый — пробуем один пакет.
     if (m.caps && (m.caps.state || m.caps.relay)) this.legacy = true;
     this.probeSent = false;
+    const next = m.accountRevision!;
+    if (this.loggedOnce && this.revision !== null) {
+      const expected = this.flight?.revision ?? this.revision;
+      if (this.flight && next === expected + 1 && m.accountSaveId === this.flight.id) this.flight = null;
+      else if (next !== expected) { this.conflict = true; this.onSaveError?.('Конфликт сохранения: аккаунт открыт в другой сессии'); }
+    }
+    this.revision = next;
     const p = m.player ?? {};
     const id = num(p.id) ?? num(m.id);
     this.me = { ...p, id: id ?? this.id ?? undefined, name: String(p.name ?? p.nick ?? m.name ?? this.nick).slice(0, 24), gender: gOf(p.gender ?? m.gender, this.gender) };
@@ -479,15 +501,15 @@ export class NetClient {
       if (typeof p.money === 'number') base.money = p.money;
       this.players.set(selfId, base);
     }
-    const tok = typeof m.token === 'string' ? m.token : '';
-    if (tok) { this.token = tok; setOnlineToken(this.nick, tok); }
     if (typeof this.me.money === 'number') this.money = this.me.money;
     this.rejoin = 0;
     this.authenticated = true; this.lastSaveMoney = NaN;
     const first = !this.loggedOnce;
     this.loggedOnce = true;
     if (first) this.sys(`Вы вошли как ${this.nick}`);
-    this.onLogin?.(this.me, first);
+    this.onLogin?.(this.me, first, m.accountState);
+    if (this.flight && !this.conflict) this.send({ type: 'account_save', revision: this.flight.revision, saveId: this.flight.id, state: JSON.parse(this.flight.json) });
+    else this.flushAccount();
     this.onChange?.();
   }
 
@@ -626,6 +648,19 @@ export class NetClient {
     this.money = m;
     if (!this.authenticated || !this.ws || this.ws.readyState !== WebSocket.OPEN || m === this.lastSaveMoney) return;
     try { this.ws.send(JSON.stringify({ type: 'save', money: m })); this.lastSaveMoney = m; } catch { /* повторим при следующем обновлении */ }
+  }
+  saveAccount(state: unknown) {
+    try { this.pending = JSON.stringify(state); } catch { this.onSaveError?.('Не удалось подготовить сохранение'); return; }
+    this.flushAccount();
+  }
+  private flushAccount() {
+    if (!this.authenticated || this.conflict || this.flight || this.pending === null || this.revision === null || !this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    const json = this.pending;
+    try {
+      const id = crypto.randomUUID();
+      this.ws.send(JSON.stringify({ type: 'account_save', revision: this.revision, saveId: id, state: JSON.parse(json) }));
+      this.flight = { json, revision: this.revision, id }; this.pending = null;
+    } catch { /* повтор после переподключения */ }
   }
   /** {type:'move', x, z, rot} — вызывается 15 раз в секунду из игрового цикла */
   sendMove(x: number, z: number, rot = 0) {

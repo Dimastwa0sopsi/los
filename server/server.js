@@ -24,6 +24,7 @@ const LIVE_PATH = 'server/live.json';
 // что на порту висит старый процесс (после обновления сервера он перезапускается сам)
 const { checkText: checkAdText } = require('./moderation.cjs');
 const { createAdsStore, AD_TTL } = require('./ads.cjs');
+const { createAccountStore, normalizeLogin } = require('./account-store.cjs');
 
 const BUILD = (() => {
   try { return crypto.createHash('sha1').update(fs.readFileSync(__filename)).digest('hex').slice(0, 12); }
@@ -36,6 +37,18 @@ db.pragma('journal_mode = WAL');
 // база лежит на Google Drive: записи бывают медленными — ждём блокировку, а не падаем
 db.pragma('busy_timeout = 8000');
 db.pragma('synchronous = NORMAL');
+const accounts = createAccountStore(db);
+const attempts = new Map();
+let authJobs = 0;
+function allowLogin(name) {
+  const key = normalizeLogin(name).slice(0, 64), now = Date.now();
+  const recent = (attempts.get(key) || []).filter(t => now - t < 60000);
+  if (recent.length >= 10) return false;
+  if (!attempts.has(key) && attempts.size >= 5000) { for (const [k, v] of attempts) if (now - v[v.length - 1] >= 60000) attempts.delete(k); if (attempts.size >= 5000) return false; }
+  recent.push(now); attempts.set(key, recent);
+  if (attempts.size > 5000) for (const [k, v] of attempts) if (now - v[v.length - 1] >= 60000) attempts.delete(k);
+  return true;
+}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS players (
@@ -59,6 +72,12 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, text TEXT, t INTEGER
   );
 `);
+
+// Старые тестовые игроки не имеют паролей; удаляем их единожды, включая старые права.
+db.exec('CREATE TABLE IF NOT EXISTS schema_flags (name TEXT PRIMARY KEY)');
+if (!db.prepare('SELECT 1 FROM schema_flags WHERE name = ?').get('accounts_v1')) {
+  db.transaction(() => { db.exec('DELETE FROM players'); db.prepare('INSERT INTO schema_flags VALUES (?)').run('accounts_v1'); })();
+}
 
 // миграция старых баз: добавляем колонку токена устройства
 try { db.exec("ALTER TABLE players ADD COLUMN token TEXT NOT NULL DEFAULT ''"); } catch { /* колонка уже есть */ }
@@ -1134,32 +1153,32 @@ process.on('unhandledRejection', (e) => {
   process.exit(1);
 });
 
-const wss = new WebSocket.Server({ server });
+const wss = new WebSocket.Server({ server, maxPayload: 1100000 });
 
 wss.on('connection', (ws) => {
-  let me = null;
-  ws.on('message', (raw) => {
+  send(ws, { type: 'hello', accounts: 1 });
+  let me = null, account = null, authBusy = false;
+  ws.on('message', async (raw) => {
     let m; try { m = JSON.parse(raw); } catch { return; }
 
     if (m.type === 'login') {
-      const name = String(m.name || '').trim().slice(0, 16);
-      if (name.length < 2) return send(ws, { type: 'error', code: 'name', text: 'Ник должен быть от 2 до 16 символов' });
-      const token = String(m.token || '').slice(0, 64);
-      let row = q.byName.get(name);
-      if (!row) { q.create.run(name, m.gender === 'f' ? 'f' : 'm', Date.now()); row = q.byName.get(name); }
+      if (me || authBusy) return;
+      const name = typeof m.name === 'string' ? m.name.normalize('NFKC').trim() : '';
+      if (!allowLogin(name)) return send(ws, { type: 'error', code: 'auth', text: 'Слишком много попыток. Подождите минуту.' });
+      if (!['login', 'register'].includes(m.mode)) return send(ws, { type: 'error', code: 'auth', text: 'Войдите с паролем через планшет' });
+      if (authJobs >= 8) return send(ws, { type: 'error', code: 'auth', text: 'Сервер занят, попробуйте ещё раз' });
+      authBusy = true; authJobs++;
+      let result;
+      try { result = m.mode === 'register' ? await accounts.register(name, m.password, m.backup || '') : await accounts.login(name, m.password); }
+      catch (e) { console.error('[auth]', e.message); authBusy = false; authJobs--; return send(ws, { type: 'error', code: 'auth', text: 'Ошибка авторизации' }); }
+      authBusy = false; authJobs--;
+      if (ws.readyState !== WebSocket.OPEN) return;
+      if (!result.ok) return send(ws, { type: 'error', code: 'auth', text: result.error === 'exists' ? 'Этот ник уже занят' : result.error === 'invalid' ? 'Проверьте ник и пароль: минимум 10 символов' : 'Неверный ник или пароль' });
+      let row = q.byName.get(result.login);
+      if (!row) { q.create.run(result.login, m.gender === 'f' ? 'f' : 'm', Date.now()); row = q.byName.get(result.login); }
       if (row.banned) return send(ws, { type: 'error', code: 'banned', text: row.ban_reason || 'Вы забанены' });
-      // техработы: пускаем только админов
       if (MAINTENANCE && !row.is_admin) return send(ws, { type: 'error', code: 'maintenance', text: 'Сервер на техобслуживании — зайдите позже' });
-      // привязка к устройству: по умолчанию мягкая (новое устройство забирает ник),
-      // строгая — только при STRICT_DEVICE=1, иначе чистка localStorage навсегда закрывала вход
-      if (!row.token) { if (token) { q.token.run(token, row.name); row.token = token; } }
-      else if (token !== row.token) {
-        if (STRICT_DEVICE && !row.is_admin) {
-          return send(ws, { type: 'error', code: 'device', text: `Ник «${row.name}» закреплён за другим устройством. Сбросьте привязку в админ-панели или возьмите другой ник.` });
-        }
-        q.token.run(token, row.name); row.token = token;
-        console.log(`[login] ${row.name}: новое устройство, привязка обновлена`);
-      }
+      account = result;
       // один игрок — одна сессия: старую сессию закрываем и пускаем новую.
       // Раньше второй вход отклонялся, и после перезагрузки страницы игрок не мог зайти,
       // пока сервер не заметит мёртвый сокет.
@@ -1172,7 +1191,7 @@ wss.on('connection', (ws) => {
       // деньги — только серверные: локальный сейв клиента в онлайн не переносится
       me = row; active.set(row.id, { ws, row }); ws.playerId = row.id;
       console.log(`[login] ${row.name} вошёл (онлайн: ${active.size})`);
-      send(ws, { type: 'login_success', token: row.token || '', caps: { state: 1, peds: 1, adm: 1, relay: 1 }, player: {
+      send(ws, { type: 'login_success', accountState: account.state, accountRevision: account.revision, accountSaveId: account.saveId, caps: { state: 1, peds: 1, adm: 1, relay: 1, accounts: 1 }, player: {
         id: row.id, name: row.name, gender: row.gender, money: row.money,
         x: row.pos_x, z: row.pos_z, rot: row.pos_rot, number: row.car_number, carNumber: row.car_number,
       } });
@@ -1181,8 +1200,21 @@ wss.on('connection', (ws) => {
       return;
     }
 
-    if (!me) return;
+    if (!me || active.get(me.id)?.ws !== ws) return;
     const row = me;
+
+    if (m.type === 'account_save') {
+      const value = Number(m.state?.money);
+      if (!Number.isFinite(value)) return send(ws, { type: 'account_saved', ok: false, error: 'invalid' });
+      const result = db.transaction(() => {
+        const r = accounts.save(account.login, m.state, m.revision, m.saveId);
+        if (r.ok) { row.money = money(value); q.money.run(row.money, row.name); }
+        return r;
+      })();
+      if (result.ok) { account.revision = result.revision; pushPlayers(); }
+      send(ws, { type: 'account_saved', ...result });
+      return;
+    }
 
     if (m.type === 'move') {
       const x = Number(m.x), z = Number(m.z), rot = Number(m.rot) || 0;
@@ -1222,13 +1254,6 @@ wss.on('connection', (ws) => {
       if (GLOBAL_MUTE && !row.is_admin) { send(ws, { type: 'chat', name: 'СИСТЕМА', text: 'Чат временно отключён администратором' }); return; }
       q.log.run(row.name, text, Date.now());
       broadcast({ type: 'chat', id: row.id, name: row.name, text });
-      return;
-    }
-
-    if (m.type === 'save') {
-      // Клиент присылает баланс после операций; сохраняем и траты, и доходы.
-      const money = Number(m.money);
-      if (isFinite(money)) acceptClientMoney(row, money);
       return;
     }
 

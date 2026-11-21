@@ -6,7 +6,7 @@ import { Modal } from './MenuScreens';
 /** текст, который показываем, если сервер не отвечает */
 export const SERVER_DOWN_TEXT = 'Сервер отключен, заходите позже';
 
-export type JoinLaunch = { mode: 'solo' | 'online'; nick: string; gender: 'm' | 'f' };
+export type JoinLaunch = { mode: 'solo' | 'online'; nick: string; gender: 'm' | 'f'; credentials?: { mode: 'login' | 'register'; password: string; backup?: string } };
 
 /** Ошибка подключения без отдельной проверки сервера. */
 export function ServerDownModal({ text, onMenu, onRetry, onSolo }: { text?: string | null; onMenu: () => void; onRetry?: () => void; onSolo?: () => void }) {
@@ -63,6 +63,9 @@ export function OnlineJoin({ variant = 'start', g, initial, onLaunch, onClose, o
   const [nick, setNick] = useState(startNick);
   const [gender, setGender] = useState<'m' | 'f'>(startGender);
   const [busy] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [password, setPassword] = useState('');
+  const [backup, setBackup] = useState('');
   const [down, setDown] = useState<string | null>(null);
   // те же правила, что и в Game.enterOnline: буквы/цифры/пробел/_-. , 2–16 символов
   const valid = /^[\p{L}\p{N} _\-.]{2,16}$/u.test(nick.trim());
@@ -70,8 +73,8 @@ export function OnlineJoin({ variant = 'start', g, initial, onLaunch, onClose, o
   const alreadyOnline = !!g?.online;
 
   const goOnline = () => {
-    if (busy || !valid) return;
-    onLaunch({ mode: 'online', nick: clean(), gender });
+    if (busy || !valid || (variant === 'panel' && (password.length < 10 || (authMode === 'register' && backup.length > 0 && backup.length < 10)))) return;
+    onLaunch({ mode: 'online', nick: clean(), gender, credentials: variant === 'panel' ? { mode: authMode, password, backup: authMode === 'register' ? backup : '' } : undefined });
   };
   const goSolo = () => onLaunch({ mode: 'solo', nick: clean(), gender });
 
@@ -79,19 +82,23 @@ export function OnlineJoin({ variant = 'start', g, initial, onLaunch, onClose, o
     return (
       <>
         <Modal title="🌐 Онлайн" onClose={onClose ?? (() => {})}>
-          {info?.exists && (
-            <div className="lg-card mb-3">
-              <b>Онлайн-сохранение</b>
-              <p className="text-sm">Пол: {info.gender === 'f' ? 'женский' : 'мужской'} · деньги ${info.money.toLocaleString('ru')} · {info.place || 'на улице'}</p>
-            </div>
-          )}
-          <Fields nick={nick} setNick={setNick} gender={gender} setGender={setGender} disabled={busy} onEnter={goOnline} />
+          <div className="flex gap-2 mb-3">
+            <button className={`lg-btn ${authMode === 'login' ? 'lg-btn-main' : ''}`} onClick={() => setAuthMode('login')}>Вход</button>
+            <button className={`lg-btn ${authMode === 'register' ? 'lg-btn-main' : ''}`} onClick={() => setAuthMode('register')}>Регистрация</button>
+          </div>
+          <label className="font-bold block mb-1">Никнейм</label>
+          <input className="lg-input" value={nick} maxLength={16} autoComplete="username" placeholder="Ник от 2 до 16 символов" onChange={e => setNick(e.target.value)} onKeyDown={e => e.stopPropagation()} />
+          <label className="font-bold block mt-3 mb-1">Пароль</label>
+          <input className="lg-input" type="password" value={password} autoComplete={authMode === 'login' ? 'current-password' : 'new-password'} placeholder="Не менее 10 символов" onChange={e => setPassword(e.target.value)} onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') goOnline(); }} />
+          {authMode === 'register' && <>
+            <label className="font-bold block mt-3 mb-1">Запасной пароль (необязательно)</label>
+            <input className="lg-input" type="password" value={backup} autoComplete="new-password" placeholder="Не менее 10 символов" onChange={e => setBackup(e.target.value)} onKeyDown={e => e.stopPropagation()} />
+            <label className="font-bold block mt-3 mb-1">Пол персонажа</label>
+            <div className="lg-join-g"><button className={`lg-btn ${gender === 'm' ? 'on' : ''}`} onClick={() => setGender('m')}>Мужской</button><button className={`lg-btn ${gender === 'f' ? 'on' : ''}`} onClick={() => setGender('f')}>Женский</button></div>
+          </>}
+          <p className="text-xs opacity-60 mt-2">{authMode === 'login' ? 'Можно ввести основной или запасной пароль.' : 'Запомните пароль: аккаунт не привязан к устройству.'}</p>
           <div className="flex flex-col gap-2 mt-4">
-            {!alreadyOnline && (
-              <button className="lg-btn lg-btn-main" disabled={!valid || busy} style={{ opacity: valid && !busy ? 1 : 0.5 }} onClick={goOnline}>
-                {busy ? 'Подключение…' : 'Войти в онлайн'}
-              </button>
-            )}
+            {!alreadyOnline && <button className="lg-btn lg-btn-main" disabled={!valid || password.length < 10 || (authMode === 'register' && !!backup && backup.length < 10)} onClick={goOnline}>{authMode === 'login' ? 'Подключиться' : 'Зарегистрироваться'}</button>}
             <button className="lg-btn" onClick={goSolo}>{alreadyOnline ? '🎮 соло' : '🎮 локальная игра'}</button>
           </div>
           {alreadyOnline && <p className="text-xs opacity-60 mt-2">Ё — выйти из онлайна</p>}

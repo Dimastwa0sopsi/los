@@ -20,9 +20,9 @@ CFG = {
     # ⚠️ НИКОГДА не вписывайте токен в файл — он попадает в репозиторий и утекает.
     # Оставьте пустым: при запуске ячейка сама спросит токен скрытым вводом.
     'NGROK_TOKEN':  '',                        # можно задать здесь ИЛИ через переменную окружения NGROK_TOKEN
-    'NGROK_DOMAIN': '',                        # необязательно: статический домен ngrok
+    'NGROK_DOMAIN': 'sandbank-economic-zeppelin.ngrok-free.dev', # постоянный домен сервера
     'GH_TOKEN':     '',                        # необязательно: contents:write → live.json обновится сам
-    'ADMIN_TOKEN':  'losgorod-admin',
+    'ADMIN_TOKEN':  '',                         # вводится скрыто, не сохраняйте в коде
     'PORT':         3000,
     'GAME_DIR':     '/content/drive/MyDrive/MyGame',
     'GAME_SITE':    'https://dimastwa0sopsi.github.io/los/',
@@ -36,7 +36,12 @@ CFG = {
 CFG['GAME_DIR'] = os.environ.get('GAME_DIR', CFG['GAME_DIR'])
 GAME_DIR = CFG['GAME_DIR']
 PORT = int(CFG['PORT'])
-ADMIN_TOKEN = CFG['ADMIN_TOKEN']
+ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN', '').strip()
+if not ADMIN_TOKEN:
+    import getpass
+    ADMIN_TOKEN = getpass.getpass('Секретный токен админ-панели (не менее 12 символов): ').strip()
+if len(ADMIN_TOKEN) < 12 or ADMIN_TOKEN == 'losgorod-admin':
+    raise SystemExit('Нужен секретный токен админ-панели длиной не менее 12 символов')
 API = f'http://127.0.0.1:{PORT}'
 os.environ.update({'ADMIN_API': API, 'ADMIN_TOKEN': ADMIN_TOKEN, 'GAME_DIR': GAME_DIR,
                    'GAME_URL': CFG['GAME_SITE'], 'GH_REPO': CFG['GH_REPO']})
@@ -204,6 +209,11 @@ def step_files():
         say('⬇️', f'server.js обновлён с {mirror} ({len(fresh) // 1024} КБ)')
     else:
         say('✅', f'server.js уже свежий ({len(fresh) // 1024} КБ)')
+    for module in ('moderation.cjs', 'ads.cjs', 'account-auth.cjs', 'account-store.cjs'):
+        contents, mirror = download(module, min_size=200)
+        with open(os.path.join(GAME_DIR, module), 'w', encoding='utf-8') as f:
+            f.write(contents)
+        say('⬇️', f'{module} обновлён с {mirror}')
     pkg_path = os.path.join(GAME_DIR, 'package.json')
     try:
         pkg = json.load(open(pkg_path, encoding='utf-8'))
@@ -1171,7 +1181,7 @@ def main():
     print('   ', CFG['GAME_SITE'])
     if ws:
         print('Текущий адрес сервера (клиент находит сам):', ws)
-    print('Токен админ-панели:', ADMIN_TOKEN, '· база:', os.path.join(GAME_DIR, 'game.db'))
+    print('База:', os.path.join(GAME_DIR, 'game.db'))
     print('Панель — ниже: игроки, деньги, 100 кнопок, чат, сервер и логи.')
     print('=' * 66)
     if CFG['SHOW_PANEL'] != '1':

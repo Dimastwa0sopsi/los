@@ -1389,6 +1389,10 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
         ib.doorSpots.hatch = { x: ib.ox + 0.1, z: ib.oz + 0.9, a: Math.PI, y: 0 };
       }
       if (village) {
+        // Предметы на кухне без коллайдеров, чтобы не перекрывать проход.
+        ib.f('c:#e7e5e4', kitchenX - 0.45, 0.91, back + 0.39, 0.32, 0.05, 0.32, false);
+        ib.f('c:#b45309', kitchenX + 0.5, 0.9, back + 0.39, 0.16, 0.22, 0.16, false);
+        ib.f('c:#a16207', left + 0.3, 1.8, back + 3.1, 0.12, 0.10, 1.2, false);
         // Тёплая печь и посуда у кухни — без дополнительных коллайдеров на проходе.
         ib.f('c:#d6c7ac', right - 0.4, 1.0, -0.6, 0.18, 0.75, 1.0, false);
         ib.f('c:#854d0e', right - 0.28, 1.25, -0.6, 0.04, 0.35, 0.45, false);

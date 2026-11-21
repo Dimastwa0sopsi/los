@@ -1,3 +1,4 @@
+import { visibleRoadIntervals } from './roadSurface';
 // Построение 3D-мира из раскладки: чанки, объединённая геометрия, инстансы
 import * as THREE from 'three';
 import { CHUNK, CELL, ROAD_W, N, SIDEWALK } from './config';
@@ -259,7 +260,7 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
   for (const e of L.edges) {
     const a = L.nodes[e.a], b = L.nodes[e.b];
     let ax = a.x, az = a.z, bx = b.x, bz = b.z;
-    const len = Math.hypot(bx - ax, bz - az); const ux = (bx - ax) / len, uz = (bz - az) / len;
+    const len = Math.hypot(bx - ax, bz - az); if (len < 1e-6) continue; const ux = (bx - ax) / len, uz = (bz - az) / len;
     if (e.kind === 'dirt') {
       const ta = dirtTrim(e.a, ux, uz);
       const tb = dirtTrim(e.b, -ux, -uz);
@@ -272,16 +273,26 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
       : e.kind === 'highway' ? 'road:road_highway6'
       : e.kind === 'avenue' ? 'road:road_highway'
       : e.kind === 'city' ? 'city' : 'road:road_' + e.kind;
-    const mx = (ax + bx) / 2, mz = (az + bz) / 2;
-    const segs = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / 60));
+    const visible = visibleRoadIntervals(L.roadSegments, e.id);
+    const originalLen = Math.hypot(b.x - a.x, b.z - a.z);
+    const startT = Math.hypot(ax - a.x, az - a.z) / originalLen;
+    const endT = 1 - Math.hypot(bx - b.x, bz - b.z) / originalLen;
+    for (const [v0, v1] of visible) {
+    const lo = Math.max(v0, startT), hi = Math.min(v1, endT);
+    if (hi <= lo) continue;
+    const startX = a.x + (b.x - a.x) * lo, startZ = a.z + (b.z - a.z) * lo;
+    const endX = a.x + (b.x - a.x) * hi, endZ = a.z + (b.z - a.z) * hi;
+    const mx = (startX + endX) / 2, mz = (startZ + endZ) / 2;
+    const segs = Math.max(1, Math.ceil(Math.hypot(endX - startX, endZ - startZ) / 60));
     for (let s = 0; s < segs; s++) {
       const t0 = s / segs, t1 = (s + 1) / segs;
-      const sx = ax + (bx - ax) * t0, sz = az + (bz - az) * t0, ex = ax + (bx - ax) * t1, ez = az + (bz - az) * t1;
+      const sx = startX + (endX - startX) * t0, sz = startZ + (endZ - startZ) * t0, ex = startX + (endX - startX) * t1, ez = startZ + (endZ - startZ) * t1;
       const v = Math.abs(Math.round((sx + sz) / 47)) % 3;
       const key = baseKey === 'city' ? (v === 1 ? 'road:road_city2' : v === 2 ? 'road:road_city3' : 'road:road_city') : baseKey;
       stripQuad(B((sx + ex) / 2, (sz + ez) / 2), key, sx, sz, ex, ez, e.w, 0.03, e.w * 2, (Math.hypot(sx - ax, sz - az) / (e.w * 2)));
     }
     void mx; void mz;
+    }
     // зебры у городских перекрёстков
     if (e.kind === 'city' || e.kind === 'avenue') {
       if (a.light || (a.gi! > 0 && a.gi! < N) || true) {
@@ -295,7 +306,17 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
     const deg = L.adj[n.id].length;
     if (n.gi !== undefined) B(n.x, n.z).add('road:patch', T.plane, M(n.x, 0.035, n.z, 0, ROAD_W, ROAD_W, 1, -Math.PI / 2), 12);
     else if (deg !== 2 || true) {
-      const e = L.edges[L.adj[n.id][0].e];
+      const adjoining = L.adj[n.id].map(a => L.edges[a.e]);
+      const e = adjoining.find(edge => edge.kind !== 'dirt') ?? adjoining[0];
+      // Узел грунтовки может оказаться посреди асфальтового ребра с другим ID.
+      // Не накладываем поверх него коричневую круглую заплатку.
+      if (e.kind === 'dirt' && L.roadSegments.some(s => {
+        if (s.kind === 'dirt') return false;
+        const dx = s.bx - s.ax, dz = s.bz - s.az, d2 = dx * dx + dz * dz;
+        if (d2 < 1e-8) return false;
+        const t = Math.max(0, Math.min(1, ((n.x - s.ax) * dx + (n.z - s.az) * dz) / d2));
+        return Math.hypot(n.x - s.ax - t * dx, n.z - s.az - t * dz) < s.w / 2;
+      })) continue;
       const key = e.kind === 'dirt' ? 'road:road_dirt' : 'road:patch';
       B(n.x, n.z).add(key, T.circle, M(n.x, 0.032, n.z, 0, e.w / 2, e.w / 2, 1, -Math.PI / 2), 12);
     }
