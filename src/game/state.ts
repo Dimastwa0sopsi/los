@@ -20,6 +20,7 @@ export interface SvcState {
 }
 export interface Location { b: number; unit?: number; sub?: number }
 export interface KioskOwn { id: number; last: number; acc: number; closed?: boolean }
+export interface StoredPlate { number: string; front: boolean; back: boolean }
 export interface CameraFine { id: string; amount: number; reason: 'speed' | 'no_plate'; speed: number; limit: number; time: number }
 export interface GameState {
   version: number; money: number; health: number; food: number; water: number; energy: number;
@@ -28,6 +29,8 @@ export interface GameState {
   vehicles: OwnedVehicle[]; kiosks: KioskOwn[]; promoUsed: boolean;
   wanted: number; pos: { x: number; z: number; a: number }; location: Location | null; gameTime: number; playTime: number;
   cameraFines?: CameraFine[];
+  /** Номерные таблички одиночного сохранения; не серверный реестр. */
+  plateInventory?: StoredPlate[];
   lastCar: string | null; created: boolean; nick?: string; mag?: number; ammoBy?: Record<string, number>; magBy?: Record<string, number>;
   plants?: Record<string, { crop: string; t: number }>; apps?: string[]; dms?: Record<string, { me: boolean; text: string; t: number }[]>; unread?: Record<string, number>; limited?: string[]; officeJob?: boolean; officeDone?: number; farmJob?: boolean; mineJob?: boolean; mineCoal?: number; mineDepth?: boolean; phoneNum?: string; contacts?: Record<string, string>; quest?: { step: number; done?: boolean; kills?: number }; trucker?: boolean; createdAt?: number;
   locks?: Record<string, boolean>; spawnHome?: string; customized?: boolean; svc?: SvcState;
