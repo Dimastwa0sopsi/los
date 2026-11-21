@@ -4,7 +4,7 @@
  *   npm run check:moderation
  */
 import { createRequire } from 'module';
-import { checkText as clientCheck, hasProfanity as clientProf } from '../src/game/moderation';
+import { checkText as clientCheck, hasProfanity as clientProf, checkChat } from '../src/game/moderation';
 
 const require2 = createRequire(import.meta.url);
 const server = require2('../server/moderation.cjs') as {
@@ -49,5 +49,10 @@ for (const kind of ['ad', 'news']) {
 t('сервер: объявление СМИ принимается', server.checkText('Кафе «Ракета» приглашает на кофе', 'news').ok);
 t('сервер: слишком короткий текст не проходит', !server.checkText('а', 'ad').ok);
 
+for (const x of ['С КС', 'с-е-к-с', 'sex']) t(`реклама режет ${x}`, !clientCheck(x, 'ad').ok && !server.checkText(x, 'ad').ok);
+t('чат допускает мат', checkChat('бля, привет') === null);
+t('чат блокирует любой @', checkChat('привет @а') !== null);
+t('чат блокирует домен', checkChat('сайт пример.рф') !== null);
+t('чат не блокирует телефон', checkChat('12345678901') === null);
 console.log(fail ? `✗ провалов: ${fail}` : '✓ модерация клиента и сервера совпадает');
 process.exit(fail ? 1 : 0);

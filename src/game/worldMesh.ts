@@ -465,7 +465,19 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
     for (const pz of [be.z0 + 14, be.z1 - 14]) B(midX, pz).add('tex:boardwalk', T.plane, M(midX, 0.118, pz, 0, len, 3.2, 1, -Math.PI / 2), 2);
     for (let z = be.z0 + 34; z < be.z1 - 20; z += 42) B(be.x1 - 16, z).add('tex:boardwalk', T.plane, M(be.x1 - 16, 0.118, z, 0, 26, 2.4, 1, -Math.PI / 2), 2);
   }
-  B(-160, 480).add('tex:asphalt', T.plane, M(-158, 0.025, 480, 0, 22, 40, 1, -Math.PI / 2), 6);
+  // Пляжная парковка и короткий съезд с дороги: покрытие выше травы и тротуара.
+  const beachLot = L.lots.find(l => l.name === 'Парковка у пляжа');
+  if (beachLot) {
+    const x = (beachLot.x0 + beachLot.x1) / 2, z = (beachLot.z0 + beachLot.z1) / 2;
+    B(x, z).add('tex:asphalt', T.plane, M(x, 0.14, z, 0, beachLot.x1 - beachLot.x0, beachLot.z1 - beachLot.z0, 1, -Math.PI / 2), 6);
+    B(-132, 466).add('tex:asphalt', T.plane, M(-132, 0.145, 466, 0, 8, 14, 1, -Math.PI / 2), 4);
+  }
+  // Новая АЗС на месте бывшей станции; узкий боковой въезд с дороги.
+  B(-63, 509).add('tex:asphalt', T.plane, M(-63, 0.14, 509, 0, 48, 36, 1, -Math.PI / 2), 6);
+  B(-42, 491).add('tex:asphalt', T.plane, M(-42, 0.145, 491, 0, 8, 12, 1, -Math.PI / 2), 4);
+  // Небольшая площадка для рабочего автобуса напротив АЗС.
+  B(-78, 447).add('tex:asphalt', T.plane, M(-78, 0.14, 447, 0, 22, 18, 1, -Math.PI / 2), 5);
+  B(-78, 464).add('tex:asphalt', T.plane, M(-78, 0.145, 464, 0, 8, 18, 1, -Math.PI / 2), 4);
   const F = L.farm;
   for (const f of [F, ...F.aiFields]) {
     for (let x = f.x0; x < f.x1; x += 60) for (let z = f.z0; z < f.z1; z += 60) {
@@ -523,7 +535,7 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
   }
   // разметка парковок
   for (const lot of L.lots) for (const sp of lot.spaces) {
-    const b = B(sp.x, sp.z); const y = lot.name === 'Парковка' ? 0.165 : 0.03;
+    const b = B(sp.x, sp.z); const y = lot.name === 'Парковка' || lot.name === 'Парковка у пляжа' ? 0.165 : 0.03;
     for (const sx of [-1.45, 1.45]) b.add('c:#f1f1ec', T.box, M(sp.x + sx, y, sp.z, 0, 0.1, 0.02, 5));
   }
   // логистический терминал: асфальт

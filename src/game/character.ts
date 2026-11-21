@@ -13,6 +13,15 @@ function faceMat(L: Look) {
   if (!m) { m = new THREE.MeshLambertMaterial({ map: getTex(k) }); faceMats.set(k, m); }
   return m;
 }
+let losCapMat: THREE.Material | undefined;
+function capLogo(): THREE.Material {
+  if (losCapMat) return losCapMat;
+  const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 64;
+  const ctx = canvas.getContext('2d')!; ctx.fillStyle = '#111827'; ctx.fillRect(0, 0, 256, 64);
+  ctx.fillStyle = '#facc15'; ctx.font = 'bold 35px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('LOS GOROD', 128, 32);
+  const tex = new THREE.CanvasTexture(canvas); tex.colorSpace = THREE.SRGBColorSpace;
+  return losCapMat = new THREE.MeshLambertMaterial({ map: tex });
+}
 const SPH = new THREE.SphereGeometry(1, 10, 8);
 function sp(parent: THREE.Object3D, color: string, rx: number, ry: number, rz: number, x = 0, y = 0, z = 0) {
   const m = new THREE.Mesh(SPH, color.startsWith('@') ? specialMat(color) : mat('c:' + color)); m.scale.set(rx, ry, rz); m.position.set(x, y, z); m.castShadow = true; parent.add(m); return m;
@@ -227,6 +236,7 @@ export class Character {
     switch (this.look.acc) {
       case 'crown': bx(h, '@gold', 0.24, 0.07, 0.25, 0, 0.33, 0); for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI * 2; bx(h, '@gold', 0.04, 0.08, 0.04, Math.sin(a) * 0.11, 0.39, Math.cos(a) * 0.11); } bx(h, '#dc2626', 0.035, 0.035, 0.02, 0, 0.33, 0.13); break;
       case 'halo': { const m = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.015, 6, 20), new THREE.MeshBasicMaterial({ color: 0xfff1a8 })); m.rotation.x = Math.PI / 2; m.position.y = 0.45; h.add(m); break; }
+      case 'los_cap': bx(h, '#111827', 0.255, 0.08, 0.265, 0, 0.3, 0); bx(h, '#111827', 0.22, 0.02, 0.13, 0, 0.27, 0.17); { const logo = new THREE.Mesh(FACE, capLogo()); logo.scale.set(0.19, 0.046, 1); logo.position.set(0, 0.3, 0.133); h.add(logo); } break;
       case 'cap': bx(h, '#111827', 0.255, 0.08, 0.265, 0, 0.3, 0); bx(h, '#111827', 0.22, 0.02, 0.13, 0, 0.27, 0.17); bx(h, '#7c5cff', 0.06, 0.04, 0.005, 0, 0.3, 0.134); break;
       case 'phones': bx(h, '#111', 0.27, 0.03, 0.04, 0, 0.3, 0); for (const sx of [1, -1]) { bx(h, '@neon', 0.04, 0.09, 0.09, sx * 0.13, 0.14, 0); } break;
     }

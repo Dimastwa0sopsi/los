@@ -1,3 +1,4 @@
+import type { Game } from '../game/game';
 import { useState } from 'react';
 import { getServerUrl } from '../game/net';
 
@@ -13,7 +14,7 @@ const sections: [string, string, string[]][] = [
   ['server', '🖥 Сервер', ['server', 'event']], ['log', '📜 Логи', []],
 ];
 
-export function AdminPanel() {
+export function AdminPanel({ g }: { g: Game }) {
   const [token, setToken] = useState('');
   const [connected, setConnected] = useState(false);
   const [state, setState] = useState<State | null>(null);
@@ -36,7 +37,7 @@ export function AdminPanel() {
   const base = getServerUrl().replace(/^wss:/, 'https:').replace(/^ws:/, 'http:').replace(/\/$/, '');
 
   async function request(path: string, body?: object): Promise<Result> {
-    const r = await fetch(base + path, { method: body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json', 'x-admin-token': token, 'ngrok-skip-browser-warning': '1' }, ...(body ? { body: JSON.stringify(body) } : {}) });
+    const r = await fetch(base + path, { method: body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json', 'x-admin-token': token, 'x-game-admin-session': g.net?.adminSession || '', 'ngrok-skip-browser-warning': '1' }, ...(body ? { body: JSON.stringify(body) } : {}) });
     const data = await r.json() as Result;
     if (!r.ok || !data.ok) throw new Error(data.error || `HTTP ${r.status}`);
     return data;
@@ -89,7 +90,7 @@ export function AdminPanel() {
   const players = (state?.players || []).filter(p => p.name.toLowerCase().includes(query.toLowerCase()) && (!onlineOnly || state?.online.includes(p.name)));
   const input = (label: string, value: string, set: (s: string) => void, type = 'text') => <label className="adm-label">{label}<input className="lg-input" type={type} value={value} onChange={e => set(e.target.value)} /></label>;
   return <div className="tb-pad adm-panel">
-    {!connected ? <><p>Введите админ-токен сервера. Он хранится только до закрытия панели.</p>{input('Админ-токен', token, setToken, 'password')}<button className="ui-btn" disabled={busy || !token} onClick={() => void connect()}>🔌 Подключиться</button><small>Адрес: {base}</small></> : <>
+    {!connected ? <><p>Войдите в аккаунт Kitty_Kittys и введите пароль панели.</p>{input('Пароль панели', token, setToken, 'password')}<button className="ui-btn" disabled={busy || !token} onClick={() => void connect()}>🔌 Подключиться</button><small>Адрес: {base}</small></> : <>
       <div className="adm-status">🟢 {state?.online.length || 0} в сети · {state?.players.length || 0} аккаунтов · v{state?.server?.version || '?'}<br /><button className="ui-btn sm" disabled={busy} onClick={() => { void refresh().catch(e => setMessage(String(e))); }}>🔄 Обновить</button> <button className="ui-btn sm" onClick={() => { setConnected(false); setToken(''); setState(null); }}>Отключиться</button></div>
       {input('Поиск игрока', query, setQuery)}<label><input type="checkbox" checked={onlineOnly} onChange={e => setOnlineOnly(e.target.checked)} /> Только онлайн</label>
       <select className="lg-input" aria-label="Выбранный игрок" value={selected} onChange={e => setSelected(e.target.value)}><option value="">Выберите игрока</option>{selected && !players.some(p => p.name === selected) && <option value={selected}>{selected}</option>}{players.map(p => <option key={p.name} value={p.name}>{state?.online.includes(p.name) ? '🟢 ' : ''}{p.name} · ${Number(p.money || 0).toLocaleString('ru')}</option>)}</select>

@@ -413,11 +413,12 @@ export const LIMITED: LimitedDef[] = [
   { id: 'lb_chrome', name: 'Хромированные брюки', icon: '🪩', kind: 'bottom', value: '@chrome', price: 50000, stock: 200 },
   { id: 'la_crown', name: 'Корона', icon: '👑', kind: 'acc', value: 'crown', price: 150000, stock: 50 },
   { id: 'la_halo', name: 'Нимб', icon: '😇', kind: 'acc', value: 'halo', price: 120000, stock: 80 },
+  { id: 'los_gorod_cap', name: 'Кепка LOS GOROD', icon: '🧢', kind: 'acc', value: 'los_cap', price: 0, stock: 0 },
   { id: 'la_cap', name: 'Кепка LosSt', icon: '🧢', kind: 'acc', value: 'cap', price: 8000, stock: 1500 },
   { id: 'la_phones', name: 'Неон-наушники', icon: '🎧', kind: 'acc', value: 'phones', price: 20000, stock: 600 },
 ];
 export function limitedWindow() { return Math.floor(Date.now() / (3 * 3600 * 1000)); }
-export function limitedAvailable(i: number) { return (limitedWindow() + i) % 3 !== 0; }
+export function limitedAvailable(i: number) { return LIMITED[i]?.id !== 'los_gorod_cap' && (limitedWindow() + i) % 3 !== 0; }
 export function limitedLeft(d: LimitedDef, i: number) { const t = (Date.now() / (3 * 3600 * 1000)) % 1; return Math.max(1, Math.round(d.stock * (1 - t * 0.85) - ((i * 37) % 23))); }
 export const DRESSES = new Set(['dress', 'minidress', 'sundress', 'cocktail', 'evening', 'wedding', 'sequin']);
 export const HAIR_COLORS = ['#1a1a1a', '#4a2f1b', '#8b5a2b', '#d9b26a', '#b5462b', '#9e9e9e', '#3b82f6', '#ec4899'];

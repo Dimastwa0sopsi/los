@@ -1,0 +1,13 @@
+import { generateLayout } from '../src/game/worldgen';
+const L = generateLayout();
+const check = (condition: unknown, text: string) => { if (!condition) throw new Error(text); };
+const station = L.buildings.find(b => b.name === 'АЗС · Набережная');
+check(station?.kind === 'gas' && station.enter, 'нет магазина АЗС с входом');
+check(L.props.filter(p => p.t === 'pump' && Math.abs(p.x + 63) < 12 && Math.abs(p.z - 501) < 1).length === 2, 'нет колонок');
+check(L.busDepot.x !== -62 && L.busRoutes.length === 3, 'автобус или маршруты');
+const clear = (x0: number, x1: number, z0: number, z1: number) => !L.colliders.some(c => c.y0 < 2 && c.y1 > 0.4 && c.x0 < x1 && c.x1 > x0 && c.z0 < z1 && c.z1 > z0);
+check(clear(-84, -72, 438, 453), 'место автобуса занято');
+check(clear(-45, -39, 487, 499), 'боковой въезд АЗС загорожен');
+check(clear(-65, -61, 511, 514), 'вход в магазин АЗС загорожен');
+check(station?.id === L.buildings.length - 1, 'новое здание должно сохранять существующие ID');
+console.log('✓ АЗС с магазином и колонками, боковой въезд, новое место автобуса, стабильные ID зданий');

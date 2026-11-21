@@ -188,7 +188,6 @@ sort = W.Dropdown(options=[('по нику', 'name'), ('по деньгам', 'm
                   value='name', description='Порядок', layout=L(width='210px'))
 plist = W.Select(options=[], rows=11, layout=L(width='330px'))
 act_search = W.Text(placeholder='поиск по кнопкам раздела…', layout=L(width='320px'))
-danger = W.Checkbox(value=False, description='Разрешить опасные', layout=L(width='210px'))
 reason = W.Text(value='Нарушение правил', description='Причина', layout=L(width='330px'))
 car_id = W.Text(value='volga', description='Авто (id)', layout=L(width='260px'))
 plate = W.Text(placeholder='номер, напр. А123ВС', description='Номер', layout=L(width='330px'))
@@ -405,8 +404,6 @@ def action_kwargs(d, loud=True):
         kw['carId'] = car_id.value.strip() or 'volga'
     if d['id'] in ('ban', 'ban_silent', 'warn'):
         kw['reason'] = reason.value.strip() or 'Нарушение правил'
-    if d.get('confirm') and not danger.value:
-        return None, 'Опасное действие: поставьте галочку «Разрешить опасные»'
     return kw, None
 
 
@@ -658,18 +655,21 @@ def tab_chat():
 
 
 def tab_mod():
+    kind = W.Dropdown(options=[('Мут', 'mute'), ('Бан', 'ban'), ('Варн', 'warn')], description='Наказание')
+    minutes = W.IntText(value=30, description='Минут', layout=L(width='210px'))
+    def issue():
+        if not PL.selected:
+            return say_msg(False, 'Сначала выберите игрока слева')
+        if not 1 <= minutes.value <= 525600:
+            return say_msg(False, 'Введите от 1 до 525600 минут')
+        run(kind.value, 'наказание', name=PL.selected, minutes=minutes.value, reason=reason.value.strip())
     return W.VBox([
-        head('Быстро: выбранный игрок'),
-        W.HBox([plain('🚫 Забанить', lambda: run('ban', 'бан', name=PL.selected,
-                                                reason=reason.value.strip()), 'danger'),
-                plain('👢 Кикнуть', lambda: run('kick', 'кик', name=PL.selected)),
-                plain('🤐 Мут', lambda: run('mute', 'мут', name=PL.selected)),
-                plain('✅ Разбанить', lambda: run('unban', 'разбан', name=PL.selected), 'success')]),
-        W.HTML('<hr style="border-color:#1e293b">'),
-        head('Все действия модерации'),
-        actions_block('mod'),
-        W.HTML('<div style="font-size:12px;color:#fca5a5">Удаление аккаунта и массовые баны — '
-               'только с галочкой «Разрешить опасные».</div>'),
+        head('Выберите игрока сверху, наказание и срок в минутах'),
+        W.HBox([kind, minutes, plain('Выдать', issue, 'danger')]),
+        W.HBox([plain('💬 Снять мут', lambda: run('unmute', 'размут', name=PL.selected), 'success'),
+                plain('✅ Разбанить', lambda: run('unban', 'разбан', name=PL.selected), 'success'),
+                plain('🧽 Снять варны', lambda: run('warns_clear', 'снять варны', name=PL.selected), 'success')]),
+        head('Другие действия модерации'), actions_block('mod'),
     ])
 
 
@@ -791,7 +791,7 @@ players_bar = W.VBox([
     W.HBox([search, filt, sort, plain('🔄 Обновить список', reload_players, 'info'),
             plain('🎯 К выбранному', lambda: run('tp_player', 'к игроку', name=PL.selected,
                                                  target=(target.value or '')), '')]),
-    W.HBox([plist, W.VBox([card, danger, target, tp_x, tp_z, reason])]),
+    W.HBox([plist, W.VBox([card, target, tp_x, tp_z, reason])]),
 ])
 
 def quick(aid, title, icon, need_player=True):
@@ -804,11 +804,9 @@ def quick(aid, title, icon, need_player=True):
 
 
 def quick_ban():
-    """Бан из быстрой строки: нужен игрок, причина и галочка «опасные»."""
+    """Бан из быстрой строки для выбранного игрока."""
     if not PL.selected:
         return say_msg(False, 'Сначала выберите игрока слева')
-    if not danger.value:
-        return say_msg(False, 'Поставьте галочку «Разрешить опасные» рядом с карточкой игрока')
     run('ban', 'бан', name=PL.selected, reason=reason.value.strip())
 
 

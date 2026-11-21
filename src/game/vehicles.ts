@@ -23,8 +23,6 @@ export class Vehicle {
   x = 0; y = 0; z = 0; heading = 0; speed = 0; vy = 0; steer = 0;
   gear = 1; autoMode: 'N' | 'D' = 'D'; rpm = 800; throttle = 0;
   condition = 1; fuel = 100; mileage = 0;
-  /** грязь на кузове: 0 — чисто, 1 — не видно цвета */
-  dirt = 0;
   /** игрок сам выключил фары — авто-свет их не включает */
   lightsUserOff = false;
   owned: OwnedVehicle | null = null;
@@ -43,7 +41,7 @@ export class Vehicle {
   constructor(type: string, role: VRole, color?: string, owned?: OwnedVehicle) {
     this.model = new VehicleModel(type, color ?? owned?.color, owned?.tuning);
     this.spec = this.model.spec; this.role = role;
-    if (owned) { this.owned = owned; this.condition = owned.condition; this.fuel = owned.fuel; this.mileage = owned.mileage; this.dirt = owned.dirt ?? 0; if (owned.missing.length) this.model.setMissing(owned.missing); }
+    if (owned) { this.owned = owned; this.condition = owned.condition; this.fuel = owned.fuel; this.mileage = owned.mileage; delete owned.dirt; if (owned.missing.length) this.model.setMissing(owned.missing); }
     // номерной знак: у всех машин, у которых он физически есть
     if (this.model.tuning.plate === undefined && this.spec.body !== 'moto' && this.spec.body !== 'scooter' && this.spec.body !== 'heli' && this.spec.body !== 'combine' && this.spec.body !== 'quad') {
       this.model.tuning.plate = randomPlate();
@@ -188,7 +186,7 @@ export function playerDrive(v: Vehicle, inp: DriveInput, dt: number, col: Collis
     if (forwardSp < -0.5) a = acc * 2; // движемся назад — газ тормозит
   }
   if (inp.brake > 0) {
-    if (forwardSp > 0.5) a -= 13.5 * inp.brake; // тормоза мощнее: короткий уверенный стоп
+    if (forwardSp > 0.5) a -= 19 * inp.brake; // тормоза мощнее: короткий уверенный стоп
     else if (g !== 0 || !manual) a = -acc * 0.6 * inp.brake; // задний ход
   }
   // дрифт: на пробел на скорости заднюю ось срывает — машина идёт боком, теряя скорость медленно
@@ -236,7 +234,15 @@ export function playerDrive(v: Vehicle, inp: DriveInput, dt: number, col: Collis
   if (v.canStunt) {
     const th = v.wheelie; const sc = v.isScooter; const now = performance.now() / 1000;
     let target = 0, k = 16, c = 6;
-    if (inp.wheelie && v.speed > (sc ? 1.5 : 3) && th >= -0.02 && !(inp.brake > 0.5 && th < 0.08 && v.speed > 7)) {
+    if (v.spec.body === 'moto') {
+      // X поднимает переднее колесо; отпуская и нажимая вновь, игрок удерживает угол.
+      const raise = inp.wheelie && v.speed > 3;
+      const targetVelocity = (raise ? 0.65 : -0.37) - inp.brake * 0.7;
+      v.wheelieV += (targetVelocity - v.wheelieV) * Math.min(1, dt * 7);
+      v.wheelie = Math.max(0, th + v.wheelieV * dt);
+      if (v.wheelie === 0 && v.wheelieV < 0) v.wheelieV = 0;
+      target = v.wheelie; k = 0; c = 0;
+    } else if (inp.wheelie && v.speed > (sc ? 1.5 : 3) && th >= -0.02 && !(inp.brake > 0.5 && th < 0.08 && v.speed > 7)) {
       // вилли: Ctrl поднимает, газ — выше (риск), тормоз — ниже; лёгкое раскачивание растёт со временем
       target = (sc ? 0.32 : 0.5) + inp.throttle * (sc ? 0.22 : 0.36) - inp.brake * 0.45 + Math.sin(now * 2.3 + v.id) * 0.05 * (1 + v.stuntT * 0.15);
       k = 9; c = 3.2;
@@ -247,7 +253,7 @@ export function playerDrive(v: Vehicle, inp: DriveInput, dt: number, col: Collis
     }
     if (v.speed < 2) target = 0;
     v.wheelieV += ((target - th) * k - v.wheelieV * c) * dt;
-    v.wheelie = th + v.wheelieV * dt;
+    if (v.spec.body !== 'moto') v.wheelie = th + v.wheelieV * dt;
     if (Math.abs(v.wheelie) > 0.15) { v.stuntT += dt; v.stuntDist += Math.abs(v.speed) * dt; }
     else if (v.stuntT > 0 && Math.abs(v.wheelie) < 0.06) { if (v.stuntT > 1.2) stuntRes = { kind: sc ? (th >= 0 ? 'Мэньюал' : 'Нос-мэньюал') : th >= 0 ? 'Вилли' : 'Стоппи', t: v.stuntT, dist: v.stuntDist }; v.stuntT = 0; v.stuntDist = 0; }
     // срыв трюка: у промо-машины запас чуть больше — стант даётся легче
