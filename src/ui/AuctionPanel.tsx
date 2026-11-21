@@ -33,6 +33,18 @@ export function AuctionPanel({ g, close }: { g: Game; close: () => void }) {
   const snapshot = connected ? net.auction : null;
   const serverNow = snapshot ? snapshot.serverTime + (Date.now() - snapshot.receivedAt) : Date.now();
   const lots = snapshot?.lots.filter(l => l.endsAt > serverNow) ?? [];
+  const state = connected ? g.getState() : null;
+  // Это только просмотр сохранения; доступность и права проверит сервер,
+  // когда торговля будет подключена.
+  const candidates = state ? [
+    ...state.vehicles.map(v => ({key:`vehicle:${v.uid}`, name:VEHICLES[v.type]?.name ?? v.type, kind:'Машина', step:1000})),
+    ...state.kiosks.map(k => ({key:`business:${k.id}`, name:g.L.kiosks[k.id] ? KIOSK_TYPES[g.L.kiosks[k.id].type]?.name ?? 'Ларёк' : 'Неизвестный ларёк', kind:'Бизнес', step:10000})),
+    ...state.properties.map(id => {
+      const [bid, unit] = id.split(':').map(Number), b = g.L.buildings[bid];
+      const apartment = b?.kind === 'apartment';
+      return {key:`property:${id}`, name:b ? `${b.name}${apartment ? ` · квартира ${unit+1}` : ''}` : `Объект ${id}`, kind:apartment?'Квартира':'Дом', step:apartment?10000:20000};
+    }),
+  ] : [];
   return <Modal title="🔨 Городской аукцион" onClose={close} wide>
     <p className="lg-money-line">Просмотр лотов. Торги и выставление имущества пока закрыты; деньги не списываются.</p>
     {!connected ? <p className="opacity-75 mt-3">Подключитесь к онлайн-серверу через планшет, чтобы увидеть серверные лоты.</p>
@@ -48,5 +60,12 @@ export function AuctionPanel({ g, close }: { g: Game; close: () => void }) {
           <button className="lg-btn sm" disabled>Ставки закрыты</button>
         </div>)}
       </div>}
+    {connected && <div className="lg-card mt-3"><b>📦 Ваше имущество для будущих торгов</b>
+      <p className="text-xs opacity-70">Предварительный список из вашего сохранения, не подтверждение права продажи. Выставление на 10 минут и ставки пока отключены.</p>
+      {!candidates.length ? <p className="opacity-75">В сохранении нет подходящего имущества.</p> : <div className="lg-list mt-2">{candidates.map(item => <div className="lg-row wrap" key={item.key}>
+        <div className="flex-1"><b>{item.name}</b><small>{item.kind} · шаг от {money(item.step)}</small></div>
+        <button className="lg-btn sm" disabled>Выставление закрыто</button>
+      </div>)}</div>}
+    </div>}
   </Modal>;
 }

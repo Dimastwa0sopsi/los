@@ -1,0 +1,60 @@
+'use strict';
+const assert=require('node:assert/strict'), fs=require('node:fs'), os=require('node:os'), path=require('node:path');
+const Database=require('better-sqlite3');
+const {createAccountStore}=require('../server/account-store.cjs');
+const {createAuctionStore}=require('../server/auction-store.cjs');
+const {createListingPolicy}=require('../server/auction-listing-policy.cjs');
+const cat=require('../server/auction-catalogue.json');
+const dir=fs.mkdtempSync(path.join(os.tmpdir(),'los-auction-policy-')), filename=path.join(dir,'game.db');
+const req=n=>`request-${String(n).padStart(16,'0')}`; const pass='secure-test-password';
+const house=Object.keys(cat.housing).find(k=>cat.housing[k]==='house'), apartment=Object.keys(cat.housing).find(k=>cat.housing[k]==='apartment');
+const fail=(fn,code)=>assert.throws(fn,e=>e.code===code);
+(async()=>{
+ let db=new Database(filename), accounts=createAccountStore(db);
+ for(const name of ['seller','alice','bob']) {
+   assert((await accounts.register(name,pass)).ok);
+   assert(accounts.save(name,{money:name==='seller'?100000:500000,vehicles:name==='seller'?[{uid:'car',type:'lada'}]:[],kiosks:name==='seller'?[{id:0,last:1,acc:0}]:[],properties:name==='seller'?[house,apartment]:[],fridges:{}},0).ok);
+ }
+ let auction=createAuctionStore(db); fail(()=>auction.list('seller',1,'business','0',100000,req(1),100),'listing_disabled');
+ let policy=createListingPolicy(db,cat); fail(()=>policy({actor:'seller',kind:'business',key:'0'}),'transaction_required');
+ auction=createAuctionStore(db,{authorizeListing:policy});
+ fail(()=>auction.list('seller',1,'apartment',house,100000,req(2),100),'invalid_asset');
+ fail(()=>auction.list('seller',1,'house',apartment,100000,req(3),100),'invalid_asset');
+ fail(()=>auction.list('seller',1,'business','999999',100000,req(4),100),'invalid_asset');
+ fail(()=>auction.list('alice',1,'business','0',100000,req(5),100),'not_owned');
+ let alice=await accounts.login('alice',pass); alice.state.kiosks.push({id:0,last:1,acc:0}); accounts.save('alice',alice.state,alice.revision);
+ fail(()=>auction.list('seller',1,'business','0',100000,req(6),100),'asset_conflict');
+ assert.equal((await accounts.login('seller',pass)).state.kiosks.length,1);
+ alice=await accounts.login('alice',pass); alice.state.kiosks=[]; accounts.save('alice',alice.state,alice.revision);
+ // Incorrect or incomplete lists in any account fail closed rather than deciding it is unowned.
+ let bob=await accounts.login('bob',pass); delete bob.state.kiosks;accounts.save('bob',bob.state,bob.revision);
+ fail(()=>auction.list('seller',1,'business','0',100000,req(7),100),'incomplete_ownership');
+ bob=await accounts.login('bob',pass);bob.state.kiosks=[];accounts.save('bob',bob.state,bob.revision);
+ const lot=auction.list('seller',1,'business','0',100000,req(8),100);
+ assert.deepEqual(auction.list('seller',1,'business','0',100000,req(8),100),lot);
+ alice=await accounts.login('alice',pass); auction.bid('alice',alice.revision,lot.id,100000,req(9),100);
+ bob=await accounts.login('bob',pass); fail(()=>auction.bid('bob',bob.revision,lot.id,109999,req(10),100),'bid_too_low');
+ auction.bid('bob',bob.revision,lot.id,110000,req(10),100);
+ assert.equal((await accounts.login('alice',pass)).state.money,500000);
+ db.close(); db=new Database(filename);accounts=createAccountStore(db);policy=createListingPolicy(db,cat);auction=createAuctionStore(db,{authorizeListing:policy});
+ assert(auction.finish(lot.id,100+600000));assert.equal((await accounts.login('bob',pass)).state.kiosks[0].id,0);
+ assert.equal((await accounts.login('seller',pass)).state.money,210000);
+ // Real catalogue classifies actual owned housing and vehicles, not client-asserted types.
+ let seller=await accounts.login('seller',pass), a2=await accounts.login('alice',pass);
+ const homeLot=auction.list('seller',seller.revision,'house',house,30000,req(20),700000);
+ auction.bid('alice',a2.revision,homeLot.id,30000,req(21),700000);
+ assert(auction.finish(homeLot.id,1300000));
+ assert((await accounts.login('alice',pass)).state.properties.includes(house));
+ seller=await accounts.login('seller',pass);
+ const carLot=auction.list('seller',seller.revision,'vehicle','car',50000,req(22),1400000);
+ a2=await accounts.login('alice',pass); auction.bid('alice',a2.revision,carLot.id,50000,req(23),1400000);
+ assert(auction.finish(carLot.id,2000000));
+ assert((await accounts.login('alice',pass)).state.vehicles.some(v=>v.uid==='car'));
+ seller=await accounts.login('seller',pass);
+ const aptLot=auction.list('seller',seller.revision,'apartment',apartment,10000,req(24),2100000);
+ assert(auction.finish(aptLot.id,2700000));
+ assert((await accounts.login('seller',pass)).state.properties.includes(apartment));
+ assert.throws(()=>createListingPolicy(db,{...cat,kiosks:['0','0']}),TypeError);
+ db.close();fs.rmSync(dir,{recursive:true,force:true});
+ console.log('✓ экспериментальный аукцион: каталог, блокировка без политики, ошибки типа, двойное владение, ставка, возврат, рестарт, передача');
+})().catch(e=>{console.error(e);process.exitCode=1;});

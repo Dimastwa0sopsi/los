@@ -17,10 +17,12 @@ async function main() {
   const net: any = {ready:true, auction:null, requestAuction() {
     this.auction = {serverTime:Date.now(),receivedAt:Date.now(),lots:[{id:1,kind:'vehicle',assetKey:'uid',vehicleType:'lada',seller:'seller',startPrice:50000,step:1000,endsAt:Date.now()+60000,bid:null,bidder:null}]};
   }};
-  const g = {net,L:{kiosks:[],buildings:[]}} as unknown as Game;
+  const g = {net,L:{kiosks:[],buildings:[]},getState:()=>({vehicles:[{uid:'mycar',type:'lada'}],kiosks:[],properties:[]})} as unknown as Game;
   await act(async () => { app = TestRenderer.create(<AuctionPanel g={g} close={() => {}} />); });
   await act(async () => { app.update(<AuctionPanel g={g} close={() => {}} />); });
   assert(text(app.toJSON()).match(/№\s*1/), 'номер лота');
+  assert(text(app.toJSON()).includes('Ваше имущество для будущих торгов'), 'показывается имущество');
+  assert(text(app.toJSON()).includes('Выставление закрыто'), 'нет мнимых сделок');
   const buttons = app.root.findAllByType('button');
   assert(buttons.some(b => b.props.disabled && text(b.children).includes('Ставки закрыты')), 'ставки не должны быть включены');
   assert(text(app.toJSON()).includes('50 000') || text(app.toJSON()).includes('50 000'), 'начальная цена');

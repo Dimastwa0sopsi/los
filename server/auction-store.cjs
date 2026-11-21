@@ -11,7 +11,7 @@ const STEPS = Object.freeze({ vehicle: 1000, business: 10000, apartment: 10000, 
 function fail(code) { const e = new Error(code); e.code = code; throw e; }
 function amount(n) { return Number.isSafeInteger(n) && n > 0 && n <= MAX_MONEY; }
 
-function createAuctionStore(db) {
+function createAuctionStore(db, { authorizeListing } = {}) {
   db.exec(`CREATE TABLE IF NOT EXISTS auction_lots (
     id INTEGER PRIMARY KEY AUTOINCREMENT, seller TEXT NOT NULL, kind TEXT NOT NULL,
     asset_key TEXT NOT NULL, asset_json TEXT NOT NULL, start_price INTEGER NOT NULL,
@@ -112,6 +112,10 @@ function createAuctionStore(db) {
       if (!Number.isSafeInteger(revision) || revision < 0) fail('invalid_revision');
       if (!Object.hasOwn(STEPS, kind) || typeof key !== 'string' || !key || key.length > 128 || !amount(price)) fail('invalid_lot');
       const seller = load(actor, revision);
+      // Fail closed: public lot viewing remains available, but a future adapter
+      // must explicitly supply the server-side listing policy.
+      if (typeof authorizeListing !== 'function') fail('listing_disabled');
+      authorizeListing({actor,kind,key});
       if (db.prepare("SELECT 1 FROM auction_lots WHERE kind=? AND asset_key=? AND status='active'").get(kind, key)) fail('already_listed');
       if ((kind === 'apartment' || kind === 'house') && db.prepare("SELECT 1 FROM auction_lots WHERE kind IN ('apartment','house') AND asset_key=? AND status='active'").get(key)) fail('already_listed');
       const asset = removeAsset(seller.state, kind, key);

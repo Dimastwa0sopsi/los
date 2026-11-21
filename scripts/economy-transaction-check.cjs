@@ -11,7 +11,7 @@ const temp = fs.mkdtempSync(path.join(os.tmpdir(),'economy-tx-')), file = path.j
 const req = i => `request-${String(i).padStart(16,'0')}`, pass = 'secure-password-123';
 (async () => {
   let db = new Database(file), accounts = createAccountStore(db), tx = createEconomyTransactions(db);
-  let auction = createAuctionStore(db), plates = createPlateStore(db, () => 'А111АА77');
+  let auction = createAuctionStore(db, {authorizeListing: () => {}}), plates = createPlateStore(db, () => 'А111АА77');
   let business = createBusinessStore(db, {'kiosk:0':{price:10000,items:{water:100}}});
   for (const n of ['alice','bob']) {
     assert((await accounts.register(n,pass)).ok);
@@ -24,7 +24,7 @@ const req = i => `request-${String(i).padStart(16,'0')}`, pass = 'secure-passwor
   // Later changes must not turn a retry into a later unrelated snapshot.
   assert(accounts.save('alice',{...issued.state,money:94000},2,req(2)).ok);
   db.close(); db = new Database(file); accounts = createAccountStore(db); tx = createEconomyTransactions(db);
-  auction = createAuctionStore(db); plates = createPlateStore(db); business = createBusinessStore(db, {'kiosk:0':{price:10000,items:{water:100}}});
+  auction = createAuctionStore(db, {authorizeListing: () => {}}); plates = createPlateStore(db); business = createBusinessStore(db, {'kiosk:0':{price:10000,items:{water:100}}});
   const replay = runPlate(); assert(replay.replay); assert.equal(replay.revision,2); assert.equal(replay.state.money,95000);
   let result = tx.execute('alice',3,req(3),'buy_business',{id:'kiosk:0'},({actor,revision,requestId,payload}) => business.purchaseBusiness(actor,revision,payload.id,requestId));
   assert(result.ok); assert.equal(result.state.money,84000); assert.equal(business.get('kiosk:0').owner,'alice');
