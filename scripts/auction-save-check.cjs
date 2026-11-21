@@ -5,7 +5,7 @@ const {createAccountStore} = require('../server/account-store.cjs');
 const {createAuctionStore} = require('../server/auction-store.cjs');
 const {createAuctionSave} = require('../server/auction-save.cjs');
 (async () => {
-  const db = new Database(':memory:'), accounts = createAccountStore(db), auction = createAuctionStore(db), saver = createAuctionSave(db, accounts);
+  const db = new Database(':memory:'), accounts = createAccountStore(db), auction = createAuctionStore(db, {authorizeListing: () => {}}), saver = createAuctionSave(db, accounts);
   const pass = 'password-is-secure', req = n => `request-${String(n).padStart(16,'0')}`;
   const state = n => ({money:200000, vehicles:n === 'seller' ? [{uid:'car',fuel:100}] : [], kiosks:[], properties:[], fridges:{}, food:80});
   for (const n of ['seller','alice','bob']) { await accounts.register(n,pass); assert(accounts.save(n,state(n),0).ok); }

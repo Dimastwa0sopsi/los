@@ -8,7 +8,7 @@ const { createSettlementRunner } = require('../server/auction-settlement.cjs');
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'auction-settle-'));
 const file = path.join(dir, 'test.db'), pass = 'password-for-test';
 (async () => {
-  let db = new Database(file), accounts = createAccountStore(db), auction = createAuctionStore(db);
+  let db = new Database(file), accounts = createAccountStore(db), auction = createAuctionStore(db, {authorizeListing: () => {}});
   for (const name of ['seller', 'buyer']) {
     await accounts.register(name, pass);
     assert(accounts.save(name, { money: name === 'buyer' ? 20000 : 0, vehicles: name === 'seller' ? [{uid:'one'}, {uid:'two'}, {uid:'three'}] : [], kiosks:[], properties:[], fridges:{} }, 0).ok);
@@ -27,7 +27,7 @@ const file = path.join(dir, 'test.db'), pass = 'password-for-test';
   assert.deepEqual(batch.failed,[{id:first.id,error:'internal'}]);
   assert.deepEqual(batch.settled,[second.id]); assert.equal(batch.nextAfterId,second.id);
   // A failure on the first lot cannot block later lots, even across restart.
-  db.close(); db = new Database(file); accounts = createAccountStore(db); auction = createAuctionStore(db); runner = createSettlementRunner(db,auction);
+  db.close(); db = new Database(file); accounts = createAccountStore(db); auction = createAuctionStore(db, {authorizeListing: () => {}}); runner = createSettlementRunner(db,auction);
   batch = runner.runBatch({now:100+DURATION,afterId:second.id,limit:2});
   assert.deepEqual(batch.settled,[third.id]); assert.equal(batch.nextAfterId,0);
   let seller = (await accounts.login('seller',pass)).state, buyer = (await accounts.login('buyer',pass)).state;

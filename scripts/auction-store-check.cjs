@@ -7,7 +7,7 @@ const { createAuctionStore, DURATION } = require('../server/auction-store.cjs');
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'los-auction-')); const file = path.join(dir, 'db.sqlite');
 const key = n => `request-${String(n).padStart(16,'0')}`;
 (async () => {
-  let db = new Database(file), accounts = createAccountStore(db), auction = createAuctionStore(db);
+  let db = new Database(file), accounts = createAccountStore(db), auction = createAuctionStore(db, {authorizeListing: () => {}});
   for (const name of ['seller','alice','bob']) {
     assert((await accounts.register(name, 'пароль для теста')).ok);
     const state = { money: name === 'seller' ? 0 : 500000, vehicles: name === 'seller' ? [{ uid:'car1', type:'lada', pos:{x:1,z:1} }] : [],
@@ -30,7 +30,7 @@ const key = n => `request-${String(n).padStart(16,'0')}`;
   assert.equal((await snap('bob')).state.money, 390000);
   fail(() => auction.bid('alice', 3, lot.id, 120000, key(4), time + DURATION), 'closed');
   assert.equal(auction.finish(lot.id, time + DURATION - 1), false);
-  db.close(); db = new Database(file); accounts = createAccountStore(db); auction = createAuctionStore(db);
+  db.close(); db = new Database(file); accounts = createAccountStore(db); auction = createAuctionStore(db, {authorizeListing: () => {}});
   assert.deepEqual(auction.due(time + DURATION), [lot.id]);
   assert(auction.finish(lot.id, time + DURATION)); assert(!auction.finish(lot.id, time + DURATION));
   assert.equal((await snap('seller')).state.money, 110000);

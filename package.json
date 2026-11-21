@@ -1,7 +1,7 @@
 {
   "name": "react-vite-tailwind",
   "private": true,
-  "version": "0.6.15",
+  "version": "0.6.16",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -42,7 +42,9 @@
     "check:local-plates-ui": "esbuild scripts/local-plate-ui-check.tsx --bundle --platform=node --format=cjs --outfile=.check/local-plate-ui.cjs --log-level=error --loader:.jpg=empty --loader:.png=empty --loader:.md=text --define:import.meta.env={} && node .check/local-plate-ui.cjs",
     "check:plate-readiness": "python3 scripts/plate_readiness_check.py",
     "check:colab-economy-audit": "python3 scripts/colab_economy_audit_check.py",
-    "check:account-client": "esbuild scripts/account-client-check.ts --bundle --platform=node --format=cjs --outfile=.check/account-client.cjs --log-level=error --define:import.meta.env={} && node .check/account-client.cjs"
+    "check:account-client": "esbuild scripts/account-client-check.ts --bundle --platform=node --format=cjs --outfile=.check/account-client.cjs --log-level=error --define:import.meta.env={} && node .check/account-client.cjs",
+    "check:auction-catalogue": "esbuild scripts/export-auction-catalogue.ts --bundle --platform=node --format=cjs --outfile=.check/export-auction-catalogue.cjs --log-level=error && node .check/export-auction-catalogue.cjs --check",
+    "check:auction-panel": "esbuild scripts/auction-panel-check.tsx --bundle --platform=node --format=cjs --outfile=.check/auction-panel.cjs --log-level=error --loader:.png=empty --loader:.jpg=empty --loader:.md=text --define:import.meta.env={} && node .check/auction-panel.cjs"
   },
   "dependencies": {
     "clsx": "2.1.1",
