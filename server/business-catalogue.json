@@ -1,0 +1,1834 @@
+{
+  "schema": 1,
+  "note": "Experimental audit catalogue; not a purchase catalogue. Gas fuel and shop share one ID.",
+  "businesses": [
+    {
+      "id": "kiosk:0",
+      "kind": "kiosk",
+      "name": "Шаурма «Вертел»",
+      "x": 228,
+      "z": 191.5,
+      "legacyPrice": 18000,
+      "legacyIncome": 140,
+      "items": {
+        "shawarma": 6,
+        "cola": 3,
+        "water": 2
+      },
+      "services": []
+    },
+    {
+      "id": "kiosk:1",
+      "kind": "kiosk",
+      "name": "Кофе с собой",
+      "x": 192,
+      "z": 191.5,
+      "legacyPrice": 12000,
+      "legacyIncome": 95,
+      "items": {
+        "coffee": 4,
+        "croissant": 3,
+        "tea": 2
+      },
+      "services": []
+    },
+    {
+      "id": "kiosk:2",
+      "kind": "kiosk",
+      "name": "Мороженое",
+      "x": 768,
+      "z": 191.5,
+      "legacyPrice": 8000,
+      "legacyIncome": 60,
+      "items": {
+        "icecream": 3,
+        "water": 2,
+        "juice": 4
+      },
+      "services": []
+    },
+    {
+      "id": "kiosk:3",
+      "kind": "kiosk",
+      "name": "Пресса и табак",
+      "x": 732,
+      "z": 191.5,
+      "legacyPrice": 15000,
+      "legacyIncome": 115,
+      "items": {
+        "cigarettes": 7,
+        "chocolate": 3,
+        "energy": 5
+      },
+      "services": []
+    },
+    {
+      "id": "kiosk:4",
+      "kind": "kiosk",
+      "name": "Фрукты",
+      "x": 1008,
+      "z": 431.5,
+      "legacyPrice": 10000,
+      "legacyIncome": 80,
+      "items": {
+        "apple": 1,
+        "banana": 1,
+        "juice": 4
+      },
+      "services": []
+    },
+    {
+      "id": "kiosk:5",
+      "kind": "kiosk",
+      "name": "Хот-доги",
+      "x": 972,
+      "z": 431.5,
+      "legacyPrice": 22000,
+      "legacyIncome": 175,
+      "items": {
+        "sausage": 6,
+        "cola": 3,
+        "chips": 3
+      },
+      "services": []
+    },
+    {
+      "id": "kiosk:6",
+      "kind": "kiosk",
+      "name": "Шаурма «Вертел»",
+      "x": 288,
+      "z": 851.5,
+      "legacyPrice": 18000,
+      "legacyIncome": 140,
+      "items": {
+        "shawarma": 6,
+        "cola": 3,
+        "water": 2
+      },
+      "services": []
+    },
+    {
+      "id": "kiosk:7",
+      "kind": "kiosk",
+      "name": "Кофе с собой",
+      "x": 252,
+      "z": 851.5,
+      "legacyPrice": 12000,
+      "legacyIncome": 95,
+      "items": {
+        "coffee": 4,
+        "croissant": 3,
+        "tea": 2
+      },
+      "services": []
+    },
+    {
+      "id": "kiosk:8",
+      "kind": "kiosk",
+      "name": "Мороженое",
+      "x": 528,
+      "z": 911.5,
+      "legacyPrice": 8000,
+      "legacyIncome": 60,
+      "items": {
+        "icecream": 3,
+        "water": 2,
+        "juice": 4
+      },
+      "services": []
+    },
+    {
+      "id": "kiosk:9",
+      "kind": "kiosk",
+      "name": "Пресса и табак",
+      "x": 492,
+      "z": 911.5,
+      "legacyPrice": 15000,
+      "legacyIncome": 115,
+      "items": {
+        "cigarettes": 7,
+        "chocolate": 3,
+        "energy": 5
+      },
+      "services": []
+    },
+    {
+      "id": "kiosk:10",
+      "kind": "kiosk",
+      "name": "Мороженое",
+      "x": 442,
+      "z": 738,
+      "legacyPrice": 8000,
+      "legacyIncome": 60,
+      "items": {
+        "icecream": 3,
+        "water": 2,
+        "juice": 4
+      },
+      "services": []
+    },
+    {
+      "id": "building:32",
+      "kind": "gas",
+      "name": "АЗС",
+      "x": 559.5,
+      "z": 18.2,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "water": 2,
+        "cola": 3,
+        "kvass": 3,
+        "coffee": 4,
+        "sandwich": 5,
+        "hotdog": 5,
+        "donut": 3,
+        "chips": 3,
+        "cigarettes": 7,
+        "energy": 5
+      },
+      "services": [
+        "fuel"
+      ]
+    },
+    {
+      "id": "building:104",
+      "kind": "shop24",
+      "name": "Магазин 24/7",
+      "x": 700.5,
+      "z": 111.3,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "mask": 75,
+        "water": 2,
+        "cola": 3,
+        "kvass": 3,
+        "lemonade": 4,
+        "coffee": 4,
+        "bread": 2,
+        "sandwich": 5,
+        "hotdog": 5,
+        "chips": 3,
+        "chocolate": 3,
+        "donut": 3,
+        "gum": 1,
+        "energy": 5,
+        "cigarettes": 7
+      },
+      "services": []
+    },
+    {
+      "id": "building:142",
+      "kind": "shop24",
+      "name": "Магазин 24/7",
+      "x": 340.5,
+      "z": 128.7,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "mask": 75,
+        "water": 2,
+        "cola": 3,
+        "kvass": 3,
+        "lemonade": 4,
+        "coffee": 4,
+        "bread": 2,
+        "sandwich": 5,
+        "hotdog": 5,
+        "chips": 3,
+        "chocolate": 3,
+        "donut": 3,
+        "gum": 1,
+        "energy": 5,
+        "cigarettes": 7
+      },
+      "services": []
+    },
+    {
+      "id": "building:199",
+      "kind": "service",
+      "name": "Автосервис и тюнинг",
+      "x": 319.5,
+      "z": 188.7,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {},
+      "services": [
+        "service"
+      ]
+    },
+    {
+      "id": "building:215",
+      "kind": "bar",
+      "name": "Бар «Ночная смена»",
+      "x": 580.5,
+      "z": 188.7,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {},
+      "services": [
+        "bar"
+      ]
+    },
+    {
+      "id": "building:220",
+      "kind": "gunshop",
+      "name": "Оружейный «Арсенал»",
+      "x": 619.5,
+      "z": 231.3,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "knife": 900,
+        "machete": 1900,
+        "seed_durman": 150,
+        "pistol": 1500,
+        "revolver": 2600,
+        "smg": 5200,
+        "shotgun": 4800,
+        "rifle": 9500,
+        "sniper": 14000,
+        "ammo": 60,
+        "ammo_m": 70,
+        "shells": 80,
+        "ammo_r": 140
+      },
+      "services": []
+    },
+    {
+      "id": "building:262",
+      "kind": "barber",
+      "name": "Парикмахерская",
+      "x": 319.5,
+      "z": 291.3,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {},
+      "services": [
+        "barber"
+      ]
+    },
+    {
+      "id": "building:265",
+      "kind": "shop24",
+      "name": "Магазин 24/7",
+      "x": 400.5,
+      "z": 248.7,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "mask": 75,
+        "water": 2,
+        "cola": 3,
+        "kvass": 3,
+        "lemonade": 4,
+        "coffee": 4,
+        "bread": 2,
+        "sandwich": 5,
+        "hotdog": 5,
+        "chips": 3,
+        "chocolate": 3,
+        "donut": 3,
+        "gum": 1,
+        "energy": 5,
+        "cigarettes": 7
+      },
+      "services": []
+    },
+    {
+      "id": "building:309",
+      "kind": "fishshop",
+      "name": "Рыболовный магазин «Поплавок»",
+      "x": 139.5,
+      "z": 308.7,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "rod": 900,
+        "rod_pro": 3200,
+        "bait": 15,
+        "lure": 120,
+        "net": 450,
+        "bucket": 90,
+        "water": 2,
+        "sandwich": 5,
+        "kvass": 3
+      },
+      "services": []
+    },
+    {
+      "id": "building:318",
+      "kind": "bar",
+      "name": "Бар «Тихий омут»",
+      "x": 280.5,
+      "z": 308.7,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {},
+      "services": [
+        "bar"
+      ]
+    },
+    {
+      "id": "building:337",
+      "kind": "cafe",
+      "name": "Кафе",
+      "x": 580.5,
+      "z": 308.7,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "coffee": 4,
+        "tea": 2,
+        "burger": 8,
+        "hotdog": 5,
+        "pizza": 10,
+        "soup": 6,
+        "borscht": 7,
+        "croissant": 3,
+        "donut": 3,
+        "cake": 7,
+        "juice": 4,
+        "lemonade": 4
+      },
+      "services": []
+    },
+    {
+      "id": "building:395",
+      "kind": "clothes",
+      "name": "Одежда «Мода»",
+      "x": 439.5,
+      "z": 411.3,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {},
+      "services": [
+        "clothes"
+      ]
+    },
+    {
+      "id": "building:414",
+      "kind": "pharmacy",
+      "name": "Аптека",
+      "x": 760.5,
+      "z": 368.7,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "medkit": 60,
+        "pills": 15,
+        "vitamins": 12,
+        "bandage": 8,
+        "antiseptic": 10,
+        "sunscreen": 12,
+        "water": 2
+      },
+      "services": []
+    },
+    {
+      "id": "building:432",
+      "kind": "clothes",
+      "name": "Одежда «Мода»",
+      "x": 1039.5,
+      "z": 368.7,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {},
+      "services": [
+        "clothes"
+      ]
+    },
+    {
+      "id": "building:438",
+      "kind": "gas",
+      "name": "АЗС",
+      "x": 19.5,
+      "z": 461.8,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "water": 2,
+        "cola": 3,
+        "kvass": 3,
+        "coffee": 4,
+        "sandwich": 5,
+        "hotdog": 5,
+        "donut": 3,
+        "chips": 3,
+        "cigarettes": 7,
+        "energy": 5
+      },
+      "services": [
+        "fuel"
+      ]
+    },
+    {
+      "id": "building:446",
+      "kind": "clothes",
+      "name": "Одежда «Мода»",
+      "x": 160.5,
+      "z": 471.3,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {},
+      "services": [
+        "clothes"
+      ]
+    },
+    {
+      "id": "building:459",
+      "kind": "cafe",
+      "name": "Кафе",
+      "x": 379.5,
+      "z": 428.7,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "coffee": 4,
+        "tea": 2,
+        "burger": 8,
+        "hotdog": 5,
+        "pizza": 10,
+        "soup": 6,
+        "borscht": 7,
+        "croissant": 3,
+        "donut": 3,
+        "cake": 7,
+        "juice": 4,
+        "lemonade": 4
+      },
+      "services": []
+    },
+    {
+      "id": "building:464",
+      "kind": "scootershop",
+      "name": "Электросамокаты «Вжух Store»",
+      "x": 460.5,
+      "z": 428.7,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {},
+      "services": [
+        "scootershop"
+      ]
+    },
+    {
+      "id": "building:478",
+      "kind": "shop24",
+      "name": "Магазин 24/7",
+      "x": 640.5,
+      "z": 471.3,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "mask": 75,
+        "water": 2,
+        "cola": 3,
+        "kvass": 3,
+        "lemonade": 4,
+        "coffee": 4,
+        "bread": 2,
+        "sandwich": 5,
+        "hotdog": 5,
+        "chips": 3,
+        "chocolate": 3,
+        "donut": 3,
+        "gum": 1,
+        "energy": 5,
+        "cigarettes": 7
+      },
+      "services": []
+    },
+    {
+      "id": "building:494",
+      "kind": "supermarket",
+      "name": "Супермаркет «Лукошко»",
+      "x": 940.5,
+      "z": 471.3,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "mask": 75,
+        "seed_tomato": 12,
+        "seed_cucumber": 12,
+        "seed_strawberry": 18,
+        "water": 2,
+        "cola": 3,
+        "juice": 4,
+        "smoothie": 6,
+        "milk": 3,
+        "bread": 2,
+        "sausage": 6,
+        "salo": 8,
+        "cheese": 6,
+        "eggs": 4,
+        "pelmeni": 6,
+        "pizza": 10,
+        "apple": 1,
+        "banana": 1,
+        "grapes": 4,
+        "watermelon": 6,
+        "corn": 2,
+        "honey": 9,
+        "chocolate": 3,
+        "icecream": 3,
+        "chips": 3,
+        "cigarettes": 7
+      },
+      "services": []
+    },
+    {
+      "id": "building:504",
+      "kind": "service",
+      "name": "Автомеханик «Гайка»",
+      "x": 79.5,
+      "z": 531.3,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {},
+      "services": [
+        "service"
+      ]
+    },
+    {
+      "id": "building:505",
+      "kind": "dealer",
+      "name": "Автосалон «Трасса»",
+      "x": 100.5,
+      "z": 531.3,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {},
+      "services": [
+        "dealer"
+      ]
+    },
+    {
+      "id": "building:513",
+      "kind": "supermarket",
+      "name": "Супермаркет «Лукошко»",
+      "x": 259.5,
+      "z": 488.7,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "mask": 75,
+        "seed_tomato": 12,
+        "seed_cucumber": 12,
+        "seed_strawberry": 18,
+        "water": 2,
+        "cola": 3,
+        "juice": 4,
+        "smoothie": 6,
+        "milk": 3,
+        "bread": 2,
+        "sausage": 6,
+        "salo": 8,
+        "cheese": 6,
+        "eggs": 4,
+        "pelmeni": 6,
+        "pizza": 10,
+        "apple": 1,
+        "banana": 1,
+        "grapes": 4,
+        "watermelon": 6,
+        "corn": 2,
+        "honey": 9,
+        "chocolate": 3,
+        "icecream": 3,
+        "chips": 3,
+        "cigarettes": 7
+      },
+      "services": []
+    },
+    {
+      "id": "building:519",
+      "kind": "dealer",
+      "name": "Автосалон «Магистраль»",
+      "x": 319.5,
+      "z": 531.3,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {},
+      "services": [
+        "dealer"
+      ]
+    },
+    {
+      "id": "building:520",
+      "kind": "cafe",
+      "name": "Кафе «Шоссе»",
+      "x": 340.5,
+      "z": 531.3,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "coffee": 4,
+        "tea": 2,
+        "burger": 8,
+        "hotdog": 5,
+        "pizza": 10,
+        "soup": 6,
+        "borscht": 7,
+        "croissant": 3,
+        "donut": 3,
+        "cake": 7,
+        "juice": 4,
+        "lemonade": 4
+      },
+      "services": []
+    },
+    {
+      "id": "building:532",
+      "kind": "service",
+      "name": "Автомеханик «Гайка»",
+      "x": 559.5,
+      "z": 531.3,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {},
+      "services": [
+        "service"
+      ]
+    },
+    {
+      "id": "building:533",
+      "kind": "dealer",
+      "name": "Автосалон «Трасса»",
+      "x": 580.5,
+      "z": 531.3,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {},
+      "services": [
+        "dealer"
+      ]
+    },
+    {
+      "id": "building:547",
+      "kind": "cafe",
+      "name": "Кафе",
+      "x": 799.5,
+      "z": 531.3,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "coffee": 4,
+        "tea": 2,
+        "burger": 8,
+        "hotdog": 5,
+        "pizza": 10,
+        "soup": 6,
+        "borscht": 7,
+        "croissant": 3,
+        "donut": 3,
+        "cake": 7,
+        "juice": 4,
+        "lemonade": 4
+      },
+      "services": []
+    },
+    {
+      "id": "building:548",
+      "kind": "dealer",
+      "name": "Автосалон «Магистраль»",
+      "x": 820.5,
+      "z": 531.3,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {},
+      "services": [
+        "dealer"
+      ]
+    },
+    {
+      "id": "building:563",
+      "kind": "service",
+      "name": "Автомеханик «Поршень»",
+      "x": 1039.5,
+      "z": 531.3,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {},
+      "services": [
+        "service"
+      ]
+    },
+    {
+      "id": "building:564",
+      "kind": "service",
+      "name": "Автомеханик «Гайка»",
+      "x": 1060.5,
+      "z": 531.3,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {},
+      "services": [
+        "service"
+      ]
+    },
+    {
+      "id": "building:569",
+      "kind": "gas",
+      "name": "АЗС",
+      "x": 79.5,
+      "z": 558.2,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "water": 2,
+        "cola": 3,
+        "kvass": 3,
+        "coffee": 4,
+        "sandwich": 5,
+        "hotdog": 5,
+        "donut": 3,
+        "chips": 3,
+        "cigarettes": 7,
+        "energy": 5
+      },
+      "services": [
+        "fuel"
+      ]
+    },
+    {
+      "id": "building:570",
+      "kind": "service",
+      "name": "Тюнинг «Нитро»",
+      "x": 100.5,
+      "z": 548.7,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {},
+      "services": [
+        "service"
+      ]
+    },
+    {
+      "id": "building:571",
+      "kind": "shop24",
+      "name": "Магазин 24/7",
+      "x": 79.5,
+      "z": 591.3,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "mask": 75,
+        "water": 2,
+        "cola": 3,
+        "kvass": 3,
+        "lemonade": 4,
+        "coffee": 4,
+        "bread": 2,
+        "sandwich": 5,
+        "hotdog": 5,
+        "chips": 3,
+        "chocolate": 3,
+        "donut": 3,
+        "gum": 1,
+        "energy": 5,
+        "cigarettes": 7
+      },
+      "services": []
+    },
+    {
+      "id": "building:574",
+      "kind": "bar",
+      "name": "Бар «Три ключа»",
+      "x": 160.5,
+      "z": 548.7,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {},
+      "services": [
+        "bar"
+      ]
+    },
+    {
+      "id": "building:582",
+      "kind": "cafe",
+      "name": "Кафе",
+      "x": 280.5,
+      "z": 548.7,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "coffee": 4,
+        "tea": 2,
+        "burger": 8,
+        "hotdog": 5,
+        "pizza": 10,
+        "soup": 6,
+        "borscht": 7,
+        "croissant": 3,
+        "donut": 3,
+        "cake": 7,
+        "juice": 4,
+        "lemonade": 4
+      },
+      "services": []
+    },
+    {
+      "id": "building:585",
+      "kind": "dealer",
+      "name": "Автосалон «Колесо»",
+      "x": 319.5,
+      "z": 548.7,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {},
+      "services": [
+        "dealer"
+      ]
+    },
+    {
+      "id": "building:586",
+      "kind": "service",
+      "name": "Автомеханик «Поршень»",
+      "x": 340.5,
+      "z": 548.7,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {},
+      "services": [
+        "service"
+      ]
+    },
+    {
+      "id": "building:601",
+      "kind": "gas",
+      "name": "АЗС",
+      "x": 559.5,
+      "z": 558.2,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "water": 2,
+        "cola": 3,
+        "kvass": 3,
+        "coffee": 4,
+        "sandwich": 5,
+        "hotdog": 5,
+        "donut": 3,
+        "chips": 3,
+        "cigarettes": 7,
+        "energy": 5
+      },
+      "services": [
+        "fuel"
+      ]
+    },
+    {
+      "id": "building:602",
+      "kind": "service",
+      "name": "Тюнинг «Нитро»",
+      "x": 580.5,
+      "z": 548.7,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {},
+      "services": [
+        "service"
+      ]
+    },
+    {
+      "id": "building:613",
+      "kind": "bar",
+      "name": "Бар «Огонёк»",
+      "x": 760.5,
+      "z": 591.3,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {},
+      "services": [
+        "bar"
+      ]
+    },
+    {
+      "id": "building:614",
+      "kind": "cafe",
+      "name": "Кафе «Шоссе»",
+      "x": 799.5,
+      "z": 548.7,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "coffee": 4,
+        "tea": 2,
+        "burger": 8,
+        "hotdog": 5,
+        "pizza": 10,
+        "soup": 6,
+        "borscht": 7,
+        "croissant": 3,
+        "donut": 3,
+        "cake": 7,
+        "juice": 4,
+        "lemonade": 4
+      },
+      "services": []
+    },
+    {
+      "id": "building:615",
+      "kind": "dealer",
+      "name": "Автосалон «Колесо»",
+      "x": 820.5,
+      "z": 548.7,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {},
+      "services": [
+        "dealer"
+      ]
+    },
+    {
+      "id": "building:621",
+      "kind": "dealer",
+      "name": "Автосалон «Драйв»",
+      "x": 930,
+      "z": 565.3,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {},
+      "services": [
+        "dealer"
+      ]
+    },
+    {
+      "id": "building:626",
+      "kind": "dealer",
+      "name": "Автосалон «Трасса»",
+      "x": 1039.5,
+      "z": 548.7,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {},
+      "services": [
+        "dealer"
+      ]
+    },
+    {
+      "id": "building:627",
+      "kind": "gas",
+      "name": "АЗС",
+      "x": 1060.5,
+      "z": 558.2,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "water": 2,
+        "cola": 3,
+        "kvass": 3,
+        "coffee": 4,
+        "sandwich": 5,
+        "hotdog": 5,
+        "donut": 3,
+        "chips": 3,
+        "cigarettes": 7,
+        "energy": 5
+      },
+      "services": [
+        "fuel"
+      ]
+    },
+    {
+      "id": "building:641",
+      "kind": "gunshop",
+      "name": "Оружейный «Арсенал»",
+      "x": 199.5,
+      "z": 608.7,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "knife": 900,
+        "machete": 1900,
+        "seed_durman": 150,
+        "pistol": 1500,
+        "revolver": 2600,
+        "smg": 5200,
+        "shotgun": 4800,
+        "rifle": 9500,
+        "sniper": 14000,
+        "ammo": 60,
+        "ammo_m": 70,
+        "shells": 80,
+        "ammo_r": 140
+      },
+      "services": []
+    },
+    {
+      "id": "building:658",
+      "kind": "pharmacy",
+      "name": "Аптека",
+      "x": 439.5,
+      "z": 651.3,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "medkit": 60,
+        "pills": 15,
+        "vitamins": 12,
+        "bandage": 8,
+        "antiseptic": 10,
+        "sunscreen": 12,
+        "water": 2
+      },
+      "services": []
+    },
+    {
+      "id": "building:665",
+      "kind": "pharmacy",
+      "name": "Аптека",
+      "x": 580.5,
+      "z": 608.7,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "medkit": 60,
+        "pills": 15,
+        "vitamins": 12,
+        "bandage": 8,
+        "antiseptic": 10,
+        "sunscreen": 12,
+        "water": 2
+      },
+      "services": []
+    },
+    {
+      "id": "building:683",
+      "kind": "supermarket",
+      "name": "Супермаркет «Лукошко»",
+      "x": 820.5,
+      "z": 651.3,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "mask": 75,
+        "seed_tomato": 12,
+        "seed_cucumber": 12,
+        "seed_strawberry": 18,
+        "water": 2,
+        "cola": 3,
+        "juice": 4,
+        "smoothie": 6,
+        "milk": 3,
+        "bread": 2,
+        "sausage": 6,
+        "salo": 8,
+        "cheese": 6,
+        "eggs": 4,
+        "pelmeni": 6,
+        "pizza": 10,
+        "apple": 1,
+        "banana": 1,
+        "grapes": 4,
+        "watermelon": 6,
+        "corn": 2,
+        "honey": 9,
+        "chocolate": 3,
+        "icecream": 3,
+        "chips": 3,
+        "cigarettes": 7
+      },
+      "services": []
+    },
+    {
+      "id": "building:693",
+      "kind": "fishshop",
+      "name": "Рыболовный магазин «Поплавок»",
+      "x": 979.5,
+      "z": 651.3,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "rod": 900,
+        "rod_pro": 3200,
+        "bait": 15,
+        "lure": 120,
+        "net": 450,
+        "bucket": 90,
+        "water": 2,
+        "sandwich": 5,
+        "kvass": 3
+      },
+      "services": []
+    },
+    {
+      "id": "building:729",
+      "kind": "barber",
+      "name": "Парикмахерская",
+      "x": 520.5,
+      "z": 711.3,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {},
+      "services": [
+        "barber"
+      ]
+    },
+    {
+      "id": "building:746",
+      "kind": "shop24",
+      "name": "Магазин 24/7",
+      "x": 799.5,
+      "z": 668.7,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "mask": 75,
+        "water": 2,
+        "cola": 3,
+        "kvass": 3,
+        "lemonade": 4,
+        "coffee": 4,
+        "bread": 2,
+        "sandwich": 5,
+        "hotdog": 5,
+        "chips": 3,
+        "chocolate": 3,
+        "donut": 3,
+        "gum": 1,
+        "energy": 5,
+        "cigarettes": 7
+      },
+      "services": []
+    },
+    {
+      "id": "building:778",
+      "kind": "clothes",
+      "name": "Одежда «Мода»",
+      "x": 340.5,
+      "z": 728.7,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {},
+      "services": [
+        "clothes"
+      ]
+    },
+    {
+      "id": "building:805",
+      "kind": "gunshop",
+      "name": "Оружейный «Арсенал»",
+      "x": 880.5,
+      "z": 728.7,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "knife": 900,
+        "machete": 1900,
+        "seed_durman": 150,
+        "pistol": 1500,
+        "revolver": 2600,
+        "smg": 5200,
+        "shotgun": 4800,
+        "rifle": 9500,
+        "sniper": 14000,
+        "ammo": 60,
+        "ammo_m": 70,
+        "shells": 80,
+        "ammo_r": 140
+      },
+      "services": []
+    },
+    {
+      "id": "building:841",
+      "kind": "shop24",
+      "name": "Магазин 24/7",
+      "x": 580.5,
+      "z": 788.7,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "mask": 75,
+        "water": 2,
+        "cola": 3,
+        "kvass": 3,
+        "lemonade": 4,
+        "coffee": 4,
+        "bread": 2,
+        "sandwich": 5,
+        "hotdog": 5,
+        "chips": 3,
+        "chocolate": 3,
+        "donut": 3,
+        "gum": 1,
+        "energy": 5,
+        "cigarettes": 7
+      },
+      "services": []
+    },
+    {
+      "id": "building:852",
+      "kind": "barber",
+      "name": "Парикмахерская",
+      "x": 739.5,
+      "z": 788.7,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {},
+      "services": [
+        "barber"
+      ]
+    },
+    {
+      "id": "building:858",
+      "kind": "clothes",
+      "name": "Одежда «Мода»",
+      "x": 799.5,
+      "z": 831.3,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {},
+      "services": [
+        "clothes"
+      ]
+    },
+    {
+      "id": "building:893",
+      "kind": "supermarket",
+      "name": "Супермаркет «Лукошко»",
+      "x": 439.5,
+      "z": 848.7,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "mask": 75,
+        "seed_tomato": 12,
+        "seed_cucumber": 12,
+        "seed_strawberry": 18,
+        "water": 2,
+        "cola": 3,
+        "juice": 4,
+        "smoothie": 6,
+        "milk": 3,
+        "bread": 2,
+        "sausage": 6,
+        "salo": 8,
+        "cheese": 6,
+        "eggs": 4,
+        "pelmeni": 6,
+        "pizza": 10,
+        "apple": 1,
+        "banana": 1,
+        "grapes": 4,
+        "watermelon": 6,
+        "corn": 2,
+        "honey": 9,
+        "chocolate": 3,
+        "icecream": 3,
+        "chips": 3,
+        "cigarettes": 7
+      },
+      "services": []
+    },
+    {
+      "id": "building:908",
+      "kind": "clothes",
+      "name": "Одежда «Мода»",
+      "x": 679.5,
+      "z": 848.7,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {},
+      "services": [
+        "clothes"
+      ]
+    },
+    {
+      "id": "building:945",
+      "kind": "pharmacy",
+      "name": "Аптека",
+      "x": 319.5,
+      "z": 908.7,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "medkit": 60,
+        "pills": 15,
+        "vitamins": 12,
+        "bandage": 8,
+        "antiseptic": 10,
+        "sunscreen": 12,
+        "water": 2
+      },
+      "services": []
+    },
+    {
+      "id": "building:969",
+      "kind": "service",
+      "name": "Автосервис и тюнинг",
+      "x": 760.5,
+      "z": 908.7,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {},
+      "services": [
+        "service"
+      ]
+    },
+    {
+      "id": "building:1021",
+      "kind": "supermarket",
+      "name": "Супермаркет «Лукошко»",
+      "x": 559.5,
+      "z": 1011.3,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "mask": 75,
+        "seed_tomato": 12,
+        "seed_cucumber": 12,
+        "seed_strawberry": 18,
+        "water": 2,
+        "cola": 3,
+        "juice": 4,
+        "smoothie": 6,
+        "milk": 3,
+        "bread": 2,
+        "sausage": 6,
+        "salo": 8,
+        "cheese": 6,
+        "eggs": 4,
+        "pelmeni": 6,
+        "pizza": 10,
+        "apple": 1,
+        "banana": 1,
+        "grapes": 4,
+        "watermelon": 6,
+        "corn": 2,
+        "honey": 9,
+        "chocolate": 3,
+        "icecream": 3,
+        "chips": 3,
+        "cigarettes": 7
+      },
+      "services": []
+    },
+    {
+      "id": "building:1023",
+      "kind": "cafe",
+      "name": "Кафе",
+      "x": 619.5,
+      "z": 968.7,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "coffee": 4,
+        "tea": 2,
+        "burger": 8,
+        "hotdog": 5,
+        "pizza": 10,
+        "soup": 6,
+        "borscht": 7,
+        "croissant": 3,
+        "donut": 3,
+        "cake": 7,
+        "juice": 4,
+        "lemonade": 4
+      },
+      "services": []
+    },
+    {
+      "id": "building:1036",
+      "kind": "shop24",
+      "name": "Магазин 24/7",
+      "x": 799.5,
+      "z": 1011.3,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "mask": 75,
+        "water": 2,
+        "cola": 3,
+        "kvass": 3,
+        "lemonade": 4,
+        "coffee": 4,
+        "bread": 2,
+        "sandwich": 5,
+        "hotdog": 5,
+        "chips": 3,
+        "chocolate": 3,
+        "donut": 3,
+        "gum": 1,
+        "energy": 5,
+        "cigarettes": 7
+      },
+      "services": []
+    },
+    {
+      "id": "building:1080",
+      "kind": "gas",
+      "name": "АЗС",
+      "x": 520.5,
+      "z": 1061.8,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "water": 2,
+        "cola": 3,
+        "kvass": 3,
+        "coffee": 4,
+        "sandwich": 5,
+        "hotdog": 5,
+        "donut": 3,
+        "chips": 3,
+        "cigarettes": 7,
+        "energy": 5
+      },
+      "services": [
+        "fuel"
+      ]
+    },
+    {
+      "id": "building:1116",
+      "kind": "vshop",
+      "name": "Сельмаг · Сосновка",
+      "x": 356,
+      "z": -348.2,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "mask": 75,
+        "knife": 900,
+        "seed_tomato": 12,
+        "seed_potato": 10,
+        "seed_cucumber": 12,
+        "seed_strawberry": 18,
+        "seed_sunflower": 8,
+        "bread": 2,
+        "milk": 3,
+        "water": 2,
+        "kvass": 3,
+        "sausage": 6,
+        "eggs": 4,
+        "cheese": 6,
+        "honey": 9,
+        "apple": 1,
+        "cigarettes": 7,
+        "tea": 2
+      },
+      "services": []
+    },
+    {
+      "id": "building:1118",
+      "kind": "vpharmacy",
+      "name": "Аптека · Сосновка",
+      "x": 434,
+      "z": -331.8,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "medkit": 60,
+        "pills": 15,
+        "vitamins": 12,
+        "bandage": 8,
+        "antiseptic": 10,
+        "sunscreen": 12,
+        "water": 2
+      },
+      "services": []
+    },
+    {
+      "id": "building:1119",
+      "kind": "vguntruck",
+      "name": "Оружейный грузовик · Сосновка",
+      "x": 486,
+      "z": -334.9,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "knife": 900,
+        "machete": 1900,
+        "seed_durman": 150,
+        "pistol": 1500,
+        "revolver": 2600,
+        "smg": 5200,
+        "shotgun": 4800,
+        "rifle": 9500,
+        "sniper": 14000,
+        "ammo": 60,
+        "ammo_m": 70,
+        "shells": 80,
+        "ammo_r": 140
+      },
+      "services": []
+    },
+    {
+      "id": "building:1142",
+      "kind": "fishshop",
+      "name": "Рыболовный магазин «Поплавок»",
+      "x": -147.3,
+      "z": 520,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "rod": 900,
+        "rod_pro": 3200,
+        "bait": 15,
+        "lure": 120,
+        "net": 450,
+        "bucket": 90,
+        "water": 2,
+        "sandwich": 5,
+        "kvass": 3
+      },
+      "services": []
+    },
+    {
+      "id": "building:1143",
+      "kind": "vpharmacy",
+      "name": "Аптека · Кленовка",
+      "x": 591.8,
+      "z": 1683,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "medkit": 60,
+        "pills": 15,
+        "vitamins": 12,
+        "bandage": 8,
+        "antiseptic": 10,
+        "sunscreen": 12,
+        "water": 2
+      },
+      "services": []
+    },
+    {
+      "id": "building:1144",
+      "kind": "vguntruck",
+      "name": "Оружейный грузовик · Кленовка",
+      "x": 605.9,
+      "z": 1695,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "knife": 900,
+        "machete": 1900,
+        "seed_durman": 150,
+        "pistol": 1500,
+        "revolver": 2600,
+        "smg": 5200,
+        "shotgun": 4800,
+        "rifle": 9500,
+        "sniper": 14000,
+        "ammo": 60,
+        "ammo_m": 70,
+        "shells": 80,
+        "ammo_r": 140
+      },
+      "services": []
+    },
+    {
+      "id": "building:1148",
+      "kind": "vshop",
+      "name": "Сельмаг · Кленовка",
+      "x": 608.2,
+      "z": 1749,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "mask": 75,
+        "knife": 900,
+        "seed_tomato": 12,
+        "seed_potato": 10,
+        "seed_cucumber": 12,
+        "seed_strawberry": 18,
+        "seed_sunflower": 8,
+        "bread": 2,
+        "milk": 3,
+        "water": 2,
+        "kvass": 3,
+        "sausage": 6,
+        "eggs": 4,
+        "cheese": 6,
+        "honey": 9,
+        "apple": 1,
+        "cigarettes": 7,
+        "tea": 2
+      },
+      "services": []
+    },
+    {
+      "id": "building:1168",
+      "kind": "vpharmacy",
+      "name": "Аптека · Ольховка",
+      "x": 1026,
+      "z": 1545.55,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "medkit": 60,
+        "pills": 15,
+        "vitamins": 12,
+        "bandage": 8,
+        "antiseptic": 10,
+        "sunscreen": 12,
+        "water": 2
+      },
+      "services": []
+    },
+    {
+      "id": "building:1169",
+      "kind": "vguntruck",
+      "name": "Оружейный грузовик · Ольховка",
+      "x": 1268,
+      "z": 1544.5,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "knife": 900,
+        "machete": 1900,
+        "seed_durman": 150,
+        "pistol": 1500,
+        "revolver": 2600,
+        "smg": 5200,
+        "shotgun": 4800,
+        "rifle": 9500,
+        "sniper": 14000,
+        "ammo": 60,
+        "ammo_m": 70,
+        "shells": 80,
+        "ammo_r": 140
+      },
+      "services": []
+    },
+    {
+      "id": "building:1206",
+      "kind": "supermarket",
+      "name": "Гипермаркет · Егоровка",
+      "x": 895.7,
+      "z": -275,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "mask": 75,
+        "seed_tomato": 12,
+        "seed_cucumber": 12,
+        "seed_strawberry": 18,
+        "water": 2,
+        "cola": 3,
+        "juice": 4,
+        "smoothie": 6,
+        "milk": 3,
+        "bread": 2,
+        "sausage": 6,
+        "salo": 8,
+        "cheese": 6,
+        "eggs": 4,
+        "pelmeni": 6,
+        "pizza": 10,
+        "apple": 1,
+        "banana": 1,
+        "grapes": 4,
+        "watermelon": 6,
+        "corn": 2,
+        "honey": 9,
+        "chocolate": 3,
+        "icecream": 3,
+        "chips": 3,
+        "cigarettes": 7
+      },
+      "services": []
+    },
+    {
+      "id": "building:1207",
+      "kind": "pharmacy",
+      "name": "Аптека · Егоровка",
+      "x": 903.7,
+      "z": -310,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "medkit": 60,
+        "pills": 15,
+        "vitamins": 12,
+        "bandage": 8,
+        "antiseptic": 10,
+        "sunscreen": 12,
+        "water": 2
+      },
+      "services": []
+    },
+    {
+      "id": "building:1208",
+      "kind": "gunshop",
+      "name": "Оружейный · Егоровка",
+      "x": 903.7,
+      "z": -335,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "knife": 900,
+        "machete": 1900,
+        "seed_durman": 150,
+        "pistol": 1500,
+        "revolver": 2600,
+        "smg": 5200,
+        "shotgun": 4800,
+        "rifle": 9500,
+        "sniper": 14000,
+        "ammo": 60,
+        "ammo_m": 70,
+        "shells": 80,
+        "ammo_r": 140
+      },
+      "services": []
+    },
+    {
+      "id": "building:1210",
+      "kind": "vshop",
+      "name": "Сельмаг · Ольховка",
+      "x": 1156,
+      "z": 1543.3,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "mask": 75,
+        "knife": 900,
+        "seed_tomato": 12,
+        "seed_potato": 10,
+        "seed_cucumber": 12,
+        "seed_strawberry": 18,
+        "seed_sunflower": 8,
+        "bread": 2,
+        "milk": 3,
+        "water": 2,
+        "kvass": 3,
+        "sausage": 6,
+        "eggs": 4,
+        "cheese": 6,
+        "honey": 9,
+        "apple": 1,
+        "cigarettes": 7,
+        "tea": 2
+      },
+      "services": []
+    },
+    {
+      "id": "building:1311",
+      "kind": "gas",
+      "name": "АЗС · Набережная",
+      "x": -63,
+      "z": 514.2,
+      "legacyPrice": null,
+      "legacyIncome": null,
+      "items": {
+        "water": 2,
+        "cola": 3,
+        "kvass": 3,
+        "coffee": 4,
+        "sandwich": 5,
+        "hotdog": 5,
+        "donut": 3,
+        "chips": 3,
+        "cigarettes": 7,
+        "energy": 5
+      },
+      "services": [
+        "fuel"
+      ]
+    }
+  ]
+}
