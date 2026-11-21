@@ -27,3 +27,17 @@ n2.handle(JSON.stringify({type:'login_success',caps:{accounts:1},accountRevision
 n2.saveAccount({money:2}); n2.authenticated = false;
 n2.handle(JSON.stringify({type:'login_success',caps:{accounts:1},accountRevision:2,accountSaveId:'other-session-save',accountState:{money:3},player:{id:1}}));
 assert(!n2.accountSaved && sent2.length === 1, 'чужая ревизия не принимается за подтверждение своего сохранения');
+
+const n3 = new NetClient('tester', 'm', 'wss://test', {mode:'login',password:'password-123'}) as any;
+const sent3:any[]=[]; n3.ws={readyState:1,send:(s:string)=>sent3.push(JSON.parse(s))}; n3.handshake=true;
+n3.handle(JSON.stringify({type:'login_success',caps:{accounts:1,saveIds:1},accountRevision:4,accountState:{money:0},player:{id:1}}));
+n3.saveAccount({money:1}); const firstId=sent3[0].saveId;
+n3.saveAccount({money:2});
+n3.handle(JSON.stringify({type:'account_saved',ok:true,revision:5,saveId:'other-request-id'}));
+assert(sent3.length===1 && !n3.accountSaved,'чужое подтверждение не сдвигает очередь');
+n3.handle(JSON.stringify({type:'account_saved',ok:true,revision:5,saveId:firstId}));
+assert(sent3.length===2 && sent3[1].revision===5,'следующий снимок после точного подтверждения');
+n3.handle(JSON.stringify({type:'account_saved',ok:false,error:'conflict',revision:5,saveId:firstId}));
+assert(!n3.accountSaved && !n3.conflict,'запоздавший отказ предыдущего сохранения игнорируется');
+n3.handle(JSON.stringify({type:'account_saved',ok:true,revision:6,saveId:sent3[1].saveId}));
+assert(n3.accountSaved,'новая очередь подтверждена');

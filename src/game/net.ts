@@ -159,13 +159,13 @@ interface Msg {
   money?: number; player?: ServerPlayer;
   players?: PlayersListEntry[] | Record<string, LegacyPlayer | PlayersListEntry>;
   x?: number; z?: number; rot?: number;
-  act?: string; reason?: string; accountState?: unknown; accountRevision?: number; accountSaveId?: string; adminSession?: string; revision?: number; accounts?: number;
+  act?: string; reason?: string; accountState?: unknown; accountRevision?: number; accountSaveId?: string; saveId?: string; adminSession?: string; revision?: number; accounts?: number;
   /** 🎁 выдача предметов из панели Colab: режим, id предмета, количество */
   mode?: string; item?: string; qty?: number;
   /** авторизация онлайна: токен устройства и пароль-подсказка */
   token?: string; pass?: string;
   /** что умеет сервер (наш сервер пересылает §-протокол и умеет админ-команды) */
-  caps?: { state?: number; peds?: number; adm?: number; relay?: number; accounts?: number };
+  caps?: { state?: number; peds?: number; adm?: number; relay?: number; accounts?: number; saveIds?: number };
   /** реклама на щитах: полный список от сервера и ответ на покупку */
   ads?: Record<string, RemoteAd>; ok?: boolean; error?: string;
   lots?: unknown; serverTime?: number; owners?: unknown; complete?: boolean;
@@ -314,6 +314,7 @@ export class NetClient {
   private pending: string | null = null;
   private conflict = false;
   private handshake = false;
+  private saveIds = false;
   get accountSaved() { return !this.flight && !this.pending && !this.conflict && this.authenticated; }
   /** {type:'error'} — бан/кик: показать текст и отключиться */
   onError: ((text: string) => void) | null = null;
@@ -432,7 +433,7 @@ export class NetClient {
         if (!this.handshake || !m.caps?.accounts || !Number.isSafeInteger(m.accountRevision)) { this.die('Сервер не поддерживает безопасные аккаунты'); return; }
         this.onLoginSuccess(m, now); return;
       case 'account_saved':
-        if (!this.flight) return;
+        if (!this.flight || (this.saveIds && m.saveId !== this.flight.id)) return;
         if (!m.ok || m.revision !== this.flight.revision + 1) { this.conflict = true; this.onSaveError?.('Сохранение отклонено. Не выходите: проверьте соединение и обратитесь к администратору.'); return; }
         this.revision = m.revision; this.flight = null; this.flushAccount(); return;
       case 'players_list': this.applyPlayers(m.players, now, false); return;
@@ -509,6 +510,7 @@ export class NetClient {
     // поз и мест в авто. Теперь включаем сразу по caps, а если сервер старый — пробуем один пакет.
     if (m.caps && (m.caps.state || m.caps.relay)) this.legacy = true;
     this.probeSent = false;
+    this.saveIds = m.caps?.saveIds === 1;
     const next = m.accountRevision!;
     if (this.loggedOnce && this.revision !== null) {
       const expected = this.flight?.revision ?? this.revision;
