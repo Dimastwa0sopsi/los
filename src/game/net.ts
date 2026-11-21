@@ -168,7 +168,7 @@ interface Msg {
   caps?: { state?: number; peds?: number; adm?: number; relay?: number; accounts?: number };
   /** реклама на щитах: полный список от сервера и ответ на покупку */
   ads?: Record<string, RemoteAd>; ok?: boolean; error?: string;
-  lots?: unknown; serverTime?: number;
+  lots?: unknown; serverTime?: number; owners?: unknown; complete?: boolean;
   /** машиночитаемая причина отказа входа: banned / maintenance / device / replaced / name */
   code?: string;
   /** админ-команды: id модели авто для спавна и прочие параметры */
@@ -301,6 +301,8 @@ export class NetClient {
   /** последние известные объявления (для панели СМИ) */
   ads: Record<string, RemoteAd> = {};
   auction: AuctionSnapshot | null = null;
+  kioskOwners: { owners: Map<number, string | null>; complete: boolean; receivedAt: number } | null = null;
+  private kioskOwnersRequested = 0;
   /** входящий перевод от другого игрока */
   onGift: ((from: number, g: { k: 'money' | 'item'; v: number | string; n: number; nick: string }) => void) | null = null;
   /** login_success: сервер прислал деньги/координаты (first — первый вход) */
@@ -352,7 +354,7 @@ export class NetClient {
   private open() {
     if (!this.want || this.dead) return;
     this.status = this.retry ? 'reconnecting' : 'connecting';
-    this.auction = null;
+    this.auction = null; this.kioskOwners = null; this.kioskOwnersRequested = 0;
     let ws: WebSocket;
     try { ws = new WebSocket(this.url); } catch { this.fail(); return; }
     this.ws = ws;
@@ -374,7 +376,7 @@ export class NetClient {
     ws.onclose = () => {
       if (this.ws !== ws) return;
       window.clearTimeout(this.connectTimer);
-      this.ws = null; this.id = null; this.authenticated = false; this.adminSession = ''; this.lastSaveMoney = NaN; this.auction = null;
+      this.ws = null; this.id = null; this.authenticated = false; this.adminSession = ''; this.lastSaveMoney = NaN; this.auction = null; this.kioskOwners = null; this.kioskOwnersRequested = 0;
       if (this.dead || !this.want) { this.status = 'offline'; this.onChange?.(); return; }
       this.fail();
     };
@@ -460,6 +462,17 @@ export class NetClient {
       case 'ads': {
         const ads = (m.ads && typeof m.ads === 'object' ? m.ads : {}) as Record<string, RemoteAd>;
         this.ads = ads; this.onAds?.(ads); return;
+      }
+      case 'kiosk_owners': {
+        if (!Array.isArray(m.owners) || m.owners.length > 1000 || typeof m.complete !== 'boolean') return;
+        const owners = new Map<number, string | null>();
+        for (const entry of m.owners) {
+          if (!entry || !Number.isSafeInteger(entry.id) || entry.id < 0 || entry.id > 1000000 ||
+              (entry.name !== null && (typeof entry.name !== 'string' || !entry.name || entry.name.length > 32)) || owners.has(entry.id)) return;
+          owners.set(entry.id, entry.name);
+        }
+        this.kioskOwners = { owners, complete:m.complete, receivedAt:Date.now() };
+        this.onChange?.(); return;
       }
       case 'auction_list': {
         if (!Array.isArray(m.lots) || !Number.isSafeInteger(m.serverTime)) return;
@@ -718,6 +731,7 @@ export class NetClient {
   /** попросить у сервера актуальный список объявлений */
   requestAds() { this.send({ type: 'ads' }); }
   requestAuction() { if (this.authenticated) this.send({ type: 'auction_list' }); }
+  requestKioskOwners() { const now = Date.now(); if (this.authenticated && now - this.kioskOwnersRequested >= 5000) { this.kioskOwnersRequested = now; this.send({ type: 'kiosk_owners' }); } }
   sendAd(id: string, text: string, tag: string) { this.send({ type: 'ad', id, text: text.slice(0, 120), tag }); }
   /** снять своё объявление досрочно */
   sendAdDrop(id: string) { this.send({ type: 'ad_drop', id }); }

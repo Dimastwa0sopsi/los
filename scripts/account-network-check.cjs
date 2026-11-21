@@ -2,7 +2,7 @@
 const fs = require('fs'), path = require('path'), os = require('os'), { spawn } = require('child_process'), assert = require('assert');
 const WebSocket = require('ws');
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'los-accounts-'));
-for (const f of ['server.js', 'ads.cjs', 'moderation.cjs', 'account-auth.cjs', 'account-store.cjs', 'account-revisions.cjs', 'auction-store.cjs']) fs.copyFileSync(path.join(__dirname, '../server', f), path.join(dir, f));
+for (const f of ['server.js', 'ads.cjs', 'moderation.cjs', 'account-auth.cjs', 'account-store.cjs', 'account-revisions.cjs', 'auction-store.cjs', 'business-owners.cjs']) fs.copyFileSync(path.join(__dirname, '../server', f), path.join(dir, f));
 fs.writeFileSync(path.join(dir, 'package.json'), '{"type":"commonjs"}');
 const db = path.join(dir, 'db.sqlite');
 const port = 23000 + Math.floor(Math.random() * 20000);
@@ -49,9 +49,11 @@ async function auth(name, mode, password, backup) { const c = client(); assert.e
   a.send({type:'auction_bid',id:catalog.lots[0].id,bid:50000});
   let dupe = await auth('tester', 'register', 'another-password'); assert.match((await dupe.next('error')).text, /занят/); dupe.ws.close();
   let bad = await auth('Tester', 'login', 'wrong-password'); assert.match((await bad.next('error')).text, /Неверный/); bad.ws.close();
-  const state = { money: 987654, health: 61, food: 42, properties:['1:2'], vehicles:[{type:'lada'}], pos:{x:510,z:490,a:1}, inventory:{bread:3} };
+  const state = { money: 987654, health: 61, food: 42, properties:['1:2'], kiosks:[{id:3,last:0,acc:7}], vehicles:[{type:'lada'}], pos:{x:510,z:490,a:1}, inventory:{bread:3} };
   a.send({type:'account_save', state, revision:0}); assert.equal((await a.next('account_saved')).revision, 1);
   let b = await auth('TESTER', 'login', 'backup-password'); let login = await b.next('login_success'); assert.deepStrictEqual(login.accountState, state); assert.equal(login.player.money, state.money); assert.equal(login.accountRevision, 1); assert.equal((await a.next('error')).code, 'replaced');
+  b.send({type:'kiosk_owners'}); const owners = await b.next('kiosk_owners');
+  assert.equal(owners.complete,true); assert.deepStrictEqual(owners.owners,[{id:3,name:'Tester'}]); assert(!JSON.stringify(owners).includes('987654'));
   b.send({type:'account_save', state, revision:0}); assert.equal((await b.next('account_saved')).error, 'conflict');
   const admin = async (action, opts = {}) => (await fetch(`http://127.0.0.1:${port}/admin/action`, { method:'POST', headers:{'Content-Type':'application/json', 'x-admin-token':'test-admin-token'}, body: JSON.stringify({action, name:'Tester', ...opts}) })).json();
   let r = await admin('mute', {minutes:30}); assert(r.ok); b.send({type:'chat',text:'привет'}); assert.match((await b.next('chat')).text, /запрещён/);
@@ -66,6 +68,6 @@ async function auth(name, mode, password, backup) { const c = client(); assert.e
   let banned = await auth('Tester', 'login', 'primary-password'); assert.equal((await banned.next('error')).code, 'banned'); banned.ws.close();
   const db2 = new Database(db); db2.prepare('UPDATE players SET banned_until = ? WHERE name = ?').run(Date.now()-1, 'Tester'); db2.close();
   b.ws.close(); await stop(); await start();
-  let c = await auth('tester', 'login', 'primary-password'); login = await c.next('login_success'); assert.deepStrictEqual(login.accountState, state); assert.equal(login.player.money, state.money); c.ws.close();
+  let c = await auth('tester', 'login', 'primary-password'); login = await c.next('login_success'); assert.deepStrictEqual(login.accountState, state); assert.equal(login.player.money, state.money); c.send({type:'kiosk_owners'}); assert.deepStrictEqual((await c.next('kiosk_owners')).owners,[{id:3,name:'Tester'}]); c.ws.close();
   await stop(); fs.rmSync(dir, { recursive:true, force:true }); console.log('✓ аккаунты и прогресс; мут, варн, бан и истечение срока после перезапуска');
 })().catch(e => { console.error(e); if (proc) proc.kill(); process.exitCode = 1; });

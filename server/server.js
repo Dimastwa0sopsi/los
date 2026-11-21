@@ -28,6 +28,7 @@ const { checkText: checkAdText, checkChat } = require('./moderation.cjs');
 const { createAdsStore, AD_TTL } = require('./ads.cjs');
 const { createAccountStore, normalizeLogin } = require('./account-store.cjs');
 const { createAuctionStore } = require('./auction-store.cjs');
+const { readKioskOwners } = require('./business-owners.cjs');
 
 const BUILD = (() => {
   try { return crypto.createHash('sha1').update(fs.readFileSync(__filename)).digest('hex').slice(0, 12); }
@@ -43,6 +44,7 @@ db.pragma('synchronous = NORMAL');
 const accounts = createAccountStore(db);
 // Только просмотр лотов; денежные операции пока не подключены к сети.
 const auctions = createAuctionStore(db);
+let kioskOwnersCache = null, kioskOwnersAt = 0;
 const attempts = new Map();
 let authJobs = 0;
 function allowLogin(name) {
@@ -1202,7 +1204,7 @@ const wss = new WebSocket.Server({ server, maxPayload: 1100000 });
 
 wss.on('connection', (ws) => {
   send(ws, { type: 'hello', accounts: 1 });
-  let me = null, account = null, authBusy = false, auctionListAt = 0;
+  let me = null, account = null, authBusy = false, auctionListAt = 0, kioskOwnersRequestAt = 0;
   ws.on('message', async (raw) => {
     let m; try { m = JSON.parse(raw); } catch { return; }
 
@@ -1250,6 +1252,14 @@ wss.on('connection', (ws) => {
     if (!me || active.get(me.id)?.ws !== ws) return;
     const row = me;
 
+    if (m.type === 'kiosk_owners') {
+      const now = Date.now();
+      if (now - kioskOwnersRequestAt < 4000) return;
+      kioskOwnersRequestAt = now;
+      if (!kioskOwnersCache || now - kioskOwnersAt >= 5000) { kioskOwnersCache = readKioskOwners(db); kioskOwnersAt = now; }
+      return send(ws, { type: 'kiosk_owners', ...kioskOwnersCache });
+    }
+
     if (m.type === 'auction_list') {
       const now = Date.now();
       if (now - auctionListAt < 1000) return;
@@ -1265,7 +1275,7 @@ wss.on('connection', (ws) => {
         if (r.ok) { row.money = money(value); q.money.run(row.money, row.name); }
         return r;
       })();
-      if (result.ok) { account.revision = result.revision; pushPlayers(); }
+      if (result.ok) { account.revision = result.revision; kioskOwnersCache = null; pushPlayers(); }
       send(ws, { type: 'account_saved', ...result });
       return;
     }

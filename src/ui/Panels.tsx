@@ -87,13 +87,13 @@ export function GamePanel({ g, panel, close }: { g: Game; panel: Panel; close: (
         <p className="text-xs opacity-70 mt-2">У кассы нажмите E и выберите действие. Для ограбления прицельтесь в кассира.</p>
       </Modal>);
     case 'kiosk': {
-      const k = g.L.kiosks[panel.id]; const kt = KIOSK_TYPES[k.type]; const own = s.kiosks.find((o) => o.id === k.id);
+      const k = g.L.kiosks[panel.id]; const kt = KIOSK_TYPES[k.type]; const own = s.kiosks.find((o) => o.id === k.id); const owner = g.kioskOwner(k.id);
       return (<Modal title={`Ларёк «${kt.name}»`} onClose={close}>
         <div className="lg-list">{kt.items.map((id) => { const it = ITEMS[id]; return <div key={id} className="lg-row"><span className="lg-ico">{it.icon}</span><b className="flex-1">{it.name}</b><button className="lg-btn sm" onClick={wrap(() => g.buy(id))}>{$(it.price)}</button></div>; })}</div>
         <div className="lg-card mt-3">
-          <b>Бизнес</b>
+          <b>Бизнес</b><p>Владелец: {owner.label}</p>
           {own ? <><p>Ларёк ваш. Доход: {$(kt.income)} каждую минуту. Накоплено: <b>{$(own.acc)}</b></p><button className="lg-btn" onClick={wrap(() => g.collectKiosks(k.id))}>Забрать доход</button></>
-            : <><p>Стоимость: <b>{$(kt.price)}</b> · доход {$(kt.income)}/мин (окупаемость ≈ {Math.round(kt.price / kt.income)} мин)</p><button className="lg-btn lg-btn-main" onClick={wrap(() => g.buyKiosk(k.id))}>Купить ларёк</button></>}
+            : owner.kind === 'state' ? <><p>Стоимость: <b>{$(kt.price)}</b> · доход {$(kt.income)}/мин (окупаемость ≈ {Math.round(kt.price / kt.income)} мин)</p><button className="lg-btn lg-btn-main" onClick={wrap(() => g.buyKiosk(k.id))}>Купить ларёк</button></> : <p>Покупка недоступна: {owner.kind === 'player' ? 'ларёк принадлежит игроку' : 'владение не подтверждено сервером'}.</p>}
         </div></Modal>);
     }
     case 'property': {
