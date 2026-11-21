@@ -140,6 +140,15 @@ export function GamePanel({ g, panel, close }: { g: Game; panel: Panel; close: (
           <div className="lg-row"><span className="flex-1">Страховка</span><span>{insured ? `до ${new Date(s.insuredUntil!).toLocaleDateString('ru')}` : 'не оформлена'}</span></div>
         </div>
         <p className="text-xs opacity-70 mt-2">Снизить розыск можно пожертвованием в приют (команда /charity) или уйти от погони.</p>
+        <div className="lg-card mt-3">
+          <b>🚘 Транспорт и документы</b>
+          <p className="text-xs opacity-70">Показаны данные вашего сохранения. Серверная выдача уникального случайного номера за $5 000 пока не подключена.</p>
+          {!s.vehicles.length && <p className="opacity-70">У вас пока нет транспорта.</p>}
+          <div className="lg-list mt-2">{s.vehicles.map(o => <div className="lg-row wrap" key={o.uid}>
+            <div className="flex-1"><b>{VEHICLES[o.type]?.name ?? o.type}</b><small>Номер: {o.tuning?.plate || 'не указан'} · передний: {!o.tuning?.plate || o.tuning.plateFront === false ? 'нет' : 'есть'} · задний: {!o.tuning?.plate || o.tuning.plateBack === false ? 'нет' : 'есть'}</small></div>
+            <button className="lg-btn sm" onClick={() => { const text = g.vehicleDocument(o.uid); if (text) g.openPanel({type:'info',title:'📄 ПТС',text}); }}>ПТС</button>
+          </div>)}</div>
+        </div>
       </Modal>);
     }
     case 'bank': {
