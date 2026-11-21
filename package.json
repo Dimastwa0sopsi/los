@@ -35,7 +35,9 @@
     "check:sosnovka": "esbuild scripts/sosnovka-check.ts --bundle --platform=node --format=cjs --outfile=.check/sosnovka.cjs --log-level=error && node .check/sosnovka.cjs",
     "check:map-search": "esbuild scripts/map-search-check.ts --bundle --platform=node --format=cjs --outfile=.check/map-search.cjs --log-level=error && node .check/map-search.cjs",
     "check:seatbelt": "esbuild scripts/seatbelt-check.ts --bundle --platform=node --format=cjs --outfile=.check/seatbelt.cjs --log-level=error --loader:.png=empty --define:import.meta.env={} && node .check/seatbelt.cjs",
-    "check:speed-camera": "esbuild scripts/speed-camera-check.ts --bundle --platform=node --format=cjs --outfile=.check/speed-camera.cjs --log-level=error --loader:.png=empty --define:import.meta.env={} && node .check/speed-camera.cjs"
+    "check:speed-camera": "esbuild scripts/speed-camera-check.ts --bundle --platform=node --format=cjs --outfile=.check/speed-camera.cjs --log-level=error --loader:.png=empty --define:import.meta.env={} && node .check/speed-camera.cjs",
+    "check:business-catalogue": "esbuild scripts/export-business-catalogue.ts --bundle --platform=node --format=cjs --outfile=.check/export-business-catalogue.cjs --log-level=error && node .check/export-business-catalogue.cjs --check && esbuild scripts/business-catalogue-check.ts --bundle --platform=node --format=cjs --outfile=.check/business-catalogue-check.cjs --log-level=error && node .check/business-catalogue-check.cjs",
+    "check:business-readiness": "python3 scripts/business_readiness_check.py"
   },
   "dependencies": {
     "clsx": "2.1.1",
