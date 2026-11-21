@@ -1040,7 +1040,7 @@ export class VehicleModel {
     const key = `${num}|${front}|${back}`;
     if (key === this.plateKey) return;
     this.plateKey = key;
-    for (const m of [this.plate, this.frontPlate]) if (m) { this.group.remove(m); m.geometry.dispose(); (m.material as THREE.Material).dispose(); }
+    for (const m of [this.plate, this.frontPlate]) if (m) { m.parent?.remove(m); m.geometry.dispose(); (m.material as THREE.Material).dispose(); }
     this.plate = null; this.frontPlate = null; this.plateTexture?.dispose(); this.plateTexture = null;
     if (!num || (!front && !back) || ['heli', 'moto', 'scooter', 'combine', 'quad'].includes(this.spec.body)) return;
     const c = document.createElement('canvas'); c.width = 256; c.height = 64;
@@ -1061,7 +1061,7 @@ export class VehicleModel {
     const make = (isFront: boolean) => {
       const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex }));
       m.position.set(0, this.spec.hei * 0.3, (isFront ? 1 : -1) * (this.spec.len / 2 + (!isFront && this.spec.body === 'suv' ? 0.34 : 0.23)));
-      m.rotation.y = isFront ? 0 : Math.PI; this.group.add(m); return m;
+      m.rotation.y = isFront ? 0 : Math.PI; this.body.add(m); return m;
     };
     if (front) this.frontPlate = make(true); if (back) this.plate = make(false);
   }

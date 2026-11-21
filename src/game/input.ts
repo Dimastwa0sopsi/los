@@ -1,6 +1,7 @@
 // Управление: клавиатура (физические коды — работает в русской раскладке), мышь, сенсорные элементы
 export class Input {
   keys = new Set<string>();
+  releaseGeneration = 0;
   private pressedOnce = new Set<string>();
   mouseDown = false; mouseClicked = false; rmb = false;
   lookDX = 0; lookDY = 0; zoomDelta = 0;
@@ -52,7 +53,7 @@ export class Input {
   tapV(n: string) { this.vOnce.add(n); }
   /** сброс в конце кадра */
   endFrame() { this.pressedOnce.clear(); this.vOnce.clear(); this.mouseClicked = false; this.lookDX = 0; this.lookDY = 0; this.zoomDelta = 0; }
-  releaseAll() { this.keys.clear(); this.vbtn.clear(); this.mouseDown = false; this.rmb = false; this.joy.x = 0; this.joy.y = 0; this.pressedOnce.clear(); this.vOnce.clear(); }
+  releaseAll() { this.releaseGeneration++; this.keys.clear(); this.vbtn.clear(); this.mouseDown = false; this.rmb = false; this.joy.x = 0; this.joy.y = 0; this.pressedOnce.clear(); this.vOnce.clear(); }
   unlock() { if (document.pointerLockElement) document.exitPointerLock?.(); }
   move() {
     if (!this.enabled) return { x: 0, y: 0 };

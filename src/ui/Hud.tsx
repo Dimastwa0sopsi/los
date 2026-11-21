@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Game, HudState } from '../game/game';
 import { Modal } from './MenuScreens';
 import { toWorld } from '../game/mapdraw';
+import { searchPlaces } from '../game/mapSearch';
 import { APP_BUILD, APP_BUILD_ID, APP_VERSION, versionShort } from '../version';
 import { CHANGES } from '../changelog';
 
@@ -161,6 +162,7 @@ export function Hud({ g, hud, mobile }: { g: Game; hud: HudState; mobile: boolea
           <span>⛽ {Math.round(v.fuel)}%{v.lights ? ' · 💡' : ''}{v.autopilot ? ' · 🤖' : ''}</span>
         </div>
       )}
+      {v?.beltAvailable && <div className="hx-belt">{v.belt ? '🔒 Ремень пристёгнут' : 'Ремень: удерживайте K'}</div>}
       {v && !v.passenger && !mobile && <Speedo kmh={v.kmh} rpm={v.rpm} gear={v.gear} heli={v.heli} alt={v.alt} fuel={v.fuel} name={v.name} lights={v.lights} auto={v.autopilot} cruise={v.cruise} diag={v.diag} canHydro={v.canHydro} hydro={v.hydro} onHydro={() => { if (v.hydro >= 100) g.hydroDown(); else g.hydroUp(); }} onCruise={() => { g.cruise = g.cruise > 0 ? 0 : Math.max(4.5, Math.abs(v.kmh / 3.6)); g.toast(g.cruise > 0 ? `Круиз-контроль: ${Math.round(g.cruise * 3.6)} км/ч` : 'Круиз-контроль выключен'); }} />}
       {hud.trip > 0 && <div className="hx-trip" style={{ opacity: hud.trip * 0.55 }} />}
       {hud.emote && <div className="hx-emote">{hud.emote}</div>}
@@ -216,6 +218,8 @@ export function MapCanvas({ g, mode, onDone, height }: { g: Game; mode: 'waypoin
   const p0 = g.playerWorldPos();
   const view = useRef({ cx: p0.x, cz: p0.z, scale: 0.75 });
   const [, f] = useState(0);
+  const [query, setQuery] = useState('');
+  const places = searchPlaces(g.L.buildings, query, g.playerWorldPos());
   const drag = useRef<{ moved: number; pts: Map<number, { x: number; y: number }> } | null>(null);
   useEffect(() => {
     const c = cv.current!; let timer = 0; let alive = true;
@@ -253,6 +257,15 @@ export function MapCanvas({ g, mode, onDone, height }: { g: Game; mode: 'waypoin
         onPointerUp={(e) => { const d = drag.current; if (!d) return; d.pts.delete(e.pointerId); if (d.pts.size === 0) { if (d.moved < 8) { const w = worldAt(e.clientX, e.clientY); g.mapClick(w.x, w.z, mode); onDone?.(); } drag.current = null; } }}
         onPointerCancel={() => { drag.current = null; }}
       />
+      <div className="hx-map-search" onPointerDown={e => e.stopPropagation()}>
+        <input aria-label="Поиск места" value={query} maxLength={100} placeholder="Поиск: автосервис, мэрия…" onChange={e => setQuery(e.target.value)} onKeyDown={e => e.stopPropagation()} />
+        {query.trim() && <div className="hx-map-results">
+          {!places.length && <span>Ничего не найдено</span>}
+          {places.map(({building:b,dist}) => <button key={b.id} onClick={() => { g.mapClick(b.door.x,b.door.z,mode); setQuery(''); onDone?.(); }}>
+            <b>{b.name}</b><small>{Math.round(dist)} м · проложить маршрут</small>
+          </button>)}
+        </div>}
+      </div>
       <div className="hx-map-ctl">
         <button onClick={() => zoomBy(1.3)}>+</button><button onClick={() => zoomBy(0.77)}>−</button>
         <button onClick={() => { const p = g.playerWorldPos(); view.current.cx = p.x; view.current.cz = p.z; view.current.scale = 1.4; f((x) => x + 1); }} title="К игроку">◎</button>

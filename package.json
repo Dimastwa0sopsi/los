@@ -1,7 +1,7 @@
 {
   "name": "react-vite-tailwind",
   "private": true,
-  "version": "0.6.12",
+  "version": "0.6.13",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -32,7 +32,10 @@
     "check:mask": "esbuild scripts/mask-check.ts --bundle --platform=node --format=cjs --outfile=.check/mask.cjs --log-level=error --loader:.png=empty --define:import.meta.env={} && node .check/mask.cjs",
     "check:money-sync": "esbuild scripts/money-sync-check.ts --bundle --platform=node --format=cjs --outfile=.check/money-sync.cjs --log-level=error --loader:.png=empty --define:import.meta.env={} && node .check/money-sync.cjs",
     "check:road-surfaces": "esbuild scripts/road-surface-check.ts --bundle --platform=node --format=cjs --outfile=.check/road-surfaces.cjs --log-level=error && node .check/road-surfaces.cjs",
-    "check:sosnovka": "esbuild scripts/sosnovka-check.ts --bundle --platform=node --format=cjs --outfile=.check/sosnovka.cjs --log-level=error && node .check/sosnovka.cjs"
+    "check:sosnovka": "esbuild scripts/sosnovka-check.ts --bundle --platform=node --format=cjs --outfile=.check/sosnovka.cjs --log-level=error && node .check/sosnovka.cjs",
+    "check:map-search": "esbuild scripts/map-search-check.ts --bundle --platform=node --format=cjs --outfile=.check/map-search.cjs --log-level=error && node .check/map-search.cjs",
+    "check:seatbelt": "esbuild scripts/seatbelt-check.ts --bundle --platform=node --format=cjs --outfile=.check/seatbelt.cjs --log-level=error --loader:.png=empty --define:import.meta.env={} && node .check/seatbelt.cjs",
+    "check:speed-camera": "esbuild scripts/speed-camera-check.ts --bundle --platform=node --format=cjs --outfile=.check/speed-camera.cjs --log-level=error --loader:.png=empty --define:import.meta.env={} && node .check/speed-camera.cjs"
   },
   "dependencies": {
     "clsx": "2.1.1",

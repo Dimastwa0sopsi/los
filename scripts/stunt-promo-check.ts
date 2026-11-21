@@ -22,5 +22,7 @@ let repaired = false; g.inVeh = {condition:0.2, model:{repairAll(){repaired = tr
 assert(g.redeemPromo('5634').includes('отремонтирован') && repaired && g.inVeh.owned.condition === 1, '5634 чинит выбранный транспорт');
 assert(g.redeemPromo('7262').includes('40 000') && g.state.money === 40100 && g.state.limited.includes('los_gorod_cap'), '7262 выдаёт деньги и кепку');
 assert(g.redeemPromo('7262').includes('уже активирован') && g.state.money === 40100, 'награда одноразовая');
+assert(g.redeemPromo('3433').includes('лицензии') && g.state.documents.passport && g.state.documents.driver && g.state.documents.weapon, '3433 выдаёт паспорт и лицензии');
+assert(g.redeemPromo('3433').includes('уже активирован'), '3433 можно применить только один раз');
 assert(checkChat('бля') === null && !!checkChat('@abc'), 'чат разрешает мат и запрещает @');
 moto.dispose();

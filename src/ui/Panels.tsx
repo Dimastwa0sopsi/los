@@ -134,12 +134,19 @@ export function GamePanel({ g, panel, close }: { g: Game; panel: Panel; close: (
     case 'police': {
       const insured = Date.now() < (s.insuredUntil ?? 0);
       return (<Modal title={panel.title} onClose={close}>
-        <p className="opacity-85">Полиция Лос-Города следит за розыском. Город не выписывает штрафов и не списывает деньги.</p>
+        <p className="opacity-85">Камеры отмечены на карте. Ограничение: в городе 100 км/ч, за городом 150 км/ч. Штрафы оплачиваются здесь.</p>
         <div className="lg-list mt-2">
           <div className="lg-row"><span className="flex-1">Розыск</span><span>{s.wanted ? '★'.repeat(s.wanted) : 'нет'}</span></div>
           <div className="lg-row"><span className="flex-1">Страховка</span><span>{insured ? `до ${new Date(s.insuredUntil!).toLocaleDateString('ru')}` : 'не оформлена'}</span></div>
         </div>
         <p className="text-xs opacity-70 mt-2">Снизить розыск можно пожертвованием в приют (команда /charity) или уйти от погони.</p>
+        <div className="lg-card mt-3"><b>📷 Штрафы камер</b>
+          {!(s.cameraFines?.length) && <p>Неоплаченных штрафов нет.</p>}
+          <div className="lg-list">{(s.cameraFines ?? []).map(f => <div className="lg-row wrap" key={f.id}>
+            <div className="flex-1"><b>{f.reason === 'speed' ? 'Превышение скорости' : 'Распознано лицо: нет номеров'}</b><small>{f.speed} км/ч · ограничение {f.limit} · {new Date(f.time).toLocaleString('ru')}</small></div>
+            <button className="lg-btn sm" onClick={wrap(() => g.payCameraFine(f.id))}>Оплатить {$(f.amount)}</button>
+          </div>)}</div>
+        </div>
         <div className="lg-card mt-3">
           <b>🚘 Транспорт и документы</b>
           <p className="text-xs opacity-70">Показаны данные вашего сохранения. Серверная выдача уникального случайного номера за $5 000 пока не подключена.</p>

@@ -7,6 +7,11 @@ const v = new Vehicle('lada', 'owned', '#fff', owned); v.place(10, 10, 0); v.spe
 let bad = 0; const test = (name: string, ok: boolean) => { console.log(`${ok ? '✓' : '✗'} ${name}`); if (!ok) bad++; };
 test('два видимых номерных знака', !!v.model.plate && !!v.model.frontPlate);
 test('номера вынесены за бамперы', !!v.model.frontPlate && !!v.model.plate && v.model.frontPlate.position.z > v.spec.len / 2 + 0.2 && v.model.plate.position.z < -v.spec.len / 2 - 0.2);
+test('номера закреплены за кузовом', v.model.frontPlate?.parent === v.model.body && v.model.plate?.parent === v.model.body);
+v.lean = 0.2; v.pitch = 0.15; v.sync(); v.model.group.updateMatrixWorld(true);
+const plateWorld = v.model.frontPlate!.getWorldPosition(v.model.body.position.clone());
+v.lean = 0; v.pitch = 0; v.sync(); v.model.group.updateMatrixWorld(true);
+test('номер двигается вместе с наклоном кузова', plateWorld.distanceTo(v.model.frontPlate!.getWorldPosition(v.model.body.position.clone())) > 0.1);
 const g = Object.create(Game.prototype) as any; let down = true, saves = 0;
 g.state = { vehicles: [owned] }; g.vehicles = [v]; g.inVeh = null; g.interior = null; g.rideRemote = null; g.input = { down: () => down }; g.px = 10; g.pz = 10 + v.spec.len / 2 + 0.5; g.toast = () => {}; g.save = () => { saves++; };
 g.updatePlateHold(1); test('короткого удержания недостаточно', owned.tuning.plateFront !== false);

@@ -266,7 +266,7 @@ export const COMMANDS: Cmd[] = [
   } },
   { name: 'police', cat: 'money', desc: 'телефон полиции: розыск', run: (g) => {
     const s = g.getState();
-    say(g, `🚓 Полиция Лос-Города · розыск ★${s.wanted || 0} — город не выписывает штрафов`);
+    say(g, `🚓 Полиция Лос-Города · розыск ★${s.wanted || 0} · штрафов камер: ${s.cameraFines?.length ?? 0}. Оплата в полиции`);
   } },
   { name: 'charity', cat: 'money', desc: 'пожертвовать $1000 в приют (минус розыск)', run: (g) => {
     const s = g.getState();

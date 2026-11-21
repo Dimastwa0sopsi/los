@@ -91,7 +91,7 @@ export const BINDINGS: Binding[] = [
   { ctx: 'car', code: K.hazard, action: 'hazard', what: 'аварийка' },
   { ctx: 'car', code: K.autopilot, action: 'autopilot', what: 'автопилот по GPS-маршруту' },
   { ctx: 'car', code: K.cruise, action: 'cruise', what: 'круиз-контроль' },
-  { ctx: 'car', code: K.race, action: 'race', what: 'уличная гонка' },
+  { ctx: 'car', code: K.race, action: 'race', what: 'гонка (нажать) · ремень безопасности (держать 1 секунду)' },
   { ctx: 'car', code: K.wheelie, action: 'wheelie', what: 'вили на мотоцикле' },
   { ctx: 'car', code: K.hydroJump, action: 'hydroJump', what: 'гидро-прыжок (если куплена гидравлика)' },
   { ctx: 'car', code: K.hydroUp, action: 'hydroUp', what: 'поднять подвеску' },

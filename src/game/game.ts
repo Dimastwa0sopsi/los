@@ -1,4 +1,5 @@
 import { canDrive, issueDocument, type DocumentKind } from './documents';
+import { generateSpeedCameras, cameraDetects, cameraFine, type SpeedCamera } from './speedCameras';
 // Игровой движок «Лос-Город»: цикл, игрок, транспорт, интерьеры, работа, полиция, такси, автопилот
 import * as THREE from 'three';
 import { CITY_SIZE, CHUNK, clamp, angleDiff, RNG, type Settings, resolveMobile, LANE_OFF, saveSettings, qualityPreset } from './config';
@@ -31,7 +32,7 @@ import { type GameState, newState, loadState, saveState, migrate, type OwnedVehi
 
 export interface HudState {
   money: number; health: number; food: number; water: number; energy: number; wanted: number; time: string; night: boolean;
-  vehicle: null | { name: string; kmh: number; gear: string; rpm: number; fuel: number; autopilot: boolean; heli: boolean; alt: number; moto: boolean; lights: boolean; canAuto: boolean; manual: boolean; passenger: boolean; cruise: number; canHydro: boolean; hydro: number; hydroMax: boolean; diag: { flat: number; missing: number; glass: number; glassMax: number; parts: number; cond: number } };
+  vehicle: null | { name: string; kmh: number; gear: string; rpm: number; fuel: number; autopilot: boolean; heli: boolean; alt: number; moto: boolean; lights: boolean; canAuto: boolean; manual: boolean; passenger: boolean; cruise: number; canHydro: boolean; hydro: number; hydroMax: boolean; belt: boolean; beltAvailable: boolean; diag: { flat: number; missing: number; glass: number; glassMax: number; parts: number; cond: number } };
   /** погоня: сколько полицейских машин с мигалками рядом и как далеко ближайшая */
   chase: null | { n: number; dist: number };
   /** уличная гонка: чекпоинт, сколько осталось секунд, приз и дистанция до следующей точки */
@@ -144,6 +145,8 @@ export class Game {
   private socialSent: { to: number; until: number } | null = null;
   private plateHold: { vehicle: Vehicle; side: 'front' | 'back'; time: number } | null = null;
   private plateHoldDone = false;
+  seatbelt = false; private beltHold = 0; private beltTriggered = false; private beltInputGeneration = 0;
+  speedCameras: SpeedCamera[] = []; private cameraSeen = new Set<string>();
   furnitureSeat: { seat: InteriorSeat; fromX: number; fromZ: number } | null = null;
   interior: Interior | null = null; interiorKind: InteriorKind | null = null;
   panel: Panel | null = null; prompt: Prompt | null = null;
@@ -308,6 +311,7 @@ export class Game {
     await new Promise((r) => setTimeout(r, 0));
     P(0.06, 'Генерация города 18×18');
     this.L = generateLayout();
+    this.speedCameras = generateSpeedCameras(this.L.roadSegments);
     await new Promise((r) => setTimeout(r, 0));
     P(0.1, 'Коллизии');
     this.col = new Collision(this.L.colliders); this.activeCol = this.col;
@@ -690,7 +694,7 @@ export class Game {
     else if (code === K.promo) this.togglePanel({ type: 'promo' });
   }
   togglePanel(p: Panel) { if (this.panel && this.panel.type === p.type) this.closePanel(); else this.openPanel(p); }
-  openPanel(p: Panel) { this.panel = p; this.input?.releaseAll(); if (this.input) this.input.enabled = false; this.input?.unlock(); this.cb.onPanel(p); this.sound.click(); }
+  openPanel(p: Panel) { this.beltHold = 0; this.beltTriggered = false; this.panel = p; this.input?.releaseAll(); if (this.input) this.input.enabled = false; this.input?.unlock(); this.cb.onPanel(p); this.sound.click(); }
   closePanel() {
     this.panel = null; this.lookOrbit = 0; if (this.input) { this.input.enabled = true; this.input.releaseAll(); } this.cb.onPanel(null);
   }
@@ -751,6 +755,7 @@ export class Game {
     // ИИ транспорт
     this.updateTraffic(dt);
     this.updatePolice(dt);
+    this.updateSpeedCameras();
     this.updateTaxi(dt);
     this.updateService(dt);
     this.updateServices(dt);
@@ -883,6 +888,7 @@ export class Game {
       return;
     }
     this.updatePlateHold(dt);
+    this.updateBeltHold(dt);
     const qHeld = I.down(K.cover) || I.vDown('qmod');
     const v = this.inVeh;
     // оружие
@@ -907,7 +913,7 @@ export class Game {
         if (I.vPressed('gearDown')) { if (this.settings.transmission === 'manual') v.gear = Math.max(0, v.gear - 1); else v.autoMode = 'N'; this.sound.gear(); }
       }
       if (I.pressed(K.lights) || I.vPressed('lights')) { v.model.setLights(!v.model.lightsOn); v.lightsUserOff = !v.model.lightsOn; }
-      if (I.pressed(K.race) || I.vPressed('race')) this.startRace();
+      if (I.vPressed('race')) this.startRace();
       if (I.pressed(K.horn) || I.vPressed('horn')) {
         this.sound.horn();
         this.peds.panic(v.x, v.z, 22);
@@ -1234,7 +1240,7 @@ export class Game {
     this.seat(v, false);
   }
   private seat(v: Vehicle, passenger: boolean) {
-    this.inVeh = v; this.passenger = passenger; this.lying = false;
+    this.inVeh = v; this.passenger = passenger; this.lying = false; this.seatbelt = false; this.beltHold = 0; this.beltTriggered = false;
     const s = passenger ? v.model.passenger : v.model.driver;
     v.model.body.add(this.player.root);
     this.player.root.position.set(s.x, s.y, s.z); this.player.root.rotation.set(0, 0, 0); this.player.root.scale.setScalar(s.scale);
@@ -1331,7 +1337,7 @@ export class Game {
       if (this.taxi.stage === 'arrived' || this.taxi.stage === 'waiting') { this.taxi.stage = 'leaving'; this.taxi.t = 0; v.ai = new AIDriver(); v.ai.route = [nearestNodeFast(this.L, v.x, v.z)]; v.ai.route.push(this.L.adj[v.ai.route[0]][0].n); v.ai.mode = 'wander'; }
     }
     if (v.role === 'job' && this.job?.type === 'combine') { this.toast(`Смена на комбайне окончена. Заработано: $${this.job.earned}`); this.job = null; }
-    this.inVeh = null; this.passenger = false;
+    this.inVeh = null; this.passenger = false; this.seatbelt = false; this.beltHold = 0; this.beltTriggered = false;
     this.headlight.intensity = 0; this.neonLight.intensity = 0;
     this.sound.engine(false, 0, 0, false); this.sound.heliSound(false, 0);
     this.player.setItem(this.weapon);
@@ -1447,7 +1453,7 @@ export class Game {
       this.exitVehicle(true);
       this.pvx = Math.sin(v.heading) * sp * 0.6; this.pvz = Math.cos(v.heading) * sp * 0.6; this.fallT = 1.8;
       this.damagePlayer(impact * 1.5); this.toast('Вы вылетели с мотоцикла!');
-    } else if (v === this.inVeh) this.damagePlayer(impact * 0.3);
+    } else if (v === this.inVeh) this.damagePlayer(impact * (this.seatbelt ? 0.15 : 0.3));
     // авария не даёт розыск: виноват может быть NPC/полиция, поэтому wanted здесь не меняем
     if (v.owned) v.owned.missing = v.model.missingParts();
   }
@@ -2268,6 +2274,49 @@ export class Game {
     seats.sort((a, b) => Math.hypot(a.x - this.px, a.z - this.pz) - Math.hypot(b.x - this.px, b.z - this.pz));
     if (!seats.length) { this.toast('Подойдите к свободному месту'); return; }
     this.furnitureSeat = { seat: seats[0], fromX: this.px, fromZ: this.pz }; this.emote = null; this.crouch = false;
+  }
+  private updateSpeedCameras() {
+    const v = this.inVeh;
+    if (!v || this.passenger || this.interior || v.isHeli || v.isScooter) { this.cameraSeen.clear(); return; }
+    for (const c of this.speedCameras) {
+      if (!cameraDetects(c,v.x,v.z)) { this.cameraSeen.delete(c.id); continue; }
+      if (Math.abs(v.speed) < 1 || this.cameraSeen.has(c.id)) continue;
+      this.cameraSeen.add(c.id);
+      const tuning = v.model.tuning;
+      const plate = !!tuning.plate?.trim() && (tuning.plateFront !== false || tuning.plateBack !== false);
+      const kmh = Math.abs(v.speed) * 3.6;
+      const fine = cameraFine(kmh,c.limit,plate,Math.random());
+      if (!fine) continue;
+      const list = (this.state.cameraFines ??= []);
+      list.push({id:uid(),amount:fine.amount,reason:fine.reason,speed:Math.round(kmh),limit:c.limit,time:Date.now()});
+      this.toast(`📷 ${fine.reason === 'speed' ? 'Превышение скорости' : 'Распознано лицо: нет номеров'} — штраф $${fine.amount.toLocaleString('ru')}`);
+      this.save();
+    }
+  }
+  payCameraFine(id: string) {
+    const list = this.state.cameraFines ?? [], index = list.findIndex(f => f.id === id);
+    if (index < 0) return;
+    const fine = list[index]; if (!this.pay(fine.amount)) return;
+    list.splice(index,1); this.save(); this.toast('Штраф оплачен');
+  }
+  toggleSeatbelt() {
+    const v = this.inVeh;
+    if (!v || v.isHeli || v.isScooter || v.isRide) { this.toast('Ремень доступен в салоне автомобиля'); return; }
+    this.seatbelt = !this.seatbelt;
+    this.toast(this.seatbelt ? 'Ремень безопасности пристёгнут' : 'Ремень безопасности снят');
+  }
+  private updateBeltHold(dt: number) {
+    const v = this.inVeh;
+    if (!v) { this.beltHold = 0; this.beltTriggered = false; return; }
+    if (this.beltInputGeneration !== this.input.releaseGeneration) { this.beltInputGeneration = this.input.releaseGeneration; this.beltHold = 0; this.beltTriggered = false; }
+    if (this.input.down(K.race)) {
+      this.beltHold += dt;
+      if (this.beltHold >= 1 && !this.beltTriggered) { this.beltTriggered = true; this.toggleSeatbelt(); }
+    } else {
+      // Короткое нажатие K остаётся запуском гонки, удержание — ремень.
+      if (this.beltHold > 0 && !this.beltTriggered && !this.passenger) this.startRace();
+      this.beltHold = 0; this.beltTriggered = false;
+    }
   }
   /** Снимаем знак только у стоящей локальной машины; сетевые машины другого игрока не меняем без сервера. */
   private nearbyPlate(): { vehicle: Vehicle; side: 'front' | 'back' } | null {
@@ -3332,6 +3381,12 @@ export class Game {
       this.spawnOwned(o, spot.x, spot.z, (spot as { a?: number }).a ?? 0);
       return o;
     };
+    if (c === '3433') {
+      // Паспорт включён: он нужен для обеих лицензий и их проверки в мэрии.
+      this.state.documents = { ...this.state.documents, passport: true, driver: true, weapon: true };
+      this.state.promos.push(c); this.save(); this.sound.coin();
+      return '🪪 Получены паспорт, водительская и оружейная лицензии';
+    }
     if (c === '7262') {
       this.state.promos.push(c); this.state.money += 40000;
       const limited = (this.state.limited ??= []); if (!limited.includes('los_gorod_cap')) limited.push('los_gorod_cap');
@@ -3410,6 +3465,7 @@ export class Game {
   private poiCache: MapIcon[] | null = null; private poiT = 0;
   markers(): MapIcon[] {
     const out: MapIcon[] = [];
+    for (const c of this.speedCameras) out.push({ x:c.x, z:c.z, icon:'📷', color:'#f97316', size:0.8, label:`Камера ${c.limit}`, small:true });
     for (const b of this.L.buildings) {
       const ic = POI_ICON[b.kind];
       if (ic) out.push({ x: b.x, z: b.z, icon: ic, color: POI_COLOR[b.kind] ?? '#334155' });
@@ -4588,6 +4644,7 @@ export class Game {
     this.rental = null; this.emote = null; this.drugT = 0; this.renderer.domElement.style.filter = '';
     for (const v of [...this.vehicles]) if (v.owned || (v.role === 'police' && v.sirens)) this.removeVehicle(v);
     this.online = nextOnline;
+    this.cameraSeen.clear();
     this.state = next;
     this.weapon = 'fists'; this.player.setItem('none'); this.combat.reset(); this.combat.clearFx();
     this.player.setLook(next.look);
@@ -5386,7 +5443,7 @@ export class Game {
       vehicle: v ? {
         name: v.spec.name, kmh: Math.round(Math.abs(v.speed) * 3.6), gear, rpm: v.rpm, fuel: v.fuel, autopilot: this.autopilot, heli: v.isHeli, alt: Math.round(v.y),
         moto: v.canStunt, lights: v.model.lightsOn, canAuto: !!v.spec.autopilot, manual, passenger: this.passenger,
-        canHydro: v.canHydro, hydro: Math.round(v.hydroTarget * 100), hydroMax: v.hydroTarget >= 1,
+        belt: this.seatbelt, beltAvailable: !v.isHeli && !v.isScooter && !v.isRide, canHydro: v.canHydro, hydro: Math.round(v.hydroTarget * 100), hydroMax: v.hydroTarget >= 1,
         cruise: this.cruise, diag: {
           flat: v.model.flatTires(), missing: v.model.missingWheels(), glass: v.model.glassLeft(), glassMax: v.model.glassPanes.length,
           parts: v.model.parts.filter((p) => !p.attached).length, cond: Math.round(v.condition * 100),
