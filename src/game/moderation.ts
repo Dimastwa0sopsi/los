@@ -26,7 +26,7 @@ const MAT_ROOTS = [
   'ебат', 'ебал', 'ебет', 'ебуч', 'ебли', 'ебан', 'ебаш', 'еблан', 'долбоеб', 'ебтво',
   'залуп', 'дроч', 'пидор', 'пидар', 'педик', 'шлюх', 'гандон', 'мудак', 'мудил',
   'мразь', 'уеб', 'наеб', 'съеб', 'отъеб', 'въеб', 'разъеб', 'заеб', 'выеб',
-  'сука', 'сучк', 'говнюк', 'жоп', 'срак',
+  'сука', 'сучк', 'говнюк', 'жоп', 'срак', 'секс',
 ];
 
 // \b в JS не работает с кириллицей — границы задаём классами символов
@@ -46,7 +46,8 @@ const LINK_PATTERNS: { re: RegExp; why: string }[] = [
   { re: /www\./i, why: 'ссылки' },
   { re: /\b[a-zа-я0-9-]{2,}\s?\.\s?(?:ru|com|net|org|io|me|gg|tv|xyz|site|online|shop|app|dev|info|biz|clan|top|fun|live|pro|рф|су)\b/i, why: 'ссылки' },
   { re: /\bt\.me\b|\bdiscord\.gg\b|\bwa\.me\b|\bvk\.com\b/i, why: 'ссылки' },
-  { re: /@[a-zа-я0-9_]{3,}/i, why: 'контакты (@ник)' },
+  { re: /@/i, why: 'контакты (@)' },
+  { re: /[a-zа-я0-9-]+\s*\.\s*(?:ru|com|net|org|io|me|gg|tv|xyz|site|online|shop|app|dev|info|biz|top|fun|live|pro|рф|су)(?![a-zа-я0-9])/i, why: 'ссылки' },
   { re: /\+?\d[\d\s()-]{8,}\d/, why: 'телефоны' },
   { re: /(?:^|[^а-яa-z])(?:tg|тг|телега|telegram|ватсап|whatsapp|дискорд|dsc)(?:$|[^а-яa-z])/i, why: 'контакты' },
 ];
@@ -70,7 +71,18 @@ function flat(raw: string, digits: string): string {
 export function normalize(raw: string): string { return flat(raw, 'o'); }
 
 /** есть ли мат (русский по нормализованному тексту, английский — по сырому) */
+export function hasAdultContent(raw: string): boolean {
+  const text = raw.normalize('NFKC').toLowerCase().replace(/ё/g, 'е');
+  return /(?:^|[^а-яa-z])[сc][\s._*\-]*[еe]?[\s._*\-]*[кk][\s._*\-]*[сc](?=$|[^а-яa-z])/i.test(text) || /(?:^|[^a-z])s[\s._*\-]*e[\s._*\-]*x(?=$|[^a-z])/i.test(text);
+}
+export function checkChat(raw: string): string | null {
+  if (raw.includes('@') || LINK_PATTERNS.slice(0, 4).some(p => p.re.test(raw.normalize('NFKC'))) || LINK_PATTERNS[5].re.test(raw.normalize('NFKC'))) return 'Ссылки и @ в чате запрещены';
+  if (hasAdultContent(raw)) return 'Текст сексуального характера в чате запрещён';
+  return null;
+}
+
 export function hasProfanity(raw: string): boolean {
+  if (hasAdultContent(raw)) return true;
   for (const variant of [flat(raw, 'o'), flat(raw, 'u')]) {
     if (MAT_WORDS.test(variant)) return true;
     for (const root of MAT_ROOTS) {

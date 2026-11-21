@@ -345,11 +345,12 @@ t('после выдачи выбор всё ещё Петя', PL.selected == '�
 t('и в списке выделен Петя', plist.value == 'Петя', str(plist.value))
 t('история панели заполняется', len(g['HIST'].items) >= 1)
 
-# опасная кнопка без галочки — не выполняется
-ban_btn = next((b for b in find_buttons(g['AREAS']['mod']) if 'Забанить' in b.description), None)
-t('кнопка бана есть', ban_btn is not None)
-ban_btn.click()
-t('опасное действие требует галочку', PL.selected == 'Петя' and g['danger'].value is False)
+# Срок вводится в разделе наказаний; мут уходит выбранному игроку сразу.
+issue_btn = next((b for b in find_buttons(tabs.children[5]) if b.description == 'Выдать'), None)
+t('кнопка выдачи наказания есть', issue_btn is not None)
+before = len(g['_calls'])
+issue_btn.click()
+t('мут на 30 минут выдан без галочки', any(body_of(c).get('action') == 'mute' and body_of(c).get('name') == 'Петя' and body_of(c).get('minutes') == 30 for c in g['_calls'][before:]))
 
 # ── быстрые кнопки под списком игроков ──
 quick = find_buttons(g['quick_bar'])

@@ -1007,6 +1007,14 @@ export function generateLayout(): WorldLayout {
   // лежаки), спортивная (волейбол, кабинки, души) и лодочная (настил у воды),
   // дюны у променада, рябь на песке и живая линия воды.
   const beach = { x0: bankE(480) - 6, x1: -168, z0: 390, z1: 590 };
+  // Открытая парковка к востоку от пляжа, с подъездом от прибрежной дороги.
+  const beachParking = { x0: -154, x1: -104, z0: 428, z1: 460 };
+  const beachSpaces: { x: number; z: number; a: number }[] = [];
+  for (let k = 0; k < 13; k++) {
+    const x = beachParking.x0 + 4 + k * 3.45;
+    beachSpaces.push({ x, z: 433, a: 0 }, { x, z: 455, a: Math.PI });
+  }
+  lots.push({ ...beachParking, name: 'Парковка у пляжа', spaces: beachSpaces });
   const beachRoadZ = 8 * CELL;                 // сквозь пляж идёт асфальт — мебель у проезда не ставим
   const nearBeachRoad = (z: number, pad = 16) => Math.abs(z - beachRoadZ) < pad;
   const bankOf = (z: number) => bankE(z);
@@ -1184,12 +1192,13 @@ export function generateLayout(): WorldLayout {
       addProp({ t: 'bench', x: bx, z: bz, r: br }, { w: 1.8, d: 0.6, h: 0.5 });
   }
 
-  // ---------- Автобусный автопарк и три маршрута ----------
-  const busDepot = { x: -62, z: 8 * CELL + 13, a: Math.PI / 2 };
-  addProp({ t: 'canopy', x: -62, z: 8 * CELL + 15, w: 16, d: 9 });
-  addProp({ t: 'booth', x: -47, z: 8 * CELL + 17 }, { w: 2.5, d: 2.5, h: 2.6 });
-  addProp({ t: 'vsign', x: -74, z: 8 * CELL + 19, r: 0.4, c: 'Автопарк · маршруты' }, { w: 0.4, d: 0.4, h: 2.6 });
-  staticVehicles.push({ type: 'bus', x: -66, z: 8 * CELL + 14, a: Math.PI / 2, color: '#f59e0b', tag: 'bus-depot' });
+  // Рабочий автобус переехал через дорогу: старую площадку занимает АЗС.
+  const busDepot = { x: -78, z: 445, a: Math.PI };
+  addProp({ t: 'vsign', x: -91, z: 450, r: 0, c: 'Автобус · отправление' }, { w: 0.4, d: 0.4, h: 2.6 });
+  // Навес и колонки новой АЗС; въезд со стороны восточного края площадки.
+  addProp({ t: 'canopy', x: -63, z: 501, w: 18, d: 9 });
+  for (const x of [-68, -58]) addProp({ t: 'pump', x, z: 501 }, { w: 0.8, d: 0.6, h: 1.6 });
+  addProp({ t: 'vsign', x: -83, z: 496, r: 0, c: 'АЗС · магазин' }, { w: 0.4, d: 0.4, h: 2.6 });
   {
     /** путь по городской сетке: углы кварталов [i, j], сначала по X, потом по Z */
     const gridPath = (corners: [number, number][]) => {
@@ -1314,9 +1323,9 @@ export function generateLayout(): WorldLayout {
           continue;
         }
         if (side === -1 && si === 0) {
-          const ph = addBuilding({ kind: 'vpharmacy', name: 'Аптека · ' + VNAME, x: 600 + side * 15, z: 1670 + slots[si], w: 11, d: 9, h: 4.2, door: doorFor(600 + side * 15, 1670 + slots[si], 11, 9, 'e'), facade: 'wood', roof: 'gable', enter: true, village: VNAME, color: '#0f766e' });
+          const ph = addBuilding({ kind: 'vpharmacy', name: 'Аптека · ' + VNAME, x: 600 + side * 15, z: 1658 + slots[si], w: 11, d: 9, h: 4.2, door: doorFor(600 + side * 15, 1658 + slots[si], 11, 9, 'e'), facade: 'wood', roof: 'gable', enter: true, village: VNAME, color: '#0f766e' });
           plotFence(ph, 2.0, 1.2, '#8b6b4a');
-          addProp({ t: 'vsign', x: 600 + side * 8.6, z: 1670 + slots[si] - 4, r: Math.PI / 2, c: '✚ АПТЕКА' }, { w: 0.4, d: 0.4, h: 2.2 });
+          addProp({ t: 'vsign', x: 600 + side * 8.6, z: 1658 + slots[si] - 4, r: Math.PI / 2, c: '✚ АПТЕКА' }, { w: 0.4, d: 0.4, h: 2.2 });
           continue;
         }
         if (side === 1 && si === 0) {
@@ -1716,7 +1725,7 @@ export function generateLayout(): WorldLayout {
     const x = fr.x + Math.cos(a) * r, z = fr.z + Math.sin(a) * r;
     if (x > -20 && x < CITY_SIZE + 20 && z > -20 && z < CITY_SIZE + 20) continue;
     if (Math.abs(x - riverCenter(z)) < riverHalf + 10) continue;   // не в воде
-    if (inRect(x, z, { x0: 1590, x1: 1710, z0: 1130, z1: 1260 }, 6) || inRect(x, z, depot, 12) || inRect(x, z, beach, 15) || inRect(x, z, ind, 10) || inRect(x, z, farm, 10) || farm.aiFields.some((f) => inRect(x, z, f, 8))) continue;
+    if (inRect(x, z, { x0: 1590, x1: 1710, z0: 1130, z1: 1260 }, 6) || inRect(x, z, depot, 12) || inRect(x, z, beach, 15) || inRect(x, z, beachParking, 4) || inRect(x, z, ind, 10) || inRect(x, z, farm, 10) || farm.aiFields.some((f) => inRect(x, z, f, 8))) continue;
     if (inRect(x, z, { x0: 1010, x1: 1420, z0: 1520, z1: 1800 }, 10)) continue;   // деревня Кленовка с фермой
     if (inRect(x, z, { x0: 360, x1: 640, z0: 1290, z1: 1500 }, 8)) continue;  // деревня Кленовка с фермой
     if (villageZones.some((vz) => inRect(x, z, vz))) continue;
@@ -1734,7 +1743,7 @@ export function generateLayout(): WorldLayout {
     if (nearRoad(x, z, 5.5) || solidNear(x, z, 2.6)) continue;
     if (Math.abs(x - riverCenter(z)) < riverHalf + 8) continue;
     if (inRect(x, z, { x0: 360, x1: 640, z0: 1290, z1: 1500 }, 8)) continue;
-    if (inRect(x, z, depot, 12) || inRect(x, z, beach, 18) || inRect(x, z, ind, 12) || inRect(x, z, farm, 12)) continue;
+    if (inRect(x, z, depot, 12) || inRect(x, z, beach, 18) || inRect(x, z, beachParking, 4) || inRect(x, z, ind, 12) || inRect(x, z, farm, 12)) continue;
     const s = rng.range(0.95, 1.7);
     addProp({ t: rng.chance(0.58) ? 'pine' : 'tree', x, z, h: s }, { w: 0.6, d: 0.6, h: 4 });
     }
@@ -2028,7 +2037,7 @@ export function generateLayout(): WorldLayout {
       const a = treesRng.next() * Math.PI * 2, r = Math.sqrt(treesRng.next()) * zone.r;
       const x = zone.x + Math.cos(a) * r, z = zone.z + Math.sin(a) * r;
       if (x < -1100 || x > 1810 || z < -610 || z > 1910 || nearRoad(x, z, 8) || solidNear(x, z, 3)) continue;
-      if (Math.abs(x - riverCenter(z)) < riverHalf + 12 || inRect(x, z, beach, 20) || inRect(x, z, depot, 15) || inRect(x, z, ind, 15) || inRect(x, z, farm, 15) || farm.aiFields.some(f => inRect(x, z, f, 12))) continue;
+      if (Math.abs(x - riverCenter(z)) < riverHalf + 12 || inRect(x, z, beach, 20) || inRect(x, z, beachParking, 4) || inRect(x, z, depot, 15) || inRect(x, z, ind, 15) || inRect(x, z, farm, 15) || farm.aiFields.some(f => inRect(x, z, f, 12))) continue;
       if (buildings.some(b => !b.removed && Math.abs(x - b.x) < b.w / 2 + 14 && Math.abs(z - b.z) < b.d / 2 + 14)) continue;
       if (garages.some(g => Math.abs(x - g.x) < g.w / 2 + 7 && Math.abs(z - g.z) < g.d / 2 + 7)) continue;
       addProp({ t: treesRng.chance(0.6) ? 'pine' : 'tree', x, z, h: treesRng.range(1, 1.6) }, { w: 0.6, d: 0.6, h: 4 });
@@ -2036,6 +2045,9 @@ export function generateLayout(): WorldLayout {
   }
 
 
+  // Добавляем в самом конце, чтобы числовые ID старых зданий в сохранениях не изменились.
+  addBuilding({ kind: 'gas', name: 'АЗС · Набережная', x: -63, z: 520, w: 14, d: 9, h: 4,
+    door: doorFor(-63, 520, 14, 9, 'n'), facade: 'shop', roof: 'flat', enter: true, color: '#16a34a' });
   void beachRoad; void wh; void clamp;
   return {
     nodes, edges, adj, buildings, props, colliders, kiosks, villages, blocks, parks, bigParks, parkRides, billboards, pools, staticVehicles, garages, parked: [...parked, ...parkedLot], scooterDocks, livestock, bazaarSlots, vendors, lots, parkades, depot, truckDests,

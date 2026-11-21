@@ -173,7 +173,6 @@ export function Hud({ g, hud, mobile }: { g: Game; hud: HudState; mobile: boolea
         </div>
       )}
       {hud.hurt > 0 && <div className="hx-hurt" style={{ opacity: Math.min(1, hud.hurt * 2.2) }} />}
-      {hud.stunt && <div className="hx-stunt"><b>{hud.stunt.kind}</b><span>{hud.stunt.t.toFixed(1)} с</span><div className="bal"><i className="zone" /><em style={{ left: `${Math.max(0, Math.min(100, (Math.abs(hud.stunt.angle) / 1.08) * 100))}%` }} /></div></div>}
       {hud.gun && (!v || hud.gun.driveBy) && (
         <div className={`hx-cross ${hud.gun.aiming ? 'aim' : ''} ${hud.hitMarker ? 'hit' : ''}`} style={{ ['--gap' as string]: `${Math.round(4 + hud.gun.spread * 260)}px` }}>
           <i className="t" /><i className="b" /><i className="l" /><i className="r" /><em />

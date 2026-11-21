@@ -6,6 +6,7 @@ const owned: any = { uid: 'test-car', type: 'lada', color: '#fff', tuning: { ...
 const v = new Vehicle('lada', 'owned', '#fff', owned); v.place(10, 10, 0); v.speed = 0;
 let bad = 0; const test = (name: string, ok: boolean) => { console.log(`${ok ? '✓' : '✗'} ${name}`); if (!ok) bad++; };
 test('два видимых номерных знака', !!v.model.plate && !!v.model.frontPlate);
+test('номера вынесены за бамперы', !!v.model.frontPlate && !!v.model.plate && v.model.frontPlate.position.z > v.spec.len / 2 + 0.2 && v.model.plate.position.z < -v.spec.len / 2 - 0.2);
 const g = Object.create(Game.prototype) as any; let down = true, saves = 0;
 g.state = { vehicles: [owned] }; g.vehicles = [v]; g.inVeh = null; g.interior = null; g.rideRemote = null; g.input = { down: () => down }; g.px = 10; g.pz = 10 + v.spec.len / 2 + 0.5; g.toast = () => {}; g.save = () => { saves++; };
 g.updatePlateHold(1); test('короткого удержания недостаточно', owned.tuning.plateFront !== false);

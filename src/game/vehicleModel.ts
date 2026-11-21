@@ -136,9 +136,6 @@ export class VehicleModel {
   private hazardMeshes: THREE.Mesh[] = [];
   private tailMeshes: THREE.Mesh[] = [];
   private sirenMeshes: THREE.Mesh[] = [];
-  /** налипшая грязь: пятна по низу кузова, включаются уровнем загрязнения */
-  private mudMeshes: THREE.Mesh[] = [];
-  dirtLevel = 0;
   constructor(type: string, color?: string, tuning?: Tuning) {
     this.spec = VEHICLES[type] ?? VEHICLES.lada;
     this.color = color ?? this.spec.colors[0];
@@ -154,32 +151,7 @@ export class VehicleModel {
       const blob = new THREE.Mesh(T.plane, mat('blob'));
       blob.rotation.x = -Math.PI / 2; blob.scale.set(this.spec.wid + 0.7, this.spec.len + 0.6, 1); blob.position.y = 0.04; blob.renderOrder = 1;
       this.group.add(blob);
-      this.buildMud();
     }
-  }
-  /** пятна грязи на порогах и арках — видны при уровне > 0.15 */
-  private buildMud() {
-    const L = this.spec.len, W = this.spec.wid;
-    const spots: [number, number, number, number, number, number][] = [
-      [W * 0.5 + 0.01, 0.42, L * 0.18, 0.03, 0.3, L * 0.5],
-      [-W * 0.5 - 0.01, 0.42, L * 0.18, 0.03, 0.3, L * 0.5],
-      [W * 0.5 + 0.01, 0.36, -L * 0.3, 0.03, 0.34, L * 0.28],
-      [-W * 0.5 - 0.01, 0.36, -L * 0.3, 0.03, 0.34, L * 0.28],
-      [0, 0.3, L * 0.48, W * 0.6, 0.2, 0.04],
-      [0, 0.3, -L * 0.48, W * 0.6, 0.2, 0.04],
-    ];
-    for (const [x, y, z, w, h, d] of spots) {
-      const m = new THREE.Mesh(T.box, mat('c:#6b5540'));
-      m.position.set(x, y, z); m.scale.set(w, h, d); m.visible = false;
-      m.userData.matKey = 'c:#6b5540';
-      this.group.add(m); this.mudMeshes.push(m);
-    }
-  }
-  /** уровень грязи 0…1 (визуально) */
-  setDirt(level: number) {
-    this.dirtLevel = Math.max(0, Math.min(1, level));
-    const on = this.dirtLevel > 0.15 ? Math.ceil((this.dirtLevel - 0.15) / 0.85 * this.mudMeshes.length) : 0;
-    this.mudMeshes.forEach((m, i) => (m.visible = i < on));
   }
   /** заменить/подкачать колёса: возвращает сколько колёс восстановлено */
   repairWheels(): number {
@@ -263,7 +235,7 @@ export class VehicleModel {
     this.glassPanes = [];
     this.extraSeats = [];
     const s = this.spec;
-    const PAINT = 'PAINT', DARK = 'c:#1f2024', TRIM = 'TRIM', HEAD = 'HEAD', TAIL = 'glow:#ff1a1a', INT = 'c:#3a3a41', PLATE = 'c:#f1f1f1';
+    const PAINT = 'PAINT', DARK = 'c:#1f2024', TRIM = 'TRIM', HEAD = 'HEAD', TAIL = 'glow:#ff1a1a', INT = 'c:#3a3a41';
     const L = s.len, W = s.wid, H = s.hei;
     if (s.body === 'moto') return this.buildMoto();
     if (s.body === 'scooter') return this.buildScooter();
@@ -443,7 +415,6 @@ export class VehicleModel {
     const bumperMat = old || this.tuning.chrome ? 'chrome' : s.body === 'sport' || ev ? PAINT : 'c:#2a2a2d';
     this.part('bumperF');
     this.box(bumperMat, 0, clear + 0.1, L / 2 + 0.06, W + 0.04, 0.22, 0.16);
-    this.box(PLATE, 0, clear + 0.12, L / 2 + 0.15, 0.5, 0.12, 0.02);
     if (!ev) {
       this.box(old ? 'chrome' : 'c:#0d0d0d', 0, (clear + 0.25 + bodyTop) / 2 + 0.02, L / 2 + 0.01, W * 0.45, bodyTop - clear - 0.3, 0.05);
       for (let i = 0; i < 4; i++) this.box('chrome', 0, clear + 0.32 + i * 0.07, L / 2 + 0.035, W * 0.44, 0.015, 0.02);
@@ -466,7 +437,6 @@ export class VehicleModel {
     for (const sx of [1, -1]) this.box(HEAD, sx * W * 0.28, clear + 0.13, L / 2 + 0.1, W * 0.11, 0.06, 0.03);
     this.part('bumperR');
     this.box(bumperMat, 0, clear + 0.1, -L / 2 - 0.06, W + 0.04, 0.22, 0.16);
-    this.box(PLATE, 0, clear + 0.28, -L / 2 - 0.02, 0.5, 0.12, 0.02);
     if (!ev) { this.part('exhaust'); this.cyl('chrome', W * 0.3, clear + 0.02, -L / 2 - 0.1, 0.04, 0.3, 'z'); if (s.body === 'sport') this.cyl('chrome', -W * 0.3, clear + 0.02, -L / 2 - 0.1, 0.05, 0.3, 'z'); }
     if (this.tuning.spoiler || s.body === 'sport') {
       this.part('spoiler');
@@ -625,13 +595,17 @@ export class VehicleModel {
     this.part('chassis', false);
     this.box(DARK, 0, 0.55, 0, W - 0.3, 0.3, L - 0.4);
     if (s.body === 'bus') {
-      this.box(PAINT, 0, 0.4 + (H - 0.4) / 2, 0, W, H - 0.4, L);
+      // Кузов с настоящими проёмами: стекло не лежит на сплошной стене кузова.
+      const belt = H * 0.49, roof = H * 0.88;
+      this.box(PAINT, 0, (0.4 + belt) / 2, 0, W, belt - 0.4, L);
+      this.box(PAINT, 0, (roof + H) / 2, 0, W, H - roof, L);
+      this.box(PAINT, 0, (belt + roof) / 2, -L / 2 + 0.18, W, roof - belt, 0.36);
       for (const sx of [1, -1]) {
-        this.box('GLASSBUS', sx * (W / 2 + 0.01), H * 0.68, -0.4, 0.02, H * 0.36, L - 2.2);
-        for (let i = 0; i < 7; i++) this.box('c:#111', sx * (W / 2 + 0.02), H * 0.68, -L / 2 + 1 + i * 1.45, 0.03, H * 0.36, 0.08);
+        this.box('GLASSBUS', sx * (W / 2 + 0.03), (belt + roof) / 2, -0.4, 0.02, roof - belt - 0.04, L - 2.2);
+        for (let i = 0; i < 7; i++) this.box(PAINT, sx * (W / 2 - 0.05), (belt + roof) / 2, -L / 2 + 1 + i * 1.45, 0.1, roof - belt, 0.08);
       }
-      this.glassPane(0, H * 0.36, L / 2, H * 0.9, L / 2, W - 0.15);
-      this.sideGlass(-W / 2 - 0.015, H * 0.42, H * 0.85, L / 2 - 2.2, L / 2 - 0.4);
+      this.glassPane(0, belt + 0.02, L / 2 + 0.025, roof - 0.02, L / 2 + 0.025, W - 0.15);
+      this.sideGlass(-W / 2 - 0.03, belt + 0.02, roof - 0.02, L / 2 - 1.05, L / 2 - 0.4);
       this.cyl('c:#111', -W / 2 - 0.02, H * 0.45, L / 2 - 1.4, 0.03, H * 0.75, 'z');
       this.box('c:#111', -W / 2 - 0.02, H * 0.45, -0.5, 0.03, H * 0.75, 1.1);
       this.box('glow:#fbbf24', 0, H - 0.22, L / 2 + 0.02, W * 0.6, 0.2, 0.02);
@@ -1073,14 +1047,20 @@ export class VehicleModel {
     const g = c.getContext('2d'); if (!g) return;
     g.fillStyle = '#f8fafc'; g.fillRect(0, 0, 256, 64);
     g.strokeStyle = '#1f2937'; g.lineWidth = 4; g.strokeRect(2, 2, 252, 60);
-    g.fillStyle = '#0b0d13'; g.font = 'bold 38px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(num, 128, 34);
-    g.fillStyle = '#1d4ed8'; g.fillRect(200, 0, 56, 22);
-    g.fillStyle = '#fff'; g.font = 'bold 15px system-ui, sans-serif'; g.fillText('RUS', 228, 11);
+    // Регион — отдельная колонка: надпись RUS больше не перекрывает цифры.
+    const match = num.replace(/\s/g, '').match(/^([АВЕКМНОРСТУХAВEKMHOPCTYX]\d{3}[АВЕКМНОРСТУХABEKMHOPCTYX]{2})(\d{2,3})$/i);
+    g.fillStyle = '#0b0d13'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    if (match) {
+      g.font = 'bold 38px system-ui, sans-serif'; g.fillText(match[1], 98, 34, 185);
+      g.fillRect(194, 4, 3, 56);
+      g.font = 'bold 25px system-ui, sans-serif'; g.fillText(match[2], 225, 23, 50);
+      g.font = 'bold 12px system-ui, sans-serif'; g.fillText('RUS', 225, 49);
+    } else { g.font = 'bold 35px system-ui, sans-serif'; g.fillText(num, 128, 34, 240); }
     const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; this.plateTexture = tex;
     const w = Math.min(0.72, this.spec.wid * 0.4), h = w * 0.25;
     const make = (isFront: boolean) => {
       const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex }));
-      m.position.set(0, this.spec.hei * 0.3, (isFront ? 1 : -1) * (this.spec.len / 2 + 0.03));
+      m.position.set(0, this.spec.hei * 0.3, (isFront ? 1 : -1) * (this.spec.len / 2 + (!isFront && this.spec.body === 'suv' ? 0.34 : 0.23)));
       m.rotation.y = isFront ? 0 : Math.PI; this.group.add(m); return m;
     };
     if (front) this.frontPlate = make(true); if (back) this.plate = make(false);

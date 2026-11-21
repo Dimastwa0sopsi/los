@@ -10,6 +10,8 @@ const Database = require('better-sqlite3');
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || crypto.randomBytes(9).toString('hex');
+// Пароль панели — дополнительный код, не замена проверке сессии аккаунта.
+const GAME_ADMIN_PASSWORD = process.env.GAME_ADMIN_PASSWORD || 'GAMEMODE';
 // Привязка ника к устройству. 0 (по умолчанию) — новый браузер просто забирает ник обратно,
 // иначе после чистки localStorage игрок навсегда терял вход. 1 — строго, как раньше.
 const STRICT_DEVICE = process.env.STRICT_DEVICE === '1';
@@ -22,7 +24,7 @@ const GH_BRANCH = String(process.env.GH_BRANCH || 'main').trim();
 const LIVE_PATH = 'server/live.json';
 // отпечаток кода: ячейка Colab сверяет его с файлом на Диске и понимает,
 // что на порту висит старый процесс (после обновления сервера он перезапускается сам)
-const { checkText: checkAdText } = require('./moderation.cjs');
+const { checkText: checkAdText, checkChat } = require('./moderation.cjs');
 const { createAdsStore, AD_TTL } = require('./ads.cjs');
 const { createAccountStore, normalizeLogin } = require('./account-store.cjs');
 
@@ -84,6 +86,9 @@ try { db.exec("ALTER TABLE players ADD COLUMN token TEXT NOT NULL DEFAULT ''"); 
 // новые поля для панели из 100 кнопок: предупреждения и запрет чата
 try { db.exec('ALTER TABLE players ADD COLUMN warns INTEGER NOT NULL DEFAULT 0'); } catch { /* */ }
 try { db.exec('ALTER TABLE players ADD COLUMN muted INTEGER NOT NULL DEFAULT 0'); } catch { /* */ }
+try { db.exec('ALTER TABLE players ADD COLUMN muted_until INTEGER NOT NULL DEFAULT 0'); } catch { /* */ }
+try { db.exec('ALTER TABLE players ADD COLUMN banned_until INTEGER NOT NULL DEFAULT 0'); } catch { /* */ }
+db.exec('CREATE TABLE IF NOT EXISTS timed_warns (id INTEGER PRIMARY KEY, name TEXT NOT NULL, expires INTEGER NOT NULL)');
 // последний присланный инвентарь: панель показывает его и у офлайн-игроков
 try { db.exec("ALTER TABLE players ADD COLUMN inventory TEXT NOT NULL DEFAULT ''"); } catch { /* */ }
 
@@ -93,10 +98,10 @@ const q = {
   move: db.prepare('UPDATE players SET pos_x = ?, pos_z = ?, pos_rot = ?, updated_at = ? WHERE id = ?'),
   log: db.prepare('INSERT INTO chat_log (name, text, t) VALUES (?, ?, ?)'),
   all: db.prepare(`SELECT id, name, gender, money, car_id, car_number, house_id,
-    pos_x, pos_z, pos_rot, banned, ban_reason, updated_at FROM players ORDER BY updated_at DESC`),
+    pos_x, pos_z, pos_rot, banned, ban_reason, warns, muted, muted_until, banned_until, updated_at FROM players ORDER BY updated_at DESC`),
   money: db.prepare('UPDATE players SET money = ? WHERE name = ?'),
   ban: db.prepare('UPDATE players SET banned = 1, ban_reason = ? WHERE name = ?'),
-  unban: db.prepare('UPDATE players SET banned = 0, ban_reason = \'\' WHERE name = ?'),
+  unban: db.prepare('UPDATE players SET banned = 0, banned_until = 0, ban_reason = \'\' WHERE name = ?'),
   car: db.prepare('UPDATE players SET car_id = ?, car_number = ? WHERE name = ?'),
   pos: db.prepare('UPDATE players SET pos_x = ?, pos_z = ?, updated_at = ? WHERE name = ?'),
   del: db.prepare('DELETE FROM players WHERE name = ?'),
@@ -210,7 +215,7 @@ const json = (res, code, obj) => {
   res.writeHead(code, {
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'content-type, x-admin-token, ngrok-skip-browser-warning',
+    'Access-Control-Allow-Headers': 'content-type, x-admin-token, x-game-admin-session, ngrok-skip-browser-warning',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     // ответы служебных ручек не кэшируем: диагностика должна быть свежей
     'Cache-Control': 'no-store',
@@ -554,10 +559,18 @@ function tpTo(name, x, z) {
   if (on) { on.row.pos_x = px; on.row.pos_z = pz; send(on.ws, { type: 'adm', act: 'tp', x: px, z: pz }); pushPlayers(); }
   return { ok: true, message: `${name} → X ${px}, Z ${pz}` };
 }
+function punishmentUntil(minutes) {
+  if (minutes === undefined || minutes === null || minutes === '') return 0;
+  const m = Number(minutes);
+  return Number.isInteger(m) && m >= 1 && m <= 525600 ? Date.now() + m * 60000 : null;
+}
 function banAction(a, notify) {
   if (!a.name) return noPlayer();
+  if (!rowOf(a.name)) return noPlayer();
   const reason = String(a.reason || a.text || 'Нарушение правил').slice(0, 120);
+  const until = punishmentUntil(a.minutes); if (until === null) return { ok:false, error:'Укажите от 1 до 525600 минут' };
   q.ban.run(reason, a.name);
+  db.prepare('UPDATE players SET banned_until = ? WHERE name = ?').run(until, a.name);
   const on = liveOf(a.name);
   if (on) { if (notify) send(on.ws, { type: 'error', text: 'Вы забанены: ' + reason }); try { on.ws.close(); } catch { /* */ } active.delete(on.row.id); pushPlayers(); }
   return { ok: true, message: `${a.name} забанен (${reason})` };
@@ -644,10 +657,10 @@ const ADMIN_HANDLERS = {
   ban_silent: (a) => banAction(a, false),
   unban: (a) => {
     if (!a.name) return noPlayer();
-    q.unban.run(a.name);
+    q.unban.run(a.name); db.prepare('UPDATE players SET banned_until = 0 WHERE name = ?').run(a.name);
     return { ok: true, message: `${a.name} разбанен` };
   },
-  unban_all: () => { const n = db.prepare('UPDATE players SET banned = 0, ban_reason = \'\'').run().changes; return { ok: true, message: `Разбанено: ${n}` }; },
+  unban_all: () => { const n = db.prepare('UPDATE players SET banned = 0, banned_until = 0, ban_reason = \'\'').run().changes; return { ok: true, message: `Разбанено: ${n}` }; },
   kick: (a) => (a.name ? (kickPlayer(a.name, 'Вас отключил администратор') ? { ok: true, message: `${a.name} отключён` } : { ok: false, error: 'Игрок не в сети' }) : noPlayer()),
   kick_all: () => {
     let n = 0;
@@ -656,15 +669,27 @@ const ADMIN_HANDLERS = {
   },
   warn: (a) => {
     const row = rowOf(a.name); if (!row) return noPlayer();
+    const until = punishmentUntil(a.minutes); if (until === null) return { ok:false, error:'Укажите от 1 до 525600 минут' };
     const warns = (row.warns || 0) + 1;
-    q.warn.run(warns, a.name); const on = liveOf(a.name); if (on) on.row.warns = warns;
+    db.transaction(() => { q.warn.run(warns, a.name); if (until) db.prepare('INSERT INTO timed_warns(name, expires) VALUES (?, ?)').run(a.name, until); })(); const on = liveOf(a.name); if (on) on.row.warns = warns;
     admTo(a.name, 'toast', { text: `⚠️ Предупреждение (${warns}) от администратора` });
     return { ok: true, message: `${a.name}: предупреждений ${warns}` };
   },
-  warns_clear: (a) => { if (!a.name) return noPlayer(); q.warn.run(0, a.name); const on = liveOf(a.name); if (on) on.row.warns = 0; return { ok: true, message: `${a.name}: предупреждения сняты` }; },
-  warns_clear_all: () => { const n = db.prepare('UPDATE players SET warns = 0').run().changes; return { ok: true, message: `Снято у ${n} игроков` }; },
-  mute: (a) => { if (!a.name) return noPlayer(); q.muted.run(1, a.name); const on = liveOf(a.name); if (on) on.row.muted = 1; return { ok: true, message: `${a.name}: чат запрещён` }; },
-  unmute: (a) => { if (!a.name) return noPlayer(); q.muted.run(0, a.name); const on = liveOf(a.name); if (on) on.row.muted = 0; return { ok: true, message: `${a.name}: чат разрешён` }; },
+  warns_clear: (a) => { if (!a.name) return noPlayer(); q.warn.run(0, a.name); db.prepare('DELETE FROM timed_warns WHERE name = ?').run(a.name); const on = liveOf(a.name); if (on) on.row.warns = 0; return { ok: true, message: `${a.name}: предупреждения сняты` }; },
+  warns_clear_all: () => { const n = db.prepare('UPDATE players SET warns = 0').run().changes; db.exec('DELETE FROM timed_warns'); for (const v of active.values()) v.row.warns = 0; return { ok: true, message: `Снято у ${n} игроков` }; },
+  mute: (a) => {
+    if (!rowOf(a.name)) return noPlayer();
+    const until = punishmentUntil(a.minutes); if (until === null) return { ok:false, error:'Укажите от 1 до 525600 минут' };
+    db.prepare('UPDATE players SET muted = 1, muted_until = ? WHERE name = ?').run(until, a.name);
+    const on = liveOf(a.name); if (on) { on.row.muted = 1; on.row.muted_until = until; }
+    return { ok:true, message: `${a.name}: чат запрещён${until ? ` на ${a.minutes} мин.` : ''}` };
+  },
+  unmute: (a) => {
+    if (!rowOf(a.name)) return noPlayer();
+    db.prepare('UPDATE players SET muted = 0, muted_until = 0 WHERE name = ?').run(a.name);
+    const on = liveOf(a.name); if (on) { on.row.muted = 0; on.row.muted_until = 0; }
+    return { ok:true, message: `${a.name}: чат разрешён` };
+  },
   mute_all: () => { GLOBAL_MUTE = true; return { ok: true, message: 'Глобальный мут включён (админы пишут)' }; },
   unmute_all: () => { GLOBAL_MUTE = false; return { ok: true, message: 'Глобальный мут выключен' }; },
   unbind: (a) => { if (!a.name) return noPlayer(); q.token.run('', a.name); return { ok: true, message: `${a.name}: привязка устройства сброшена` }; },
@@ -969,6 +994,21 @@ function setGender(a, g) {
   return { ok: true, message: `${a.name}: пол ${g === 'f' ? 'женский' : 'мужской'}` };
 }
 
+function expirePunishments() {
+  const now = Date.now();
+  const expire = db.transaction(() => {
+    db.prepare("UPDATE players SET banned = 0, banned_until = 0, ban_reason = '' WHERE banned_until > 0 AND banned_until <= ?").run(now);
+    db.prepare('UPDATE players SET muted = 0, muted_until = 0 WHERE muted_until > 0 AND muted_until <= ?').run(now);
+    const expired = db.prepare('SELECT name, COUNT(*) AS n FROM timed_warns WHERE expires <= ? GROUP BY name').all(now);
+    for (const r of expired) db.prepare('UPDATE players SET warns = MAX(0, warns - ?) WHERE name = ?').run(r.n, r.name);
+    db.prepare('DELETE FROM timed_warns WHERE expires <= ?').run(now);
+  });
+  expire();
+  for (const a of active.values()) {
+    const row = q.byName.get(a.row.name); if (row) { a.row.muted = row.muted; a.row.muted_until = row.muted_until; a.row.warns = row.warns; }
+  }
+}
+
 /** выполнить действие панели по id */
 function adminAction(a) {
   const id = String(a.action || '');
@@ -1091,7 +1131,9 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   const token = url.searchParams.get('token') || req.headers['x-admin-token'];
-  if (token !== ADMIN_TOKEN) { json(res, 403, { ok: false, error: 'Неверный токен админ-панели' }); return; }
+  const gameSession = String(req.headers['x-game-admin-session'] || '');
+  const gameAdmin = token === GAME_ADMIN_PASSWORD && !!gameSession && [...active.values()].some(a => a.row.name.toLowerCase() === 'kitty_kittys' && a.ws.readyState === WebSocket.OPEN && a.ws.adminSession === gameSession);
+  if (token !== ADMIN_TOKEN && !gameAdmin) { json(res, 403, { ok: false, error: 'Нет доступа: проверьте аккаунт и пароль' }); return; }
   if (req.method === 'GET' && url.pathname === '/admin/tunnel') {
     tunnelInfo().then((t) => json(res, 200, t)).catch(() => json(res, 200, { ok: true, url: '', ws: '', source: 'none' }));
     return;
@@ -1103,7 +1145,7 @@ const server = http.createServer(async (req, res) => {
     }).catch((e) => json(res, 200, { ok: false, error: String(e && e.message ? e.message : e) }));
     return;
   }
-  if (req.method === 'GET' && url.pathname === '/admin/state') { json(res, 200, adminState()); return; }
+  if (req.method === 'GET' && url.pathname === '/admin/state') { expirePunishments(); json(res, 200, adminState()); return; }
   if (url.pathname === '/admin/money') {
     if (req.method === 'POST') {
       const body = await readBody(req);
@@ -1174,6 +1216,7 @@ wss.on('connection', (ws) => {
       authBusy = false; authJobs--;
       if (ws.readyState !== WebSocket.OPEN) return;
       if (!result.ok) return send(ws, { type: 'error', code: 'auth', text: result.error === 'exists' ? 'Этот ник уже занят' : result.error === 'invalid' ? 'Проверьте ник и пароль: минимум 10 символов' : 'Неверный ник или пароль' });
+      expirePunishments();
       let row = q.byName.get(result.login);
       if (!row) { q.create.run(result.login, m.gender === 'f' ? 'f' : 'm', Date.now()); row = q.byName.get(result.login); }
       if (row.banned) return send(ws, { type: 'error', code: 'banned', text: row.ban_reason || 'Вы забанены' });
@@ -1190,8 +1233,9 @@ wss.on('connection', (ws) => {
       }
       // деньги — только серверные: локальный сейв клиента в онлайн не переносится
       me = row; active.set(row.id, { ws, row }); ws.playerId = row.id;
+      if (normalizeLogin(row.name) === 'kitty_kittys') ws.adminSession = crypto.randomBytes(32).toString('hex');
       console.log(`[login] ${row.name} вошёл (онлайн: ${active.size})`);
-      send(ws, { type: 'login_success', accountState: account.state, accountRevision: account.revision, accountSaveId: account.saveId, caps: { state: 1, peds: 1, adm: 1, relay: 1, accounts: 1 }, player: {
+      send(ws, { type: 'login_success', accountState: account.state, accountRevision: account.revision, accountSaveId: account.saveId, adminSession: ws.adminSession || undefined, caps: { state: 1, peds: 1, adm: 1, relay: 1, accounts: 1 }, player: {
         id: row.id, name: row.name, gender: row.gender, money: row.money,
         x: row.pos_x, z: row.pos_z, rot: row.pos_rot, number: row.car_number, carNumber: row.car_number,
       } });
@@ -1249,10 +1293,17 @@ wss.on('connection', (ws) => {
       const proto = raw.charAt(0) === '§';
       const text = raw.slice(0, proto ? 20000 : 200);
       if (!text) return;
-      if (proto) { broadcast({ type: 'chat', id: row.id, name: row.name, text }); return; }
+      let dm = null;
+      if (text.startsWith('§LGE')) { try { const event = JSON.parse(text.slice(4)); if (event.e === 'dm') dm = String(event.text || ''); } catch { /* невалидное событие игнорируется получателем */ } }
+      const spoken = !proto || text.startsWith('§LGM') || text.startsWith('§LGS') || dm !== null;
+      if (!spoken) { broadcast({ type: 'chat', id: row.id, name: row.name, text }); return; }
+      expirePunishments();
       if (row.muted) { send(ws, { type: 'chat', name: 'СИСТЕМА', text: 'Чат вам запрещён администратором' }); return; }
       if (GLOBAL_MUTE && !row.is_admin) { send(ws, { type: 'chat', name: 'СИСТЕМА', text: 'Чат временно отключён администратором' }); return; }
-      q.log.run(row.name, text, Date.now());
+      const content = dm !== null ? dm : proto ? text.slice(4) : text;
+      const problem = text.startsWith('§LGS') ? (checkAdText(content, 'news').error || null) : checkChat(content);
+      if (problem) { send(ws, { type: 'chat', name: 'СИСТЕМА', text: problem }); return; }
+      if (!proto) q.log.run(row.name, text, Date.now());
       broadcast({ type: 'chat', id: row.id, name: row.name, text });
       return;
     }

@@ -1,3 +1,4 @@
+import { canDrive, issueDocument, type DocumentKind } from './documents';
 // Игровой движок «Лос-Город»: цикл, игрок, транспорт, интерьеры, работа, полиция, такси, автопилот
 import * as THREE from 'three';
 import { CITY_SIZE, CHUNK, clamp, angleDiff, RNG, type Settings, resolveMobile, LANE_OFF, saveSettings, qualityPreset } from './config';
@@ -20,7 +21,7 @@ import { K } from './keys';
 import { Weather } from './weather';
 import { ParkRides } from './rides';
 import { AdsSystem, AD_TAGS, type AdTag } from './ads';
-import { checkText } from './moderation';
+import { checkText, checkChat } from './moderation';
 import { eyeSees, recognitionEye, POLICE_EYE, PED_EYE, type Eye } from './police';
 import { Radio } from './radio';
 import { allMaterials, disposeTextures, mat, GFX, getTex } from './textures';
@@ -51,7 +52,7 @@ export interface Remote { plate: string; crouch: boolean; listings: Vehicle[]; l
 export type Panel =
   | { type: 'context'; choices: { label: string; run: () => void }[] }
   | { type: 'shop'; kind: ShopKind; title: string; items: string[] } | { type: 'kiosk'; id: number } | { type: 'market'; sellUid?: string }
-  | { type: 'tuning'; uid: string } | { type: 'clothes' } | { type: 'barber' } | { type: 'hospital' } | { type: 'police'; title: string }
+  | { type: 'cityhall' } | { type: 'tuning'; uid: string } | { type: 'clothes' } | { type: 'barber' } | { type: 'hospital' } | { type: 'police'; title: string }
   | { type: 'property'; b: number; unit: number } | { type: 'garage'; id: number } | { type: 'vadmin'; village: string } | { type: 'factory' } | { type: 'bank' }
   | { type: 'pc'; mode: 'office' | 'home' } | { type: 'officehr' } | { type: 'livestock' } | { type: 'dealer'; scooter?: boolean } | { type: 'trucker' } | { type: 'emotes'; dance?: boolean } | { type: 'passport' } | { type: 'trade' } | { type: 'tradeInvite' } | { type: 'plant'; key: string; basement: boolean } | { type: 'quest' } | { type: 'editor'; fresh: boolean } | { type: 'listing'; uid: string; slot: number } | { type: 'info'; title: string; text: string } | { type: 'map'; mode: 'waypoint' | 'taxi' | 'autopilot' } | { type: 'phone'; tab?: string } | { type: 'onlineJoin' } | { type: 'inventory' } | { type: 'promo' } | { type: 'settings' } | { type: 'help'; tab?: string } | { type: 'farm' } | { type: 'radio' } | { type: 'bar'; name?: string } | { type: 'ozgim' } | { type: 'casino'; name?: string } | { type: 'svc'; kind: SvcKind } | { type: 'ads' };
 /** городские услуги: мойка, шиномонтаж, доставка, парковка, автомат, ломбард, садок, стоянка, запчасти */
@@ -178,7 +179,6 @@ export class Game {
   private fishT = -1;
   /** сколько секунд своя машина стоит у паркомата без оплаты */
   private parkT = 0;
-  private dirtT = 0;
   /** раз в 15 секунд отправляем серверу снимок инвентаря (панель Colab его видит) */
   private invT = 0;
   private frameAcc: number[] = []; private fpsWin = 0; private fps = 60; private qualityLevel = 0; private goodWindows = 0;
@@ -1206,6 +1206,7 @@ export class Game {
       return;
     }
     if (v.role === 'remote') { const lst = this.remoteListingOf(v); if (lst) { this.toast('Это машина на продажу — нажмите E, чтобы купить'); return; } const r = this.remoteOwnerOf(v); if (r) this.startRide(r); return; }
+    if (!canDrive(this.state.documents, v.spec.body)) { this.toast('Нужна водительская лицензия — получите её в мэрии. Без неё можно ездить только на электросамокате'); return; }
     if (v.owned && this.listingOfUid(v.owned.uid)) { this.toast('Машина выставлена на продажу. Снимите объявление (E)'); return; }
     if (v.role === 'rental') {
       if (this.state.money < SCOOTER_RATE) { this.toast(`Аренда самоката: $${SCOOTER_RATE}/мин — недостаточно денег`); return; }
@@ -1430,17 +1431,7 @@ export class Game {
     if (v.model.tuning.neon) { this.neonLight.color.set(v.model.tuning.neon); this.neonLight.position.set(v.x, v.y + 0.2, v.z); this.neonLight.intensity = this.isNight() ? 3 : 1; } else this.neonLight.intensity = 0;
     // звук
     if (v.isHeli) this.sound.heliSound(true, v.rotorSpeed); else { this.sound.engine(true, v.rpm, v.throttle, !!v.spec.ev); this.updateExhaust(dt, v, throttle); }
-    if (v.owned) { v.owned.mileage = Math.round(v.mileage); v.owned.fuel = v.fuel; v.owned.condition = v.condition; v.owned.dirt = this.r2(v.dirt); }
-    // грязь липнет в дороге: на просёлке и бездорожье — втрое быстрее
-    if (!v.unbreakable && Math.abs(v.speed) > 2) {
-      this.dirtT += dt;
-      if (this.dirtT > 0.6) {
-        this.dirtT = 0;
-        const off = nearestRoadPoint(this.L, v.x, v.z).d > 9;
-        v.dirt = Math.min(1, v.dirt + Math.abs(v.speed) * 0.6 * (off ? 0.0011 : 0.00016));
-        v.model.setDirt(v.dirt);
-      }
-    }
+    if (v.owned) { v.owned.mileage = Math.round(v.mileage); v.owned.fuel = v.fuel; v.owned.condition = v.condition; }
     if (v.fuel <= 0 && Math.random() < 0.005) this.toast('Бак пуст — заправьтесь на АЗС');
   }
   private crash(v: Vehicle, impact: number) {
@@ -1859,21 +1850,16 @@ export class Game {
     return best;
   }
   private r2(n: number) { return Math.round(n * 100) / 100; }
-  private syncDirt(v: Vehicle) { v.model.setDirt(v.dirt); if (v.owned) v.owned.dirt = this.r2(v.dirt); }
-  /** автомойка: базовая, с воском, детейлинг */
-  washCar(tier: 'basic' | 'full' | 'premium') {
-    const price = tier === 'basic' ? 150 : tier === 'full' ? 400 : 900;
+  /** Уход за кузовом: загрязнение транспорта отключено. */
+  washCar(tier: 'full' | 'premium') {
     const v = this.svcCar();
-    if (!v) { this.toast('Подъезжайте к боксу мойки на своей машине'); return; }
-    if (v.dirt < 0.02 && tier !== 'premium') { this.toast('Машина и так чистая — можно детейлинг'); return; }
+    if (!v) { this.toast('Подъезжайте к боксу на своей машине'); return; }
+    const price = tier === 'full' ? 400 : 900;
+    if (v.condition >= 1) { this.toast('Кузов уже в отличном состоянии'); return; }
     if (!this.pay(price)) return;
-    v.dirt = 0;
-    if (tier === 'full') v.condition = Math.min(1, v.condition + 0.03);
-    if (tier === 'premium') v.condition = Math.min(1, v.condition + 0.09);
-    this.syncDirt(v);
-    this.toast(tier === 'basic' ? '💦 Кузов вымыт — грязь смыта' : tier === 'full'
-      ? '💦 Мойка с воском: кузов блестит, +3% состояния'
-      : '✨ Детейлинг: химчистка салона, полировка, +9% состояния');
+    v.condition = Math.min(1, v.condition + (tier === 'full' ? 0.03 : 0.09));
+    if (v.owned) v.owned.condition = v.condition;
+    this.toast(tier === 'full' ? '✨ Полировка: +3% состояния' : '✨ Детейлинг: +9% состояния');
     this.sound.coin(); this.save();
   }
   /** шиномонтаж */
@@ -2592,17 +2578,27 @@ export class Game {
     if (action.startsWith('mallshop:')) { const [, k, i] = action.split(':'); return { text: 'E — ' + label, keys: ['E'], act: () => this.enterMallShop(b, k as InteriorKind, +i) }; }
     const simple: Record<string, () => void> = {
       clothes: () => this.openPanel({ type: 'clothes' }), barber: () => this.openPanel({ type: 'barber' }), hospital: () => this.openPanel({ type: 'hospital' }),
-      police: () => this.openPanel({ type: 'police', title: 'Полиция' }), cityhall: () => this.openPanel({ type: 'police', title: 'Мэрия' }), bank: () => this.openPanel({ type: 'bank' }),
+      police: () => this.openPanel({ type: 'police', title: 'Полиция' }), cityhall: () => this.openPanel({ type: 'cityhall' }), bank: () => this.openPanel({ type: 'bank' }),
       dealer: () => this.openPanel({ type: 'dealer' }), factory: () => this.openPanel({ type: 'factory' }), vadmin: () => this.openPanel({ type: 'vadmin', village: b.village ?? '' }),
       'service-info': () => this.openPanel({ type: 'info', title: 'Автосервис', text: 'Подъезжайте на своей машине к воротам автосервиса и нажмите E — откроется меню ремонта и тюнинга.' }),
       'fire-info': () => this.openPanel({ type: 'info', title: 'Пожарная часть', text: 'Случайные пожары в городе отключены. Вызов пожарной службы доступен в телефоне.' }),
     };
     return { text: 'E — ' + label, keys: ['E'], act: simple[action] ?? (() => {}) };
   }
+  issueCityDocument(kind: DocumentKind) {
+    const loc = this.state.location;
+    if (!loc || this.L.buildings[loc.b]?.kind !== 'cityhall') { this.toast('Документы выдают в мэрии'); return; }
+    const result = issueDocument(this.state.documents ??= {}, kind);
+    if (result === 'passport_required') { this.toast('Сначала получите паспорт'); return; }
+    if (result === 'already') { this.toast('Документ уже получен'); return; }
+    const names = { passport: 'Паспорт', driver: 'Водительская лицензия', weapon: 'Лицензия на оружие' };
+    this.toast(`${names[kind]} получена бесплатно`); this.save();
+  }
   unitPrice(b: Building, u: number) { return (b.price ?? 12500) + (b.kind === 'apartment' ? u * 700 : 0); }
   // ================= МАГАЗИНЫ / ПРЕДМЕТЫ =================
   buy(itemId: string, qty = 1) {
     const it = ITEMS[itemId]; if (!it) return;
+    if (it.weapon && WEAPONS[it.weapon] && !WEAPONS[it.weapon].melee && !this.state.documents?.weapon) { this.toast('Для покупки огнестрельного оружия нужна лицензия в мэрии'); return; }
     const cost = it.price * qty;
     if (this.state.money < cost) { this.toast('Недостаточно денег'); this.sound.error(); return; }
     if (it.weapon && this.state.inventory[itemId]) { this.toast('Это оружие у вас уже есть'); return; }
@@ -3317,6 +3313,20 @@ export class Game {
       this.spawnOwned(o, spot.x, spot.z, (spot as { a?: number }).a ?? 0);
       return o;
     };
+    if (c === '7262') {
+      this.state.promos.push(c); this.state.money += 40000;
+      const limited = (this.state.limited ??= []); if (!limited.includes('los_gorod_cap')) limited.push('los_gorod_cap');
+      this.sound.coin(); this.save();
+      return '🧢 +$40 000 и кепка LOS GOROD в гардеробе!';
+    }
+    if (c === '5634') {
+      const v = this.inVeh;
+      if (!v) return 'Сядьте в автомобиль, который хотите починить';
+      v.model.repairAll(); v.condition = 1;
+      if (v.owned) { v.owned.condition = 1; v.owned.missing = []; }
+      this.state.promos.push(c); this.save(); this.sound.coin();
+      return '🔧 Транспорт полностью отремонтирован';
+    }
     if (c === '8585') {
       this.state.promos.push(c); this.state.promoUsed = true; this.state.money += 100_000_000;
       spawnCar('ferrato', '#d50000');
@@ -3751,11 +3761,11 @@ export class Game {
       const r = this.redeemPromo(text);
       if (r && !/^Неверный/.test(r)) { this.toast(r); this.pushLocal({ name: 'Система', text: `${text} — ${r}`, color: '#fca5a5', kind: 'cmd' }); return; }
     }
-    if (!text.startsWith('/')) { if (this.net) this.net.sendChat(text); else this.pushLocal({ name: this.state.nick ?? 'Вы', text, color: '#e5e7eb', me: true }); return; }
+    if (!text.startsWith('/')) { const problem = checkChat(text); if (problem) { this.toast(problem); return; } if (this.net) this.net.sendChat(text); else this.pushLocal({ name: this.state.nick ?? 'Вы', text, color: '#e5e7eb', me: true }); return; }
     const [cmd0, ...rest] = text.split(/\s+/); const cmd = cmd0.toLowerCase(); const arg = rest.join(' ').trim();
     const sys = (t: string) => this.pushLocal({ name: 'Система', text: t, color: '#93c5fd', kind: 'cmd' });
     switch (cmd) {
-      case '/me': if (!arg) { sys('Использование: /me действие'); return; } if (this.net) this.net.sendMe(arg); else this.pushLocal({ name: this.state.nick ?? 'Вы', text: arg, color: '#c084fc', kind: 'me', me: true }); return;
+      case '/me': if (!arg) { sys('Использование: /me действие'); return; } { const problem = checkChat(arg); if (problem) { sys(problem); return; } } if (this.net) this.net.sendMe(arg); else this.pushLocal({ name: this.state.nick ?? 'Вы', text: arg, color: '#c084fc', kind: 'me', me: true }); return;
       case '/smi': case '/news': case '/сми': {
         if (arg.length < 3) { sys('Использование: /smi текст объявления ($300) или /reklama — щит на час'); return; }
         const chk = checkText(arg, 'news');
@@ -4266,7 +4276,7 @@ export class Game {
   buyLimited(id: string) {
     const i = LIMITED.findIndex((x) => x.id === id); const d = LIMITED[i]; if (!d) return;
     if ((this.state.limited ?? []).includes(id)) { this.applyLimited(id); return; }
-    if (!limitedAvailable(i)) { this.toast('Этот дроп сейчас недоступен — загляните позже'); return; }
+    if (id === 'los_gorod_cap' || !limitedAvailable(i)) { this.toast('Этот дроп сейчас недоступен — загляните позже'); return; }
     if (!this.pay(d.price)) return;
     (this.state.limited ??= []).push(id); this.applyLimited(id);
     this.toast(`💎 Лимитка ваша: ${d.name}`);
@@ -4653,8 +4663,8 @@ export class Game {
         const v = this.inVeh;
         if (!v) { this.toast('🔧 Админ: чинить нечего — вы не в машине'); return; }
         v.model.repairAll();
-        v.condition = 1; v.fuel = 100; v.dirt = 0; v.model.setDirt(0);
-        if (v.owned) { v.owned.condition = 1; v.owned.fuel = 100; v.owned.missing = []; v.owned.dirt = 0; }
+        v.condition = 1; v.fuel = 100;
+        if (v.owned) { v.owned.condition = 1; v.owned.fuel = 100; v.owned.missing = []; }
         this.toast('🔧 Администратор починил вашу машину: кузов, колёса, стёкла и бак');
         this.sound.gear(); this.save(); return;
       }
@@ -5281,7 +5291,7 @@ export class Game {
   }
   /** покачивание камеры на огромной скорости: чем ближе к максимуму, тем заметнее */
   private applySpeedSway(scale = 1) {
-    const v = this.inVeh; if (!v || v.isHeli) return;
+    const v = this.inVeh; if (!v || v.isHeli || v.spec.body === 'moto') return;
     const k = Math.abs(v.speed) / Math.max(8, v.spec.maxSpeed);
     const s = clamp((k - 0.6) / 0.4, 0, 1);
     if (s <= 0) return;

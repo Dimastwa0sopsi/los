@@ -1,0 +1,26 @@
+import './domstub';
+import { Vehicle, playerDrive } from '../src/game/vehicles';
+import { Game } from '../src/game/game';
+import { checkChat } from '../src/game/moderation';
+const assert = (ok: unknown, text: string) => { if (!ok) throw new Error(text); console.log('✓ ' + text); };
+const moto = new Vehicle('strizh', 'owned', '#fff'); moto.place(0, 0, 0);
+const col = {pushCircle: () => null, groundAt: () => 0} as any;
+let flipped = false;
+function step(x: boolean) { moto.speed = 15; const r = playerDrive(moto, {throttle:0, brake:0, steer:0, handbrake:false, wheelie:x, up:0}, 0.02, col, false, () => false); flipped ||= !!r.flip; }
+for (let i=0;i<40;i++) step(true);
+assert(moto.wheelie > 0.25 && !flipped, 'X поднимает мотоцикл');
+const high = moto.wheelie; for (let i=0;i<25;i++) step(false);
+assert(moto.wheelie < high && !flipped, 'отпускание X опускает мотоцикл');
+for (let i=0;i<300;i++) step(moto.wheelie < 0.6);
+assert(!flipped && moto.wheelie > 0.2 && moto.wheelie < 0.9, 'нажатия удерживают баланс');
+for (let i=0;i<150;i++) step(true);
+assert(flipped, 'длительное нажатие вызывает падение');
+const g = Object.create(Game.prototype) as any;
+g.state = { promos: [], money: 100, limited: [], look: {}, vehicles: [] }; g.sound = { coin() {} }; g.save = () => {}; g.inVeh = null;
+assert(g.redeemPromo('5634').includes('Сядьте') && !g.state.promos.includes('5634'), 'ремонт не тратит код без транспорта');
+let repaired = false; g.inVeh = {condition:0.2, model:{repairAll(){repaired = true;}}, owned:{condition:0.2,missing:['door']}};
+assert(g.redeemPromo('5634').includes('отремонтирован') && repaired && g.inVeh.owned.condition === 1, '5634 чинит выбранный транспорт');
+assert(g.redeemPromo('7262').includes('40 000') && g.state.money === 40100 && g.state.limited.includes('los_gorod_cap'), '7262 выдаёт деньги и кепку');
+assert(g.redeemPromo('7262').includes('уже активирован') && g.state.money === 40100, 'награда одноразовая');
+assert(checkChat('бля') === null && !!checkChat('@abc'), 'чат разрешает мат и запрещает @');
+moto.dispose();

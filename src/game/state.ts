@@ -1,4 +1,5 @@
 // Состояние игры, экономика, сохранение с версионированием и миграцией
+import type { Documents } from './documents';
 import { SOSNOVKA_DZ, inOldSosnovka } from './sosnovka';
 import { SAVE_KEY, SAVE_KEY_ONLINE, SAVE_VERSION, START_MONEY, RNG } from './config';
 import { type Look, type Tuning, defaultLook, defaultTuning, VEHICLES, SELLER_NAMES } from './data';
@@ -29,6 +30,8 @@ export interface GameState {
   plants?: Record<string, { crop: string; t: number }>; apps?: string[]; dms?: Record<string, { me: boolean; text: string; t: number }[]>; unread?: Record<string, number>; limited?: string[]; officeJob?: boolean; officeDone?: number; farmJob?: boolean; mineJob?: boolean; mineCoal?: number; mineDepth?: boolean; phoneNum?: string; contacts?: Record<string, string>; quest?: { step: number; done?: boolean; kills?: number }; trucker?: boolean; createdAt?: number;
   locks?: Record<string, boolean>; spawnHome?: string; customized?: boolean; svc?: SvcState;
   listings?: { slot: number; uid: string; price: number; t: number }[];
+  /** Паспорт и лицензии, полученные в мэрии. */
+  documents?: Documents;
   /** активированные промокоды (раньше был один флаг promoUsed) */
   promos?: string[];
   /** ежедневный бонус: когда последний раз забирали */

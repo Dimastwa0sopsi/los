@@ -34,6 +34,10 @@ t('светофоры в парке не строятся', W.lights.every((l) =
   return !(l.x > bp.x0 - 1 && l.x < bp.x1 + 1 && l.z > bp.z0 - 1 && l.z < bp.z1 + 1);
 }), `${W.lights.length} перекрёстков со светофором`);
 
+const beachLot = L.lots.find(l => l.name === 'Парковка у пляжа');
+t('у пляжа размечена парковка на 26 мест', !!beachLot && beachLot.spaces.length === 26);
+t('рабочий автобус не перекрывает декоративный', !L.staticVehicles.some(v => v.tag === 'bus-depot'));
+
 W.root.updateMatrixWorld(true);
 const ground: THREE.Object3D[] = [];
 W.root.traverse(o => { if (o.userData.matKey === 'tex:grass' || o.userData.matKey === 'tex:asphalt') ground.push(o); });
