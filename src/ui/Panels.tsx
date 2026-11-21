@@ -10,6 +10,7 @@ import { LookPreview } from './LookPreview';
 import { repairCost, sellPrice, demand, carValue, type MarketOffer } from '../game/state';
 import { HelpPanel } from './Help';
 import { AdsPanel } from './AdsPanel';
+import { AuctionPanel } from './AuctionPanel';
 
 const $ = (n: number) => '$' + Math.round(n).toLocaleString('ru');
 
@@ -114,6 +115,7 @@ export function GamePanel({ g, panel, close }: { g: Game; panel: Panel; close: (
     case 'hospital': return (<Modal title="Больница" onClose={close}><p>Здоровье: {Math.round(s.health)}%</p>
       <div className="flex flex-col gap-2 mt-3"><button className="lg-btn" onClick={wrap(() => g.heal())}>Лечение — $200</button><button className="lg-btn" onClick={wrap(() => g.changeGender())}>Смена пола — $50 000</button></div>
       <p className="text-xs opacity-70 mt-2">Работа врачом: стойка «Смена врача» в приёмном отделении. Осмотрите пациента на кушетке, возьмите верный препарат в шкафу и введите его пациенту — $60 за приём и бонус за смену.</p></Modal>);
+    case 'auction': return <AuctionPanel g={g} close={close} />;
     case 'cityhall': {
       const docs = s.documents ?? {};
       const entries = [

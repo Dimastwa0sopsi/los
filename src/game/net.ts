@@ -126,6 +126,12 @@ export interface RemotePlayer {
   /** номерной знак с сервера (car_number) */
   number?: string;
 }
+export interface AuctionLot {
+  id: number; kind: 'vehicle' | 'business' | 'house' | 'apartment'; assetKey: string;
+  vehicleType: string; seller: string; startPrice: number; step: number; endsAt: number;
+  bid: number | null; bidder: string | null;
+}
+export interface AuctionSnapshot { lots: AuctionLot[]; serverTime: number; receivedAt: number; }
 export interface ChatMsg { name: string; text: string; color: string; t: number; me?: boolean; kind?: 'me' | 'news' | 'sys' | 'cmd' | 'weather' }
 export type NetStatus = 'connecting' | 'online' | 'reconnecting' | 'offline';
 
@@ -162,6 +168,7 @@ interface Msg {
   caps?: { state?: number; peds?: number; adm?: number; relay?: number; accounts?: number };
   /** реклама на щитах: полный список от сервера и ответ на покупку */
   ads?: Record<string, RemoteAd>; ok?: boolean; error?: string;
+  lots?: unknown; serverTime?: number;
   /** машиночитаемая причина отказа входа: banned / maintenance / device / replaced / name */
   code?: string;
   /** админ-команды: id модели авто для спавна и прочие параметры */
@@ -293,6 +300,7 @@ export class NetClient {
   onAdResult: ((r: { id: string; ok: boolean; error?: string }) => void) | null = null;
   /** последние известные объявления (для панели СМИ) */
   ads: Record<string, RemoteAd> = {};
+  auction: AuctionSnapshot | null = null;
   /** входящий перевод от другого игрока */
   onGift: ((from: number, g: { k: 'money' | 'item'; v: number | string; n: number; nick: string }) => void) | null = null;
   /** login_success: сервер прислал деньги/координаты (first — первый вход) */
@@ -344,6 +352,7 @@ export class NetClient {
   private open() {
     if (!this.want || this.dead) return;
     this.status = this.retry ? 'reconnecting' : 'connecting';
+    this.auction = null;
     let ws: WebSocket;
     try { ws = new WebSocket(this.url); } catch { this.fail(); return; }
     this.ws = ws;
@@ -365,7 +374,7 @@ export class NetClient {
     ws.onclose = () => {
       if (this.ws !== ws) return;
       window.clearTimeout(this.connectTimer);
-      this.ws = null; this.id = null; this.authenticated = false; this.adminSession = ''; this.lastSaveMoney = NaN;
+      this.ws = null; this.id = null; this.authenticated = false; this.adminSession = ''; this.lastSaveMoney = NaN; this.auction = null;
       if (this.dead || !this.want) { this.status = 'offline'; this.onChange?.(); return; }
       this.fail();
     };
@@ -451,6 +460,20 @@ export class NetClient {
       case 'ads': {
         const ads = (m.ads && typeof m.ads === 'object' ? m.ads : {}) as Record<string, RemoteAd>;
         this.ads = ads; this.onAds?.(ads); return;
+      }
+      case 'auction_list': {
+        if (!Array.isArray(m.lots) || !Number.isSafeInteger(m.serverTime)) return;
+        const lots: AuctionLot[] = [];
+        for (const raw of m.lots.slice(0, 100)) {
+          if (!raw || !['vehicle', 'business', 'house', 'apartment'].includes(raw.kind) || !Number.isSafeInteger(raw.id) || raw.id < 1 ||
+            typeof raw.assetKey !== 'string' || raw.assetKey.length > 128 || typeof raw.seller !== 'string' || raw.seller.length > 32 ||
+            typeof raw.vehicleType !== 'string' || !Number.isSafeInteger(raw.startPrice) || raw.startPrice < 1 || !Number.isSafeInteger(raw.step) || raw.step < 1 ||
+            !Number.isSafeInteger(raw.endsAt) || (raw.bid !== null && (!Number.isSafeInteger(raw.bid) || raw.bid < 1)) ||
+            (raw.bidder !== null && typeof raw.bidder !== 'string')) continue;
+          lots.push(raw as AuctionLot);
+        }
+        this.auction = { lots, serverTime: m.serverTime!, receivedAt: Date.now() };
+        this.onChange?.(); return;
       }
       case 'ad_result': {
         this.onAdResult?.({ id: String(m.id || ''), ok: !!m.ok, error: typeof m.error === 'string' ? m.error : undefined });
@@ -694,6 +717,7 @@ export class NetClient {
   /** покупка щита: сервер сам проверит текст, цену и занятость, имя берёт из сессии */
   /** попросить у сервера актуальный список объявлений */
   requestAds() { this.send({ type: 'ads' }); }
+  requestAuction() { if (this.authenticated) this.send({ type: 'auction_list' }); }
   sendAd(id: string, text: string, tag: string) { this.send({ type: 'ad', id, text: text.slice(0, 120), tag }); }
   /** снять своё объявление досрочно */
   sendAdDrop(id: string) { this.send({ type: 'ad_drop', id }); }

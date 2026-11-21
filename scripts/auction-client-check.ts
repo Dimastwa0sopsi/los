@@ -1,0 +1,14 @@
+import './domstub';
+import { NetClient } from '../src/game/net';
+(globalThis as any).WebSocket = { OPEN: 1 };
+const n = new NetClient('player', 'm', 'wss://test') as any;
+const sent: any[] = []; n.ws = { readyState: 1, send: (m: string) => sent.push(JSON.parse(m)) };
+const assert = (v: unknown, msg: string) => { if (!v) throw new Error(msg); };
+n.requestAuction(); assert(!sent.length, 'без авторизации нельзя запросить лоты');
+n.authenticated = true; n.requestAuction(); assert(sent[0].type === 'auction_list', 'отправлен запрос');
+const lot = {id:1,kind:'vehicle',assetKey:'car',vehicleType:'lada',seller:'test',startPrice:1000,step:1000,endsAt:500000,bid:null,bidder:null};
+n.handle(JSON.stringify({type:'auction_list',serverTime:1234,lots:[lot,{...lot,id:-1},{...lot,id:2,kind:'bad'}]}));
+assert(n.auction.lots.length === 1 && n.auction.lots[0].id === 1, 'неверные данные отфильтрованы');
+assert(n.auction.serverTime === 1234 && n.auction.receivedAt > 0, 'время сервера и время получения');
+n.handle(JSON.stringify({type:'auction_list',serverTime:'wrong',lots:[]})); assert(n.auction.lots.length===1,'неверный снимок не принят');
+console.log('✓ сетевой клиент: авторизация, чтение лотов, проверка данных и время сервера');

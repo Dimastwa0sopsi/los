@@ -2,7 +2,7 @@
 const fs = require('fs'), path = require('path'), os = require('os'), { spawn } = require('child_process'), assert = require('assert');
 const WebSocket = require('ws');
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'los-accounts-'));
-for (const f of ['server.js', 'ads.cjs', 'moderation.cjs', 'account-auth.cjs', 'account-store.cjs', 'account-revisions.cjs']) fs.copyFileSync(path.join(__dirname, '../server', f), path.join(dir, f));
+for (const f of ['server.js', 'ads.cjs', 'moderation.cjs', 'account-auth.cjs', 'account-store.cjs', 'account-revisions.cjs', 'auction-store.cjs']) fs.copyFileSync(path.join(__dirname, '../server', f), path.join(dir, f));
 fs.writeFileSync(path.join(dir, 'package.json'), '{"type":"commonjs"}');
 const db = path.join(dir, 'db.sqlite');
 const port = 23000 + Math.floor(Math.random() * 20000);
@@ -32,6 +32,21 @@ async function auth(name, mode, password, backup) { const c = client(); assert.e
   assert.equal((await gameAdminReq(ownerLogin.adminSession)).status, 403); assert.equal((await gameAdminReq(owner2.adminSession)).status, 200); otherOwner.ws.close();
   let legacy = client(); await legacy.next('hello'); legacy.send({ type:'login', name:'Tester' }); assert.equal((await legacy.next('error')).code, 'auth'); legacy.ws.close();
   let a = await auth('Tester', 'register', 'primary-password', 'backup-password'); let first = await a.next('login_success'); assert(!first.adminSession); assert.equal(first.accountState, null); assert.equal(first.accountRevision, 0);
+  // Реальный WebSocket: публичный каталог показывает только активные лоты,
+  // не раскрывает полный объект автомобиля и не позволяет делать ставки.
+  const DatabaseAuction = require('better-sqlite3');
+  const adb = new DatabaseAuction(db);
+  const addLot = adb.prepare("INSERT INTO auction_lots(seller,kind,asset_key,asset_json,start_price,step,ends_at,status) VALUES (?,?,?,?,?,?,?,'active')");
+  const secret = JSON.stringify({item:{type:'lada', uid:'car', secret:'PRIVATE'}});
+  addLot.run('seller','vehicle','car',secret,50000,1000,Date.now()+600000);
+  addLot.run('seller','vehicle','old',secret,50000,1000,Date.now()-1);
+  adb.close();
+  a.send({type:'auction_list'});
+  const catalog = await a.next('auction_list');
+  assert.equal(catalog.trading,false); assert.equal(catalog.lots.length,1);
+  assert.equal(catalog.lots[0].vehicleType,'lada');
+  assert(!JSON.stringify(catalog).includes('PRIVATE')); assert(!('asset_json' in catalog.lots[0]));
+  a.send({type:'auction_bid',id:catalog.lots[0].id,bid:50000});
   let dupe = await auth('tester', 'register', 'another-password'); assert.match((await dupe.next('error')).text, /занят/); dupe.ws.close();
   let bad = await auth('Tester', 'login', 'wrong-password'); assert.match((await bad.next('error')).text, /Неверный/); bad.ws.close();
   const state = { money: 987654, health: 61, food: 42, properties:['1:2'], vehicles:[{type:'lada'}], pos:{x:510,z:490,a:1}, inventory:{bread:3} };

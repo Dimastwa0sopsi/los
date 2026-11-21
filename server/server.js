@@ -27,6 +27,7 @@ const LIVE_PATH = 'server/live.json';
 const { checkText: checkAdText, checkChat } = require('./moderation.cjs');
 const { createAdsStore, AD_TTL } = require('./ads.cjs');
 const { createAccountStore, normalizeLogin } = require('./account-store.cjs');
+const { createAuctionStore } = require('./auction-store.cjs');
 
 const BUILD = (() => {
   try { return crypto.createHash('sha1').update(fs.readFileSync(__filename)).digest('hex').slice(0, 12); }
@@ -40,6 +41,8 @@ db.pragma('journal_mode = WAL');
 db.pragma('busy_timeout = 8000');
 db.pragma('synchronous = NORMAL');
 const accounts = createAccountStore(db);
+// Только просмотр лотов; денежные операции пока не подключены к сети.
+const auctions = createAuctionStore(db);
 const attempts = new Map();
 let authJobs = 0;
 function allowLogin(name) {
@@ -1199,7 +1202,7 @@ const wss = new WebSocket.Server({ server, maxPayload: 1100000 });
 
 wss.on('connection', (ws) => {
   send(ws, { type: 'hello', accounts: 1 });
-  let me = null, account = null, authBusy = false;
+  let me = null, account = null, authBusy = false, auctionListAt = 0;
   ws.on('message', async (raw) => {
     let m; try { m = JSON.parse(raw); } catch { return; }
 
@@ -1246,6 +1249,13 @@ wss.on('connection', (ws) => {
 
     if (!me || active.get(me.id)?.ws !== ws) return;
     const row = me;
+
+    if (m.type === 'auction_list') {
+      const now = Date.now();
+      if (now - auctionListAt < 1000) return;
+      auctionListAt = now;
+      return send(ws, { type: 'auction_list', serverTime: now, trading: false, lots: auctions.publicLots(now) });
+    }
 
     if (m.type === 'account_save') {
       const value = Number(m.state?.money);
