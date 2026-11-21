@@ -2451,7 +2451,9 @@ export class Game {
           return { text: b.forSale ? `E — Дом ID ${b.id}: $${b.price?.toLocaleString('ru')}` : `Чужой дом ID ${b.id} — заперто`, keys: ['E'], act: () => this.enterBuilding(b) };
         }
         const government = ['police', 'hospital', 'fire', 'cityhall', 'auction', 'vadmin', 'checkpoint'].includes(b.kind);
-        return { text: `E — войти: ${b.name}${government ? '' : ` · ID ${b.id}`}`, keys: ['E'], act: () => this.enterBuilding(b) };
+        // Эти здания пока нельзя покупать; общая серверная собственность ещё не включена.
+        const business = ['shop24', 'supermarket', 'cafe', 'pharmacy', 'gunshop', 'clothes', 'barber', 'gas', 'vshop', 'vpharmacy', 'vguntruck', 'fishshop', 'service', 'bar'].includes(b.kind);
+        return { text: `E — войти: ${b.name}${government ? '' : ` · ID ${b.id}`}${business ? ' · владелец: государство' : ''}`, keys: ['E'], act: () => this.enterBuilding(b) };
       }
     }
     // бассейн: нырнуть с бортика и вылезти обратно
@@ -2505,7 +2507,10 @@ export class Game {
       return { text: 'E — ' + SVC_TITLES[kind], keys: ['E'], act: () => this.openPanel({ type: 'svc', kind }) };
     }
     // ларьки
-    for (const k of this.L.kiosks) if (Math.hypot(k.x + Math.sin(k.a) * 1.8 - px, k.z + Math.cos(k.a) * 1.8 - pz) < 2.2) return { text: `E — Ларёк «${KIOSK_TYPES[k.type].name}»`, keys: ['E'], act: () => this.openPanel({ type: 'kiosk', id: k.id }) };
+    for (const k of this.L.kiosks) if (Math.hypot(k.x + Math.sin(k.a) * 1.8 - px, k.z + Math.cos(k.a) * 1.8 - pz) < 2.2) {
+      const owner = this.kioskOwner(k.id);
+      return { text: `E — Ларёк «${KIOSK_TYPES[k.type].name}» · владелец: ${owner.label}`, keys: ['E'], act: () => this.openPanel({ type: 'kiosk', id: k.id }) };
+    }
     // гаражи
     for (const g of this.L.garages) if (Math.hypot(g.x - px, g.gateZ - 1.5 - pz) < 3.5) {
       const own = this.state.garages.includes(g.id);
@@ -3202,7 +3207,20 @@ export class Game {
     this.state.money += price; this.sound.coin(); this.save();
     this.toast(`🏚️ Гараж №${id + 1} продан за $${price.toLocaleString('ru')}`);
   }
-  buyKiosk(id: number) { const kt = KIOSK_TYPES[this.L.kiosks[id].type]; if (this.state.kiosks.some((k) => k.id === id)) return; if (!this.pay(kt.price)) return; this.state.kiosks.push({ id, last: Date.now(), acc: 0 }); this.toast(`Ларёк «${kt.name}» ваш! Доход $${kt.income} каждую минуту`); this.save(); }
+  kioskOwner(id: number): { kind: 'state' | 'player' | 'conflict' | 'unknown'; label: string } {
+    if (!this.online) return this.state.kiosks.some(k => k.id === id) ? {kind:'player', label:this.state.nick || 'Вы'} : {kind:'state', label:'государство'};
+    if (!this.net?.ready) return {kind:'unknown',label:'неизвестен'};
+    this.net.requestKioskOwners();
+    const snapshot = this.net.kioskOwners;
+    if (!snapshot || Date.now() - snapshot.receivedAt >= 15000) return {kind:'unknown',label:'неизвестен'};
+    if (snapshot.owners.has(id)) {
+      const name = snapshot.owners.get(id);
+      return name ? {kind:'player', label:name} : {kind:'conflict', label:'спорное владение'};
+    }
+    return snapshot.complete ? {kind:'state',label:'государство'} : {kind:'unknown',label:'неизвестен'};
+  }
+  buyKiosk(id: number) { const kt = KIOSK_TYPES[this.L.kiosks[id].type]; if (this.state.kiosks.some((k) => k.id === id)) return;
+    if (this.online && this.kioskOwner(id).kind !== 'state') { this.toast('Покупка недоступна: владелец уже есть или данные ещё загружаются'); return; } if (!this.pay(kt.price)) return; this.state.kiosks.push({ id, last: Date.now(), acc: 0 }); this.toast(`Ларёк «${kt.name}» ваш! Доход $${kt.income} каждую минуту`); this.save(); }
   collectKiosks(id?: number) {
     this.updateKiosks();
     let sum = 0; for (const k of this.state.kiosks) if (id === undefined || k.id === id) { sum += k.acc; k.acc = 0; }

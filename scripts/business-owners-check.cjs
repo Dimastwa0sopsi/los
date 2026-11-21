@@ -1,0 +1,16 @@
+'use strict';
+const assert = require('node:assert/strict');
+const Database = require('better-sqlite3');
+const {readKioskOwners} = require('../server/business-owners.cjs');
+const db = new Database(':memory:');
+db.exec('CREATE TABLE accounts(display_name TEXT,state_json TEXT)');
+const insert = db.prepare('INSERT INTO accounts VALUES (?,?)');
+insert.run('Alice',JSON.stringify({kiosks:[{id:1,acc:1234}],secret:'not public'}));
+insert.run('Bob',JSON.stringify({kiosks:[{id:2}]}));
+let view = readKioskOwners(db);
+assert.equal(view.complete,true); assert.deepEqual(view.owners,[{id:1,name:'Alice'},{id:2,name:'Bob'}]);
+assert(!JSON.stringify(view).includes('not public')); assert(!JSON.stringify(view).includes('acc'));
+insert.run('Charlie',JSON.stringify({kiosks:[{id:1}]}));
+view = readKioskOwners(db); assert.deepEqual(view.owners[0],{id:1,name:null});
+insert.run('Broken','{'); assert.equal(readKioskOwners(db).complete,false);
+db.close(); console.log('✓ публичные владельцы: ник, конфликты, повреждённые сохранения и приватность');
