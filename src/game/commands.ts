@@ -161,11 +161,8 @@ export const COMMANDS: Cmd[] = [
     const o = myCar(g, a); if (!o) return;
     g.deliverCar(o.uid);
   } },
-  { name: 'plate', args: '[номер] X000XX 00', cat: 'car', desc: 'поставить номерной знак', run: (g, a) => {
-    const parts = a.trim().split(/\s+/);
-    const n = parts.length > 1 && /^\d+$/.test(parts[0]) ? parts.shift()! : '';
-    const o = myCar(g, n); if (!o) return;
-    say(g, g.setPlate(o.uid, parts.join(' ')));
+  { name: 'plate', cat: 'car', desc: 'как получить и установить номер', run: (g) => {
+    say(g, g.online ? 'Выдача номеров онлайн пока не подключена' : 'Получите случайный номер в полиции; установите его возле своей машины через инвентарь');
   } },
   { name: 'park', args: '[номер]', cat: 'car', desc: 'убрать машину с улицы (сохранится)', run: (g, a) => {
     const o = myCar(g, a); if (!o) return;

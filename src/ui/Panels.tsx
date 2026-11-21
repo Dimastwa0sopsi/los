@@ -147,9 +147,13 @@ export function GamePanel({ g, panel, close }: { g: Game; panel: Panel; close: (
             <button className="lg-btn sm" onClick={wrap(() => g.payCameraFine(f.id))}>Оплатить {$(f.amount)}</button>
           </div>)}</div>
         </div>
+        <div className="lg-card mt-3"><b>🪪 Выдача номеров</b>
+          {g.online ? <p>Серверная выдача уникальных номеров пока не подключена.</p> : <><p>Случайный комплект за $5 000 попадёт в инвентарь. Доступно только в одиночной игре; уникальность между игроками не гарантируется.</p>
+            <button className="lg-btn sm lg-btn-main" onClick={wrap(() => g.issueLocalPlate())}>Получить случайный номер · $5 000</button></>}
+        </div>
         <div className="lg-card mt-3">
           <b>🚘 Транспорт и документы</b>
-          <p className="text-xs opacity-70">Показаны данные вашего сохранения. Серверная выдача уникального случайного номера за $5 000 пока не подключена.</p>
+          <p className="text-xs opacity-70">Показаны данные вашего сохранения.</p>
           {!s.vehicles.length && <p className="opacity-70">У вас пока нет транспорта.</p>}
           <div className="lg-list mt-2">{s.vehicles.map(o => <div className="lg-row wrap" key={o.uid}>
             <div className="flex-1"><b>{VEHICLES[o.type]?.name ?? o.type}</b><small>Номер: {o.tuning?.plate || 'не указан'} · передний: {!o.tuning?.plate || o.tuning.plateFront === false ? 'нет' : 'есть'} · задний: {!o.tuning?.plate || o.tuning.plateBack === false ? 'нет' : 'есть'}</small></div>

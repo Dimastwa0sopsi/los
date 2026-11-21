@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Game } from '../game/game';
-import { ITEMS, WEAPONS, AMMO_NAMES, TOPS, BOTTOMS, CLOTH_COLORS, DRESSES } from '../game/data';
+import { ITEMS, VEHICLES, WEAPONS, AMMO_NAMES, TOPS, BOTTOMS, CLOTH_COLORS, DRESSES } from '../game/data';
 
 const COLS = 9;
 export function Slot({ id, n, sel, onClick, onDouble, small }: { id?: string; n?: number; sel?: boolean; onClick?: () => void; onDouble?: () => void; small?: boolean }) {
@@ -49,6 +49,13 @@ export function InventoryGrid({ g }: { g: Game }) {
           <button className="ui-btn sm ghost" onClick={() => { g.dropItem(sel); r(); if (!g.getState().inventory[sel]) setSel(null); }}>Выбросить</button>
         </div>
       )}
+      {(s.plateInventory?.length ?? 0) > 0 && <><div className="mc-title">🚘 Номерные таблички <small>только для одиночной игры</small></div>
+        <p className="tb-note">Выйдите и подойдите к своей стоящей машине, затем выберите её для установки. Старые таблички вернутся в инвентарь.</p>
+        {(s.plateInventory ?? []).map((p,i) => <div className="mc-info" key={`${p.number}-${i}`}>
+          <span className="big">🚘</span><div className="grow"><b>{p.number}</b><small>передняя: {p.front ? 'есть' : 'нет'} · задняя: {p.back ? 'есть' : 'нет'}</small>
+            <div>{s.vehicles.filter(o => VEHICLES[o.type] && !['moto','scooter','heli','combine','quad'].includes(VEHICLES[o.type].body)).map(o => <button key={o.uid} className="ui-btn sm" disabled={g.online} onClick={() => { g.installLocalPlate(p.number,o.uid); r(); }}>Установить: {VEHICLES[o.type].name}</button>)}</div>
+          </div>
+        </div>)}</>}
       <div className="mc-title">👕 Одежда <small>переодевание где угодно</small></div>
       <Wardrobe g={g} />
       {fridge && <>

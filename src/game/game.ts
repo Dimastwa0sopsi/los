@@ -27,7 +27,7 @@ import { eyeSees, recognitionEye, POLICE_EYE, PED_EYE, type Eye } from './police
 import { Radio } from './radio';
 import { allMaterials, disposeTextures, mat, GFX, getTex } from './textures';
 import { T, M } from './geom';
-import { LIMITED, limitedAvailable, CROPS, EMOTES, SCOOTER_RATE, HYDRO_PRICE, WEAPONS, WEAPON_ORDER, AMMO_NAMES, ITEMS, VEHICLES, TRAFFIC_TYPES, TRAFFIC_WEIGHTS, KIOSK_TYPES, KIOSK_PERIOD, KIOSK_MAX_PERIODS, SHOP_ITEMS, normalizePlate, randomPlate, type ShopKind, type Look, type Tuning, defaultTuning, TUNE_PRICES, TUNE_CATALOG, HAIR_STYLES, TOPS, BOTTOMS, BAR_DRINKS } from './data';
+import { LIMITED, limitedAvailable, CROPS, EMOTES, SCOOTER_RATE, HYDRO_PRICE, WEAPONS, WEAPON_ORDER, AMMO_NAMES, ITEMS, VEHICLES, TRAFFIC_TYPES, TRAFFIC_WEIGHTS, KIOSK_TYPES, KIOSK_PERIOD, KIOSK_MAX_PERIODS, SHOP_ITEMS, randomPlate, plateKey, type ShopKind, type Look, type Tuning, defaultTuning, TUNE_PRICES, TUNE_CATALOG, HAIR_STYLES, TOPS, BOTTOMS, BAR_DRINKS } from './data';
 import { type GameState, newState, loadState, saveState, migrate, type OwnedVehicle, marketOffers, sellPrice, repairCost, carValue, uid, type MarketOffer } from './state';
 
 export interface HudState {
@@ -2344,6 +2344,15 @@ export class Game {
     this.plateHold.time += dt;
     if (this.plateHold.time < 2) return;
     const v = near.vehicle, t = { ...v.model.tuning, [near.side === 'front' ? 'plateFront' : 'plateBack']: false };
+    if (!this.online && v.owned) {
+      const number = v.model.tuning.plate ?? '', key = plateKey(number);
+      const list = (this.state.plateInventory ??= []);
+      if (!key || !Array.isArray(list)) { this.toast('Не удалось сохранить табличку в инвентарь'); this.plateHold = null; this.plateHoldDone = true; return; }
+      const matching = list.filter(p => plateKey(p.number) === key);
+      if (matching.length > 1 || (matching[0] && matching[0][near.side]) || (!matching.length && list.length >= 100)) { this.toast('Не удалось безопасно сохранить табличку в инвентарь'); this.plateHold = null; this.plateHoldDone = true; return; }
+      const item = matching[0] ?? {number,front:false,back:false};
+      item[near.side] = true; if (!matching.length) list.push(item);
+    }
     v.model.applyTuning(t); v.sync();
     if (v.owned) { v.owned.tuning = { ...v.owned.tuning, [near.side === 'front' ? 'plateFront' : 'plateBack']: false }; this.save(); }
     this.plateHoldDone = true; this.plateHold = null;
@@ -3423,20 +3432,46 @@ export class Game {
     }
     return 'Неверный промокод';
   }
-  /** установить номерной знак на своё авто (формат X000XX 00) */
-  setPlate(uidv: string, raw: string): string {
-    const o = this.state.vehicles.find((x) => x.uid === uidv);
-    if (!o) return 'Машина не найдена';
-    if (!raw.trim()) { o.tuning = { ...o.tuning, plate: '', plateFront: false, plateBack: false }; const v0 = this.ownedVehicleNear(uidv); v0?.model.applyTuning(o.tuning); this.save(); return 'Номер снят'; }
-    const num = normalizePlate(raw);
-    if (!num) return 'Формат: X000XX 00 (например, А123ВС 77)';
-    if (this.state.vehicles.some((x) => x.uid !== uidv && x.tuning.plate === num)) return 'Такой номер уже занят';
-    o.tuning = { ...o.tuning, plate: num, plateFront: true, plateBack: true };
+  /** Временная выдача только в одиночном сохранении; не резервирует номер в сети. */
+  issueLocalPlate() {
+    if (this.online) { this.toast('Серверная выдача номеров ещё не подключена'); return; }
+    if (this.interiorKind !== 'police') { this.toast('Получить номер можно в полиции'); return; }
+    const list = this.state.plateInventory ?? [];
+    if (!Array.isArray(list) || list.length >= 100) { this.toast('Инвентарь номеров заполнен'); return; }
+    if (this.state.money < 5000) { this.toast('Недостаточно денег: нужно $5 000'); return; }
+    const used = new Set<string>();
+    for (const o of this.state.vehicles) { const k = plateKey(o.tuning?.plate ?? ''); if (k) used.add(k); }
+    for (const p of list) { const k = plateKey(p.number); if (k) used.add(k); }
+    for (const v of this.vehicles) { const k = plateKey(v.model.tuning.plate ?? ''); if (k) used.add(k); }
+    let number = '';
+    for (let i = 0; i < 100; i++) { const candidate = randomPlate(), key = plateKey(candidate); if (key && !used.has(key)) { number = candidate; break; } }
+    if (!number) { this.toast('Не удалось подобрать номер, попробуйте ещё раз'); return; }
+    if (!this.pay(5000)) return;
+    (this.state.plateInventory ??= []).push({number,front:true,back:true});
+    this.save(); this.toast(`Номер ${number} в инвентаре. Установите его возле машины`);
+  }
+  /** Установка табличек из локального инвентаря только на свою стоящую машину. */
+  installLocalPlate(number: string, uidv: string) {
+    if (this.online) { this.toast('Установка из инвентаря пока доступна только в одиночной игре'); return; }
+    const list = this.state.plateInventory;
+    if (!Array.isArray(list)) return;
+    const index = list.findIndex(p => p.number === number), p = list[index];
+    const o = this.state.vehicles.find(x => x.uid === uidv);
+    if (!p || !o || !o.tuning || !plateKey(p.number) || typeof p.front !== 'boolean' || typeof p.back !== 'boolean' || (!p.front && !p.back)) { this.toast('Номер или машина не найдены'); return; }
+    const spec = VEHICLES[o.type];
+    if (!spec || ['moto','scooter','heli','combine','quad'].includes(spec.body)) { this.toast('Для этого транспорта номера недоступны'); return; }
     const v = this.ownedVehicleNear(uidv);
-    if (v) { v.model.applyTuning(o.tuning); v.sync(); }
-    this.net?.sendPlate(o.type, num);
-    this.save();
-    return `Номер ${num} установлен`;
+    if (!v || this.interior || this.inVeh || Math.abs(v.speed) > 0.5 || Math.hypot(v.x-this.px,v.z-this.pz) > 8) { this.toast('Выйдите и подойдите к своей стоящей машине'); return; }
+    const key = plateKey(p.number);
+    if (this.state.vehicles.some(x => x.uid !== uidv && plateKey(x.tuning?.plate ?? '') === key)) { this.toast('Этот номер уже указан у другой вашей машины'); return; }
+    const old = o.tuning.plate ?? '', oldKey = plateKey(old);
+    const oldFront = !!old && o.tuning.plateFront !== false, oldBack = !!old && o.tuning.plateBack !== false;
+    if ((oldFront || oldBack) && (!oldKey || list.some((x,i) => i !== index && plateKey(x.number) === oldKey))) { this.toast('Старый номер не удалось безопасно вернуть в инвентарь'); return; }
+    if (oldKey === key && ((oldFront && p.front) || (oldBack && p.back))) { this.toast('Дублирующиеся таблички: установка отменена'); return; }
+    list.splice(index,1);
+    if (oldKey !== key && (oldFront || oldBack)) list.push({number:old,front:oldFront,back:oldBack});
+    o.tuning = { ...o.tuning, plate:p.number, plateFront:p.front || (oldKey === key && oldFront), plateBack:p.back || (oldKey === key && oldBack) };
+    v.model.applyTuning(o.tuning); v.sync(); this.save(); this.toast(`Номер ${p.number} установлен`);
   }
   vehicleDocument(uidv: string): string | null {
     const o = this.state.vehicles.find(v => v.uid === uidv); if (!o) return null;

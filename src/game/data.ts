@@ -343,6 +343,11 @@ export function normalizePlate(raw: string): string | null {
   for (const ch of out.slice(0, 1) + out.slice(4, 6)) if (!PLATE_LETTERS.includes(ch)) return null;
   return out;
 }
+/** Сравнение похожих латинских и кириллических букв для локального инвентаря. */
+export function plateKey(raw: string): string | null {
+  const p = normalizePlate(raw); if (!p) return null;
+  return p.replace(/[ABEKMHOPCTYX]/g, c => 'АВЕКМНОРСТУХ'['ABEKMHOPCTYX'.indexOf(c)]).replace(/ /g, '');
+}
 export function randomPlate(): string {
   const L = 'АВЕКМНОРСТУХ', D = '0123456789';
   const r = (a: string) => a[Math.floor(Math.random() * a.length)];
