@@ -1,4 +1,5 @@
 import { visibleRoadIntervals } from './roadSurface';
+import { generateSpeedCameras } from './speedCameras';
 // Построение 3D-мира из раскладки: чанки, объединённая геометрия, инстансы
 import * as THREE from 'three';
 import { CHUNK, CELL, ROAD_W, N, SIDEWALK } from './config';
@@ -527,6 +528,13 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
   for (let i = 0; i < L.props.length; i++) {
     buildProp(B(L.props[i].x, L.props[i].z), L.props[i], liftAt(L.props[i].x, L.props[i].z));
     if (i % 800 === 0) { progress(0.55 + (i / L.props.length) * 0.15, `Объекты ${i}/${L.props.length}`); await tick(); }
+  }
+  // Камеры только на нескольких дорогах; точки совпадают с миникартой.
+  for (const c of generateSpeedCameras(L.roadSegments)) {
+    const b = B(c.poleX, c.poleZ), yaw = Math.atan2(c.dx,c.dz);
+    b.add('c:#475569', T.cylB, M(c.poleX, 0, c.poleZ, 0, 0.12, 3.7, 0.12));
+    b.add('c:#e5e7eb', T.box, M(c.poleX, 3.65, c.poleZ, yaw, 0.55, 0.38, 0.7));
+    b.add('c:#111827', T.box, M(c.poleX + c.dx * 0.36, 3.65, c.poleZ + c.dz * 0.36, yaw, 0.24, 0.22, 0.04));
   }
   // ларьки — вывески
   for (const k of L.kiosks) {

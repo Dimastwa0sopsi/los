@@ -20,12 +20,14 @@ export interface SvcState {
 }
 export interface Location { b: number; unit?: number; sub?: number }
 export interface KioskOwn { id: number; last: number; acc: number; closed?: boolean }
+export interface CameraFine { id: string; amount: number; reason: 'speed' | 'no_plate'; speed: number; limit: number; time: number }
 export interface GameState {
   version: number; money: number; health: number; food: number; water: number; energy: number;
   look: Look; inventory: Record<string, number>; ammo: number;
   properties: string[]; fridges: Record<string, Record<string, number>>; garages: number[];
   vehicles: OwnedVehicle[]; kiosks: KioskOwn[]; promoUsed: boolean;
   wanted: number; pos: { x: number; z: number; a: number }; location: Location | null; gameTime: number; playTime: number;
+  cameraFines?: CameraFine[];
   lastCar: string | null; created: boolean; nick?: string; mag?: number; ammoBy?: Record<string, number>; magBy?: Record<string, number>;
   plants?: Record<string, { crop: string; t: number }>; apps?: string[]; dms?: Record<string, { me: boolean; text: string; t: number }[]>; unread?: Record<string, number>; limited?: string[]; officeJob?: boolean; officeDone?: number; farmJob?: boolean; mineJob?: boolean; mineCoal?: number; mineDepth?: boolean; phoneNum?: string; contacts?: Record<string, string>; quest?: { step: number; done?: boolean; kills?: number }; trucker?: boolean; createdAt?: number;
   locks?: Record<string, boolean>; spawnHome?: string; customized?: boolean; svc?: SvcState;
@@ -127,7 +129,7 @@ export function migrate(s: Partial<GameState>): GameState | null {
   if (!out.ammoBy) { out.ammoBy = { p: (out.ammo ?? 0) }; out.magBy = { pistol: out.mag ?? 0 }; out.ammo = 0; out.mag = 0; }
   // промокоды: переносим старый флаг promoUsed в список
   if (!Array.isArray(out.promos)) out.promos = s.promoUsed ? ['8585'] : [];
-  // в городе нет ни штрафов, ни камер: старые сохранения чистим
+  // Удаляем устаревший формат штрафов; новые штрафы камер хранятся отдельно.
   delete (out as unknown as Record<string, unknown>).fines;
   if (!s.sosnovkaShifted) {
     if (out.pos && inOldSosnovka(out.pos.x, out.pos.z)) out.pos = { ...out.pos, z: out.pos.z + SOSNOVKA_DZ };

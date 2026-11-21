@@ -1,0 +1,15 @@
+import './domstub';
+import {Game} from '../src/game/game';
+const g = Object.create(Game.prototype) as any; let down = false, races = 0, damage = 0;
+g.inVeh = {isHeli:false,isScooter:false,isRide:false,unbreakable:true,owned:null}; g.passenger = false; g.seatbelt = false; g.beltHold = 0; g.beltTriggered = false;
+g.input = {down:()=>down, releaseGeneration:0}; g.beltInputGeneration=0; g.toast=()=>{}; g.startRace=()=>{races++;};
+g.sound={crash:()=>{}}; g.damagePlayer=(n:number)=>{damage=n;};
+const assert=(v:unknown,m:string)=>{if(!v)throw Error(m);};
+down=true; g.updateBeltHold(0.3); down=false; g.updateBeltHold(0.1); assert(races===1 && !g.seatbelt,'короткое K — гонка');
+down=true; g.updateBeltHold(0.5); g.updateBeltHold(0.6); assert(g.seatbelt && races===1,'долгое K — ремень');
+g.updateBeltHold(1); assert(g.seatbelt,'удержание переключает только один раз');
+g.crash(g.inVeh,10); assert(damage===1.5,'ремень снижает урон при аварии');
+down=false; g.updateBeltHold(0.1); down=true; g.updateBeltHold(1.1); assert(!g.seatbelt && races===1,'следующее удержание снимает ремень');
+down=false; g.updateBeltHold(0.1); down=true; g.updateBeltHold(0.3); down=false; g.input.releaseGeneration++; g.updateBeltHold(0.1); assert(races===1,'потеря фокуса отменяет удержание');
+g.inVeh=null; down=false; g.updateBeltHold(0.1); assert(races===1,'выход не запускает гонку');
+console.log('✓ ремень: удержание, одиночное переключение, прежний K для гонки, урон');

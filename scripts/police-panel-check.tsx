@@ -7,8 +7,8 @@ import type { Game } from '../src/game/game';
 const assert = (ok: unknown, msg: string) => { if (!ok) throw Error(msg); };
 const text = (node: any): string => typeof node === 'string' ? node : !node ? '' : Array.isArray(node) ? node.map(text).join(' ') : text(node.children);
 async function main() {
-  const state: any = {wanted:0,vehicles:[]}; let opened: any = null;
-  const g = {getState:()=>state,vehicleDocument:(uid:string)=>`ПТС ${uid}`,openPanel:(p:unknown)=>{opened=p;}} as unknown as Game;
+  const state: any = {wanted:0,vehicles:[]}; let opened: any = null; let paid = '';
+  const g = {getState:()=>state,vehicleDocument:(uid:string)=>`ПТС ${uid}`,openPanel:(p:unknown)=>{opened=p;},payCameraFine:(id:string)=>{paid=id;}} as unknown as Game;
   let app!: TestRenderer.ReactTestRenderer;
   await act(async()=>{app=TestRenderer.create(<GamePanel g={g} panel={{type:'police',title:'Полиция'}} close={()=>{}} />);});
   assert(text(app.toJSON()).includes('У вас пока нет транспорта'),'пустой список');
@@ -17,6 +17,10 @@ async function main() {
   const rendered = text(app.toJSON());
   assert(rendered.includes('А123ВС 77') && rendered.includes('передний:') && rendered.includes('нет'),'номер и снятый знак');
   assert(rendered.includes('пока не подключена'),'не обещать выдачу номеров');
+  state.cameraFines = [{id:'fine-1',amount:5000,reason:'speed',speed:110,limit:100,time:1000000}];
+  await act(async()=>{app.update(<GamePanel g={g} panel={{type:'police',title:'Полиция'}} close={()=>{}} />);});
+  const fineButton = app.root.findAllByType('button').find(b=>text(b.children).includes('Оплатить'));
+  assert(fineButton, 'оплата штрафа отображена'); await act(async()=>fineButton!.props.onClick()); assert(paid==='fine-1','оплата выбранного штрафа');
   const buttons = app.root.findAllByType('button');
   const pts = buttons.find(b=>text(b.children)==='ПТС'); assert(pts,'кнопка ПТС');
   await act(async()=>pts!.props.onClick());
