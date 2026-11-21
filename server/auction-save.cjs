@@ -8,12 +8,14 @@ const { createRevisionHistory } = require('./account-revisions.cjs');
 const { reconcileAuctionState } = require('./auction-reconcile.cjs');
 function createAuctionSave(db, accounts) {
   db.exec(`CREATE TABLE IF NOT EXISTS auction_save_requests (
-    login_key TEXT NOT NULL, save_id TEXT NOT NULL, payload_hash TEXT NOT NULL,
+    login_key TEXT NOT NULL, save_id TEXT NOT NULL, payload_hash TEXT NOT NULL, result_revision INTEGER NOT NULL,
     PRIMARY KEY(login_key,save_id)
   )`);
+  // Do not silently reinterpret rows from an older experimental schema.
+  if (!db.prepare('PRAGMA table_info(auction_save_requests)').all().some(c => c.name === 'result_revision')) throw new Error('incompatible_auction_save_schema');
   const history = createRevisionHistory(db);
-  const previous = db.prepare('SELECT payload_hash FROM auction_save_requests WHERE login_key=? AND save_id=?');
-  const remember = db.prepare('INSERT INTO auction_save_requests VALUES (?,?,?)');
+  const previous = db.prepare('SELECT payload_hash, result_revision FROM auction_save_requests WHERE login_key=? AND save_id=?');
+  const remember = db.prepare('INSERT INTO auction_save_requests VALUES (?,?,?,?)');
   const get = db.prepare('SELECT state_json, revision, save_id FROM accounts WHERE login_key=?');
   const run = db.transaction((name, local, baseRevision, saveId) => {
     const key = normalizeLogin(name);
@@ -25,9 +27,13 @@ function createAuctionSave(db, accounts) {
     if (!payload || Buffer.byteLength(payload, 'utf8') > 1024 * 1024 + 128) return {ok:false,error:'too_large'};
     const hash = createHash('sha256').update(payload).digest('hex');
     const prior = previous.get(key, saveId);
-    if (prior) return prior.payload_hash === hash
-      ? {ok:true,revision:row.revision,state:JSON.parse(row.state_json),replay:true}
-      : {ok:false,error:'request_reused'};
+    if (prior) {
+      if (prior.payload_hash !== hash) return {ok:false,error:'request_reused'};
+      // Return the committed revision, NEVER a newer unrelated refund/sale.
+      const state = row.revision === prior.result_revision ? JSON.parse(row.state_json) : history.get(key,prior.result_revision);
+      if (!state) return {ok:false,error:'receipt_expired',committed:true,revision:prior.result_revision};
+      return {ok:true,revision:prior.result_revision,state,replay:true};
+    }
     if (row.revision < baseRevision) return {ok:false,error:'conflict'};
     const base = row.revision === baseRevision ? JSON.parse(row.state_json) : history.get(key, baseRevision);
     if (!base) return {ok:false,error:'base_expired'};
@@ -35,7 +41,7 @@ function createAuctionSave(db, accounts) {
     if (!merged.ok) return {ok:false,error:'conflict',conflicts:merged.conflicts};
     const saved = accounts.save(key, merged.state, row.revision, saveId);
     if (!saved.ok) return saved;
-    remember.run(key, saveId, hash);
+    remember.run(key, saveId, hash, saved.revision);
     return {ok:true,revision:saved.revision,state:merged.state,replay:false};
   });
   return { save: (name, local, baseRevision, saveId) => run(name, local, baseRevision, saveId) };
