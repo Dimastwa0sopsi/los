@@ -2,7 +2,7 @@
 const fs = require('fs'), path = require('path'), os = require('os'), { spawn } = require('child_process'), assert = require('assert');
 const WebSocket = require('ws');
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'los-accounts-'));
-for (const f of ['server.js', 'ads.cjs', 'moderation.cjs', 'account-auth.cjs', 'account-store.cjs']) fs.copyFileSync(path.join(__dirname, '../server', f), path.join(dir, f));
+for (const f of ['server.js', 'ads.cjs', 'moderation.cjs', 'account-auth.cjs', 'account-store.cjs', 'account-revisions.cjs']) fs.copyFileSync(path.join(__dirname, '../server', f), path.join(dir, f));
 fs.writeFileSync(path.join(dir, 'package.json'), '{"type":"commonjs"}');
 const db = path.join(dir, 'db.sqlite');
 const port = 23000 + Math.floor(Math.random() * 20000);

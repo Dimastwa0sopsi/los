@@ -11,7 +11,7 @@ import './domstub';
 import { buildInterior, type InteriorKind, type Interior } from '../src/game/interiors';
 
 const KINDS: InteriorKind[] = ['shop24', 'supermarket', 'cafe', 'pharmacy', 'gunshop', 'clothes', 'barber', 'police', 'hospital',
-  'cityhall', 'bank', 'fishshop', 'dealer', 'service', 'mall', 'hall', 'apt_eco', 'apt_mid', 'apt_lux', 'house_city', 'house_village',
+  'cityhall', 'bank', 'auction', 'fishshop', 'dealer', 'service', 'mall', 'hall', 'apt_eco', 'apt_mid', 'apt_lux', 'house_city', 'house_village',
   'vshop', 'vpharmacy', 'vguntruck', 'vadmin', 'checkpoint', 'fire', 'gas', 'mallfood', 'basement', 'banya', 'truckoffice', 'office',
   'scootershop', 'greenhouse', 'bar', 'ozgim', 'mine', 'casino'];
 

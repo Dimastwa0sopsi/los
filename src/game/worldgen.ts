@@ -10,7 +10,7 @@ export interface REdge { id: number; a: number; b: number; kind: RoadKind; w: nu
 export interface Box { x0: number; y0: number; z0: number; x1: number; y1: number; z1: number; tag?: string }
 
 export type BKind = 'tower' | 'apartment' | 'house' | 'vhouse' | 'shop24' | 'supermarket' | 'cafe' | 'pharmacy' | 'gunshop' | 'clothes' | 'barber' |
-  'mall' | 'dealer' | 'market' | 'service' | 'gas' | 'police' | 'hospital' | 'fire' | 'cityhall' | 'bank' | 'vshop' | 'vadmin' |
+  'auction' | 'mall' | 'dealer' | 'market' | 'service' | 'gas' | 'police' | 'hospital' | 'fire' | 'cityhall' | 'bank' | 'vshop' | 'vadmin' |
   'factory' | 'warehouse' | 'checkpoint' | 'garage' | 'farm' | 'parking' | 'parkade' | 'garages' | 'storage' | 'depot' | 'scootershop' | 'office' | 'barn' | 'coop' | 'livestock' |
   'banya' | 'fishshop' | 'vpharmacy' | 'vguntruck' | 'greenhouse' | 'bar' | 'ozgim' | 'mine' | 'casino';
 export interface Building {
@@ -90,7 +90,7 @@ export interface WorldLayout {
 const SIGN: Record<string, string> = {
   shop24: 'Магазин 24/7', supermarket: 'Супермаркет «Лукошко»', cafe: 'Кафе', pharmacy: 'Аптека', gunshop: 'Оружейный «Арсенал»', clothes: 'Одежда «Мода»',
   barber: 'Парикмахерская', mall: 'ТЦ «Орбита»', dealer: 'Автосалон «Драйв»', market: 'Авторынок', service: 'Автосервис и тюнинг', gas: 'АЗС',
-  police: 'Полиция', hospital: 'Больница', fire: 'Пожарная часть', cityhall: 'Мэрия', bank: 'Банк', vshop: 'Сельмаг', vadmin: 'Администрация',
+  auction: 'Городской аукцион', police: 'Полиция', hospital: 'Больница', fire: 'Пожарная часть', cityhall: 'Мэрия', bank: 'Банк', vshop: 'Сельмаг', vadmin: 'Администрация',
   checkpoint: 'Проходная завода', vpharmacy: 'Аптека', vguntruck: 'Оружейный грузовик', office: 'Бизнес-центр «ЛосТех»', scootershop: 'Электросамокаты «Вжух Store»', farm: 'Агрохолдинг «Нива»', warehouse: 'Склад деталей', fishshop: 'Рыболовный магазин «Поплавок»',
   mine: 'Шахта «Чёрная Жила»', casino: 'Казино «Жар-Птица»', casino2: 'Казино «Золотой Лось»',
   bar: 'Бар',
@@ -2048,6 +2048,9 @@ export function generateLayout(): WorldLayout {
   // Добавляем в самом конце, чтобы числовые ID старых зданий в сохранениях не изменились.
   addBuilding({ kind: 'gas', name: 'АЗС · Набережная', x: -63, z: 520, w: 14, d: 9, h: 4,
     door: doorFor(-63, 520, 14, 9, 'n'), facade: 'shop', roof: 'flat', enter: true, color: '#16a34a' });
+  // Дописываем после остальных построек: сохранённые ID домов остаются прежними.
+  addBuilding({ kind: 'auction', name: SIGN.auction, x: 514, z: 530, w: 8, d: 6, h: 5,
+    door: doorFor(514, 530, 8, 6, 's'), facade: 'civic', roof: 'flat', enter: true, color: '#315e73' });
   void beachRoad; void wh; void clamp;
   return {
     nodes, edges, adj, buildings, props, colliders, kiosks, villages, blocks, parks, bigParks, parkRides, billboards, pools, staticVehicles, garages, parked: [...parked, ...parkedLot], scooterDocks, livestock, bazaarSlots, vendors, lots, parkades, depot, truckDests,

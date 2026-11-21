@@ -2,6 +2,7 @@
 // Отдельный слой аккаунтов. Вызовы сохранения должны выполняться только для
 // авторизованной сессии. Пароли и коды восстановления никогда не пишутся в лог.
 const auth = require('./account-auth.cjs');
+const { createRevisionHistory } = require('./account-revisions.cjs');
 const MAX_STATE_BYTES = 1024 * 1024;
 const normalizeLogin = value => typeof value === 'string' ? value.normalize('NFKC').trim().toLowerCase() : '';
 const validLogin = value => /^[\p{L}\p{N} _.-]{2,16}$/u.test(value);
@@ -20,6 +21,7 @@ function createAccountStore(db) {
   )`);
   try { db.exec('ALTER TABLE accounts ADD COLUMN backup_hash TEXT'); } catch (e) { if (!String(e.message).includes('duplicate column')) throw e; }
   try { db.exec('ALTER TABLE accounts ADD COLUMN save_id TEXT'); } catch (e) { if (!String(e.message).includes('duplicate column')) throw e; }
+  const history = createRevisionHistory(db);
   const get = db.prepare('SELECT * FROM accounts WHERE login_key = ?');
   const create = db.prepare('INSERT INTO accounts (login_key, display_name, password_hash, backup_hash) VALUES (?, ?, ?, ?)');
   const reset = db.prepare('UPDATE accounts SET reset_digest = ?, reset_expires = ? WHERE login_key = ?');
@@ -78,8 +80,14 @@ function createAccountStore(db) {
     let json;
     try { json = JSON.stringify(state); } catch { return { ok: false, error: 'invalid' }; }
     if (!json || Buffer.byteLength(json, 'utf8') > MAX_STATE_BYTES) return { ok: false, error: 'too_large' };
-    if (update.run(json, saveId, key, revision).changes !== 1) return { ok: false, error: 'conflict' };
-    return { ok: true, revision: revision + 1 };
+    return db.transaction(() => {
+      const previous = get.get(key);
+      if (!previous || previous.revision !== revision) return { ok: false, error: 'conflict' };
+      if (update.run(json, saveId, key, revision).changes !== 1) return { ok: false, error: 'conflict' };
+      history.record(key, revision, previous.state_json);
+      history.record(key, revision + 1, json);
+      return { ok: true, revision: revision + 1 };
+    })();
   }
   return { register, login, prepareLegacy, issueReset, resetPassword, save };
 }

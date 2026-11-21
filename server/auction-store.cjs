@@ -4,6 +4,7 @@
  * вернуть имущество из эскроу. Потребуется серверный контроль сохранений и
  * безопасная синхронизация активных клиентов до включения этого модуля. */
 const { normalizeLogin, MAX_STATE_BYTES } = require('./account-store.cjs');
+const { createRevisionHistory } = require('./account-revisions.cjs');
 const DURATION = 10 * 60 * 1000;
 const MAX_MONEY = 2147483647;
 const STEPS = Object.freeze({ vehicle: 1000, business: 10000, apartment: 10000, house: 20000 });
@@ -23,6 +24,7 @@ function createAuctionStore(db) {
     actor TEXT NOT NULL, request_id TEXT NOT NULL, payload TEXT NOT NULL, result TEXT NOT NULL,
     PRIMARY KEY(actor,request_id)
   );`);
+  const history = createRevisionHistory(db);
   const getAccount = db.prepare('SELECT login_key,state_json,revision FROM accounts WHERE login_key=?');
   const updateAccount = db.prepare('UPDATE accounts SET state_json=?,revision=revision+1,save_id=NULL WHERE login_key=? AND revision=?');
   const getLot = db.prepare('SELECT * FROM auction_lots WHERE id=?');
@@ -42,6 +44,8 @@ function createAuctionStore(db) {
     const json = JSON.stringify(a.state);
     if (Buffer.byteLength(json, 'utf8') > MAX_STATE_BYTES) fail('state_too_large');
     if (!updateAccount.run(json, a.row.login_key, a.row.revision).changes) fail('conflict');
+    history.record(a.row.login_key, a.row.revision, a.row.state_json);
+    history.record(a.row.login_key, a.row.revision + 1, json);
   }
   function request(actor, id, payload, action) {
     if (typeof id !== 'string' || !/^[a-zA-Z0-9-]{16,80}$/.test(id)) fail('invalid_request');

@@ -78,9 +78,9 @@ const MEDS = [
 ];
 /** радиус «границы леса»: дальше начинается пустой мир, поэтому возвращаем игрока в город */
 const WORLD_BOUND_R = 2300;
-const POI_ICON: Record<string, string> = { shop24: '🛒', supermarket: '🛍️', cafe: '☕', pharmacy: '💊', gunshop: '🔫', service: '🔧', clothes: '👕', barber: '✂️', mall: '🏬', dealer: '🚗', market: '🚙', gas: '⛽', police: '👮', hospital: '🏥', fire: '🚒', cityhall: '🏛️', bank: '🏦', vshop: '🛒', vpharmacy: '💊', vguntruck: '🔫', vadmin: '🏛️', checkpoint: '🏭', farm: '🌾', fishshop: '🎣', bar: '🍸', ozgim: '🛍️', greenhouse: '🌱' };
+const POI_ICON: Record<string, string> = { auction: '🔨', shop24: '🛒', supermarket: '🛍️', cafe: '☕', pharmacy: '💊', gunshop: '🔫', service: '🔧', clothes: '👕', barber: '✂️', mall: '🏬', dealer: '🚗', market: '🚙', gas: '⛽', police: '👮', hospital: '🏥', fire: '🚒', cityhall: '🏛️', bank: '🏦', vshop: '🛒', vpharmacy: '💊', vguntruck: '🔫', vadmin: '🏛️', checkpoint: '🏭', farm: '🌾', fishshop: '🎣', bar: '🍸', ozgim: '🛍️', greenhouse: '🌱' };
 export { POI_ICON };
-const POI_COLOR: Record<string, string> = { shop24: '#e11d48', supermarket: '#f59e0b', cafe: '#a16207', pharmacy: '#059669', gunshop: '#374151', service: '#2563eb', clothes: '#8b5cf6', barber: '#db2777', mall: '#7c3aed', dealer: '#0ea5e9', market: '#0369a1', gas: '#16a34a', police: '#1d4ed8', hospital: '#dc2626', fire: '#b91c1c', cityhall: '#1e3a8a', bank: '#0f766e', vshop: '#e11d48', vadmin: '#1e3a8a', checkpoint: '#57534e', farm: '#a16207', beach: '#0891b2', fishshop: '#0e7490', bar: '#a21caf', ozgim: '#0ea5e9' };
+const POI_COLOR: Record<string, string> = { auction: '#0f766e', shop24: '#e11d48', supermarket: '#f59e0b', cafe: '#a16207', pharmacy: '#059669', gunshop: '#374151', service: '#2563eb', clothes: '#8b5cf6', barber: '#db2777', mall: '#7c3aed', dealer: '#0ea5e9', market: '#0369a1', gas: '#16a34a', police: '#1d4ed8', hospital: '#dc2626', fire: '#b91c1c', cityhall: '#1e3a8a', bank: '#0f766e', vshop: '#e11d48', vadmin: '#1e3a8a', checkpoint: '#57534e', farm: '#a16207', beach: '#0891b2', fishshop: '#0e7490', bar: '#a21caf', ozgim: '#0ea5e9' };
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
 const REMOTE_POSES = new Set(['dance1', 'dance2', 'dance3', 'dance4', 'dance5', 'wave', 'clap', 'sit', 'liedown', 'pushup', 'tread', 'crouch', 'crouchwalk', 'crouchaim', 'idle', 'walk', 'run', 'guard', 'jab', 'cross', 'hook', 'block', 'flinch', 'aim', 'knock', 'lie', 'fall', 'smoke', 'carry', 'swim', 'sitbench', 'sitpc', 'handshake', 'punch', 'cover', 'coverwalk', 'coveraim', 'bow', 'salute', 'point', 'think', 'stretch', 'cheer']);
@@ -2450,7 +2450,7 @@ export class Game {
           if (tk) return { text: tk.locked ? `🔒 Дом ID ${b.id} игрока ${tk.name} заперт` : `E — в гости к ${tk.name} · ID ${b.id}`, keys: ['E'], act: () => this.enterBuilding(b) };
           return { text: b.forSale ? `E — Дом ID ${b.id}: $${b.price?.toLocaleString('ru')}` : `Чужой дом ID ${b.id} — заперто`, keys: ['E'], act: () => this.enterBuilding(b) };
         }
-        const government = ['police', 'hospital', 'fire', 'cityhall', 'vadmin', 'checkpoint'].includes(b.kind);
+        const government = ['police', 'hospital', 'fire', 'cityhall', 'auction', 'vadmin', 'checkpoint'].includes(b.kind);
         return { text: `E — войти: ${b.name}${government ? '' : ` · ID ${b.id}`}`, keys: ['E'], act: () => this.enterBuilding(b) };
       }
     }
@@ -2578,6 +2578,7 @@ export class Game {
     if (action.startsWith('mallshop:')) { const [, k, i] = action.split(':'); return { text: 'E — ' + label, keys: ['E'], act: () => this.enterMallShop(b, k as InteriorKind, +i) }; }
     const simple: Record<string, () => void> = {
       clothes: () => this.openPanel({ type: 'clothes' }), barber: () => this.openPanel({ type: 'barber' }), hospital: () => this.openPanel({ type: 'hospital' }),
+      auction: () => this.openPanel({ type: 'info', title: 'Городской аукцион', text: 'Аукцион пока не открыт: серверные ставки и передача имущества ещё проходят проверку. Деньги не списываются.' }),
       police: () => this.openPanel({ type: 'police', title: 'Полиция' }), cityhall: () => this.openPanel({ type: 'cityhall' }), bank: () => this.openPanel({ type: 'bank' }),
       dealer: () => this.openPanel({ type: 'dealer' }), factory: () => this.openPanel({ type: 'factory' }), vadmin: () => this.openPanel({ type: 'vadmin', village: b.village ?? '' }),
       'service-info': () => this.openPanel({ type: 'info', title: 'Автосервис', text: 'Подъезжайте на своей машине к воротам автосервиса и нажмите E — откроется меню ремонта и тюнинга.' }),
