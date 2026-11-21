@@ -82,6 +82,12 @@ function createAccountStore(db) {
     if (!json || Buffer.byteLength(json, 'utf8') > MAX_STATE_BYTES) return { ok: false, error: 'too_large' };
     return db.transaction(() => {
       const previous = get.get(key);
+      // Повтор потерянного подтверждения допустим только для последней записи,
+      // того же ID, исходной ревизии и точного снимка; он ничего не меняет.
+      if (previous && saveId !== null && previous.save_id === saveId) {
+        if (previous.revision === revision + 1 && previous.state_json === json) return { ok: true, revision: previous.revision, replay: true };
+        return { ok: false, error: 'request_reused' };
+      }
       if (!previous || previous.revision !== revision) return { ok: false, error: 'conflict' };
       if (update.run(json, saveId, key, revision).changes !== 1) return { ok: false, error: 'conflict' };
       history.record(key, revision, previous.state_json);

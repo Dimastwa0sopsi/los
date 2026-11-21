@@ -50,12 +50,27 @@ async function auth(name, mode, password, backup) { const c = client(); assert.e
   let dupe = await auth('tester', 'register', 'another-password'); assert.match((await dupe.next('error')).text, /занят/); dupe.ws.close();
   let bad = await auth('Tester', 'login', 'wrong-password'); assert.match((await bad.next('error')).text, /Неверный/); bad.ws.close();
   const state = { money: 987654, health: 61, food: 42, properties:['1:2'], kiosks:[{id:3,last:0,acc:7}], vehicles:[{type:'lada'}], pos:{x:510,z:490,a:1}, inventory:{bread:3} };
-  a.send({type:'account_save', state, revision:0}); assert.equal((await a.next('account_saved')).revision, 1);
+  const saveId = 'stable-network-request-0001';
+  assert.equal(first.caps.saveIds, 1);
+  a.send({type:'account_save', state, revision:0, saveId});
+  let saved = await a.next('account_saved'); assert.equal(saved.revision, 1); assert.equal(saved.saveId,saveId);
+  a.send({type:'account_save', state, revision:0, saveId});
+  saved = await a.next('account_saved'); assert.equal(saved.revision,1); assert.equal(saved.replay,true); assert.equal(saved.saveId,saveId);
+  a.send({type:'account_save', state:{...state,money:10}, revision:0, saveId});
+  saved = await a.next('account_saved'); assert.equal(saved.error,'request_reused'); assert.equal(saved.saveId,saveId);
   let b = await auth('TESTER', 'login', 'backup-password'); let login = await b.next('login_success'); assert.deepStrictEqual(login.accountState, state); assert.equal(login.player.money, state.money); assert.equal(login.accountRevision, 1); assert.equal((await a.next('error')).code, 'replaced');
   b.send({type:'kiosk_owners'}); const owners = await b.next('kiosk_owners');
   assert.equal(owners.complete,true); assert.deepStrictEqual(owners.owners,[{id:3,name:'Tester'}]); assert(!JSON.stringify(owners).includes('987654'));
   b.send({type:'account_save', state, revision:0}); assert.equal((await b.next('account_saved')).error, 'conflict');
   const admin = async (action, opts = {}) => (await fetch(`http://127.0.0.1:${port}/admin/action`, { method:'POST', headers:{'Content-Type':'application/json', 'x-admin-token':'test-admin-token'}, body: JSON.stringify({action, name:'Tester', ...opts}) })).json();
+  // Повтор подтверждения не должен перезаписывать баланс, изменённый администратором после сохранения.
+  const rp = await auth('ReplayUser','register','replay-user-password'); await rp.next('login_success');
+  const rid = 'replay-after-admin-00001', rs = {money:8000,kiosks:[],vehicles:[],properties:[]};
+  rp.send({type:'account_save',state:rs,revision:0,saveId:rid}); assert((await rp.next('account_saved')).ok);
+  assert((await admin('money_set_1m',{name:'ReplayUser'})).ok); await rp.next('adm');
+  rp.send({type:'account_save',state:rs,revision:0,saveId:rid}); assert((await rp.next('account_saved')).replay);
+  const rp2 = await auth('replayuser','login','replay-user-password'); const rpLogin=await rp2.next('login_success');
+  assert.equal(rpLogin.player.money,1000000); assert.equal(rpLogin.accountState.money,8000); rp2.ws.close();
   let r = await admin('mute', {minutes:30}); assert(r.ok); b.send({type:'chat',text:'привет'}); assert.match((await b.next('chat')).text, /запрещён/);
   b.send({type:'chat',text:'§LGMдействие'}); assert.match((await b.next('chat')).text, /запрещён/);
   r = await admin('warn', {minutes:30}); assert(r.ok);
@@ -68,6 +83,7 @@ async function auth(name, mode, password, backup) { const c = client(); assert.e
   let banned = await auth('Tester', 'login', 'primary-password'); assert.equal((await banned.next('error')).code, 'banned'); banned.ws.close();
   const db2 = new Database(db); db2.prepare('UPDATE players SET banned_until = ? WHERE name = ?').run(Date.now()-1, 'Tester'); db2.close();
   b.ws.close(); await stop(); await start();
-  let c = await auth('tester', 'login', 'primary-password'); login = await c.next('login_success'); assert.deepStrictEqual(login.accountState, state); assert.equal(login.player.money, state.money); c.send({type:'kiosk_owners'}); assert.deepStrictEqual((await c.next('kiosk_owners')).owners,[{id:3,name:'Tester'}]); c.ws.close();
+  let c = await auth('tester', 'login', 'primary-password'); login = await c.next('login_success'); assert.deepStrictEqual(login.accountState, state); assert.equal(login.player.money, state.money); c.send({type:'account_save', state, revision:0, saveId}); const replay = await c.next('account_saved'); assert.equal(replay.replay,true); assert.equal(replay.saveId,saveId); assert.equal(replay.revision,1);
+  c.send({type:'kiosk_owners'}); assert.deepStrictEqual((await c.next('kiosk_owners')).owners,[{id:3,name:'Tester'}]); c.ws.close();
   await stop(); fs.rmSync(dir, { recursive:true, force:true }); console.log('✓ аккаунты и прогресс; мут, варн, бан и истечение срока после перезапуска');
 })().catch(e => { console.error(e); if (proc) proc.kill(); process.exitCode = 1; });

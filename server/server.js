@@ -1240,7 +1240,7 @@ wss.on('connection', (ws) => {
       me = row; active.set(row.id, { ws, row }); ws.playerId = row.id;
       if (normalizeLogin(row.name) === 'kitty_kittys') ws.adminSession = crypto.randomBytes(32).toString('hex');
       console.log(`[login] ${row.name} вошёл (онлайн: ${active.size})`);
-      send(ws, { type: 'login_success', accountState: account.state, accountRevision: account.revision, accountSaveId: account.saveId, adminSession: ws.adminSession || undefined, caps: { state: 1, peds: 1, adm: 1, relay: 1, accounts: 1 }, player: {
+      send(ws, { type: 'login_success', accountState: account.state, accountRevision: account.revision, accountSaveId: account.saveId, adminSession: ws.adminSession || undefined, caps: { state: 1, peds: 1, adm: 1, relay: 1, accounts: 1, saveIds: 1 }, player: {
         id: row.id, name: row.name, gender: row.gender, money: row.money,
         x: row.pos_x, z: row.pos_z, rot: row.pos_rot, number: row.car_number, carNumber: row.car_number,
       } });
@@ -1269,14 +1269,14 @@ wss.on('connection', (ws) => {
 
     if (m.type === 'account_save') {
       const value = Number(m.state?.money);
-      if (!Number.isFinite(value)) return send(ws, { type: 'account_saved', ok: false, error: 'invalid' });
+      if (!Number.isFinite(value)) return send(ws, { type: 'account_saved', ok: false, error: 'invalid', saveId: m.saveId });
       const result = db.transaction(() => {
         const r = accounts.save(account.login, m.state, m.revision, m.saveId);
-        if (r.ok) { row.money = money(value); q.money.run(row.money, row.name); }
+        if (r.ok && !r.replay) { row.money = money(value); q.money.run(row.money, row.name); }
         return r;
       })();
       if (result.ok) { account.revision = result.revision; kioskOwnersCache = null; pushPlayers(); }
-      send(ws, { type: 'account_saved', ...result });
+      send(ws, { type: 'account_saved', ...result, saveId: m.saveId });
       return;
     }
 
