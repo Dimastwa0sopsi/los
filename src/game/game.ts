@@ -26,7 +26,7 @@ import { Radio } from './radio';
 import { allMaterials, disposeTextures, mat, GFX, getTex } from './textures';
 import { T, M } from './geom';
 import { LIMITED, limitedAvailable, CROPS, EMOTES, SCOOTER_RATE, HYDRO_PRICE, WEAPONS, WEAPON_ORDER, AMMO_NAMES, ITEMS, VEHICLES, TRAFFIC_TYPES, TRAFFIC_WEIGHTS, KIOSK_TYPES, KIOSK_PERIOD, KIOSK_MAX_PERIODS, SHOP_ITEMS, normalizePlate, randomPlate, type ShopKind, type Look, type Tuning, defaultTuning, TUNE_PRICES, TUNE_CATALOG, HAIR_STYLES, TOPS, BOTTOMS, BAR_DRINKS } from './data';
-import { type GameState, newState, loadState, saveState, type OwnedVehicle, marketOffers, sellPrice, repairCost, carValue, uid, type MarketOffer } from './state';
+import { type GameState, newState, loadState, saveState, migrate, type OwnedVehicle, marketOffers, sellPrice, repairCost, carValue, uid, type MarketOffer } from './state';
 
 export interface HudState {
   money: number; health: number; food: number; water: number; energy: number; wanted: number; time: string; night: boolean;
@@ -257,7 +257,7 @@ export class Game {
   discoOn = false;
   /** остаток «опьянения» в секундах: руль чуть плавает */
   buzzT = 0;
-  online = false; net: NetClient | null = null; remotes = new Map<number, Remote>();
+  online = false; private onlineInitialMoney: number | null = null; net: NetClient | null = null; remotes = new Map<number, Remote>();
   private netT = 0; private netMoveT = 0; private netN = 0; private lastSpeed = 0;
   sky: THREE.Mesh | null = null; stars: THREE.Points | null = null; clouds: THREE.Group | null = null; private skyMat: THREE.ShaderMaterial | null = null;
   minimap: HTMLCanvasElement | null = null; private miniT = 0;
@@ -4514,8 +4514,10 @@ export class Game {
     if (!this.state) return;
     // деньги онлайна берём только с сервера: локальный соло-кошелёк в онлайн не переносится,
     // а новый ник получает чистый стартовый капитал
-    if (typeof p.money === 'number' && isFinite(p.money)) {
-      const m = Math.max(0, Math.round(p.money));
+    if (first && typeof p.money === 'number' && isFinite(p.money)) {
+      const delta = this.onlineInitialMoney === null ? 0 : this.state.money - this.onlineInitialMoney;
+      const m = Math.max(0, Math.min(2147483647, Math.round(p.money + delta)));
+      this.onlineInitialMoney = null;
       if (m !== this.state.money) this.lastMoney = -1; // HUD покажет баланс с сервера без «+$»
       this.state.money = m;
       this.state.serverMoney = m;
@@ -4565,23 +4567,15 @@ export class Game {
     this.restorePosition();
     this.camera.position.set(this.px - Math.sin(this.camYaw) * 5, this.py + 3, this.pz - Math.cos(this.camYaw) * 5);
   }
-  enterOnline(nick: string, gender: 'm' | 'f', fresh = false, allowIntro = false) {
+  enterOnline(nick: string, gender: 'm' | 'f', _fresh = false, allowIntro = false, credentials?: { mode: 'login' | 'register'; password: string; backup?: string }) {
     if ((this.intro && !allowIntro) || this.online) return;
     const clean = nick.replace(/[^\p{L}\p{N} _\-.]/gu, '').trim().slice(0, 16);
     if (clean.length < 2) { this.toast('Ник должен быть от 2 до 16 символов'); return; }
-    let st = fresh ? null : loadState(true, clean);
-    if (!st) st = newState(gender, this.L.playerSpawn);
-    st.nick = clean;
+    if (!credentials) { this.openPanel({ type: 'onlineJoin' }); return; }
+    if (this.net) { this.toast('Подключение уже выполняется'); return; }
     try { localStorage.setItem('losgorod_nick', clean); } catch { /* */ }
-    // появление дома, если есть жильё
-    const home = st.spawnHome && st.properties.includes(st.spawnHome) ? st.spawnHome : st.properties[0];
-    if (home) { const [hb, hu] = home.split(':').map(Number); const bd = this.L.buildings[hb]; if (bd) st.location = bd.kind === 'apartment' ? { b: hb, unit: hu } : { b: hb }; }
-    this.swapState(st, true);
-    st.money = 0;                        // до ответа сервера баланс неизвестен — не показываем локальный
-    saveState(st, true, clean);
-    this.net = new NetClient(clean, gender);
+    this.net = new NetClient(clean, gender, undefined, credentials);
     this.net.onEvent = (from, ev) => this.handleNetEvent(from, ev);
-    this.peds.onlineMode = false; this.removeQuestPeds();
     this.net.onChange = null;
     this.net.onNews = (nm, txt) => this.toast(`📰 СМИ · ${nm}: ${txt}`);
     // объявления на щитах общие: сервер держит их и рассылает всем
@@ -4611,7 +4605,23 @@ export class Game {
       }
     };
     // {type:'login_success', player:{...}} — деньги и координаты приходят с сервера
-    this.net.onLogin = (p, first) => this.applyServerPlayer(p, first);
+    this.net.onLogin = (p, first, remoteState) => {
+      if (!first) return;
+      let st: GameState | null = null;
+      if (remoteState !== null && remoteState !== undefined) {
+        try { st = migrate(remoteState as Partial<GameState>); } catch { /* damaged save: never overwrite it */ }
+        if (!st) { this.cb.onNetError?.('Серверное сохранение повреждено; оно не перезаписано'); this.net?.close(); return; }
+      } else st = newState(p.gender === 'f' ? 'f' : 'm', this.L.playerSpawn);
+      st.nick = p.name || clean;
+      if (typeof p.money === 'number' && Number.isFinite(p.money)) { st.money = p.money; st.serverMoney = p.money; }
+      this.peds.onlineMode = false; this.removeQuestPeds();
+      this.swapState(st, true);
+      this.net!.money = st.money;
+      this.save();
+      if (!st.customized) setTimeout(() => { if (this.online && !this.intro) this.openEditor(true); }, 300);
+      this.toast(`🌐 Онлайн: ${st.nick}. Прогресс сохраняется на сервере`);
+    };
+    this.net.onSaveError = text => { this.sound.error(); this.cb.onNetError?.(text); };
     // команды из админ-панели Colab: мгновенный телепорт
     // админ-панель (100 кнопок в Colab): команды приходят как {type:'adm', act}
     this.net.onAdmin = (act, m) => {
@@ -4626,7 +4636,7 @@ export class Game {
       }
       if (act === 'money') {
         const v = Number(m.money);
-        if (isFinite(v)) { this.state.money = Math.max(0, Math.round(v)); this.toast(`💵 Баланс: $${this.state.money.toLocaleString('ru-RU')}`); this.sound.coin(); }
+        if (m.reason === 'admin' && isFinite(v)) { this.state.money = Math.max(0, Math.round(v)); this.lastMoney = -1; this.save(); this.toast(`💵 Администратор изменил баланс: $${this.state.money.toLocaleString('ru-RU')}`); this.sound.coin(); }
         return;
       }
       if (act === 'heal') { this.state.health = 100; this.state.energy = Math.max(this.state.energy, 60); this.toast('❤️ Администратор вылечил вас'); return; }
@@ -4683,15 +4693,23 @@ export class Game {
     this.net.onPeds = (from, list, vehs) => { if (this.remotes.get(from)?.ikey === '' || !this.remotes.has(from)) { this.peds.applySnapshot(from, list); this.applyCarSnapshot(from, vehs); } };
     this.net.connect();
     setTimeout(() => this.reportInventory(), 2500);
-    if (!st.customized) setTimeout(() => { if (!this.intro) this.openEditor(true); }, 300);
-    this.toast(`🌐 Онлайн: ${clean}. Отдельный прогресс сохраняется. Ё — вернуться в одиночную игру`);
+    this.toast('🌐 Подключение к серверу…');
     this.sound.coin();
   }
-  leaveOnline() {
+  async leaveOnline() {
     if (!this.online) return;
+    this.save();
+    const net = this.net;
+    if (net && !net.accountSaved) {
+      this.toast('Сохраняем прогресс на сервере…');
+      const until = Date.now() + 5000;
+      while (!net.accountSaved && this.net === net && Date.now() < until) await new Promise(resolve => setTimeout(resolve, 100));
+      if (!net.accountSaved) { this.toast('Нет подтверждения сохранения. Проверьте соединение и попробуйте снова'); return; }
+    }
+    if (!this.online || this.net !== net) return;
     this.admFreeze = false;
     if (this.rideRemote) this.exitRemoteRide(true);
-    this.net?.close(); this.net = null; this.pendingBuy = null; this.socialInvite = null; this.socialSent = null;
+    this.net?.close(); this.net = null; this.onlineInitialMoney = null; this.pendingBuy = null; this.socialInvite = null; this.socialSent = null;
     for (const r of this.remotes.values()) this.disposeRemote(r);
     this.remotes.clear(); this.peds.clearPuppets(); this.removeCarPuppets(); this.peds.onlineMode = false; this.trade = null; this.tradeInvite = null;
     const solo = loadState(false) ?? newState(this.state.look.gender, this.L.playerSpawn);
@@ -4701,7 +4719,7 @@ export class Game {
   }
   /** сервер отвалился: продолжаем играть офлайн, ничего не теряя */
   fallbackOffline() {
-    if (this.online) { this.leaveOnline(); this.input.enabled = true; this.input.releaseAll(); return; }
+    if (this.online) { void this.leaveOnline(); this.input.enabled = true; this.input.releaseAll(); return; }
     this.net?.close(); this.net = null;
     this.input.enabled = true; this.input.releaseAll();
     this.toast('🎮 Сервер недоступен — продолжаем в одиночной игре');
@@ -4782,7 +4800,7 @@ export class Game {
     const net = this.net; if (!net) return;
     this.netT += dt; this.netMoveT += dt;
     net.setMoney(this.state.money);
-    net.sendSave(this.state.money);
+    // Баланс сохраняется вместе с полным снимком аккаунта.
     const v = this.inVeh;
     const rr = this.rideRemote ? this.remotes.get(this.rideRemote.id) : null;
     const host = v ?? rr?.veh ?? null;
@@ -5321,7 +5339,7 @@ export class Game {
     if (u >= 1) this.endIntro();
   }
   skipIntro() { if (this.intro) this.endIntro(); }
-  private endIntro() { this.intro = null; this.camYaw = this.pa; this.cb.onIntroEnd(); this.sound.ensure(); if (!this.state.customized && !this.state.location) setTimeout(() => this.openEditor(true), 200); }
+  private endIntro() { this.intro = null; this.camYaw = this.pa; this.cb.onIntroEnd(); this.sound.ensure(); if (!this.state.customized && !this.state.location) setTimeout(() => { if (!this.panel) this.openEditor(true); }, 200); }
   // ================= HUD =================
   private emitHud(dt: number) {
     this.hudT += dt; if (this.hudT < 0.12) return;
@@ -5418,6 +5436,7 @@ export class Game {
     if (!this.interior) { const p = this.playerWorldPos(); s.pos = { x: p.x, z: p.z, a: p.a }; }
     for (const v of this.vehicles) if (v.owned) { v.owned.pos = { x: v.x, z: v.z, a: v.heading }; v.owned.condition = v.condition; v.owned.fuel = v.fuel; v.owned.mileage = Math.round(v.mileage); v.owned.missing = v.model.missingParts(); }
     saveState(s, this.online, s.nick);
+    if (this.online) this.net?.saveAccount(s);
   }
   getState() { return this.state; }
   ownedVehicleNear(uidv: string) { return this.vehicles.find((v) => v.owned?.uid === uidv) ?? null; }

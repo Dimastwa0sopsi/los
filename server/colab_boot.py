@@ -8,9 +8,9 @@ import base64
 import json
 import urllib.request
 
-REPO = 'Dimastwa0sopsi/File'
+REPO = 'Dimastwa0sopsi/los'
 PATH = 'server/colab_cell.py'
-BRANCHES = ['arena/bbf0a881-file', 'main']      # первый доступный побеждает
+BRANCHES = ['main']      # первый доступный побеждает
 API = 'https://api.github.com/repos/{repo}/contents/{path}?ref={ref}'
 MIRRORS = [
     'https://cdn.jsdelivr.net/gh/{repo}@{ref}/{path}',

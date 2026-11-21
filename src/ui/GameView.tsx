@@ -55,10 +55,9 @@ export function GameView({ settings, newGame, gender, nick = '', mode = 'solo', 
       onReady: () => {
         if (!alive) return;
         setPhase('intro');
-        // онлайн из стартового окна: продолжаем онлайн-сохранение, если оно есть
-        if (mode === 'online' && inst) inst.enterOnline(nick, gender, !inst.onlineInfo().exists, true);
+
       },
-      onIntroEnd: () => alive && setPhase('play'),
+      onIntroEnd: () => { if (alive) { setPhase('play'); if (mode === 'online' && inst) inst.openPanel({ type: 'onlineJoin' }); } },
       onError: (e) => { if (alive) { setError(e); setPhase('error'); } },
       // {type:'error'} с сервера (бан) или недоступный сервер — модальное окно поверх игры
       onNetError: (text) => {
@@ -121,7 +120,7 @@ export function GameView({ settings, newGame, gender, nick = '', mode = 'solo', 
           onLaunch={(l) => {
             close();
             if (l.mode === 'solo') { if (game.online) game.leaveOnline(); return; }
-            game.enterOnline(l.nick, l.gender, !game.onlineInfo().exists);
+            game.enterOnline(l.nick, l.gender, false, false, l.credentials);
           }} />
       )}
       {game && panel && panel.type === 'radio' && <RadioPanel g={game} close={close} />}

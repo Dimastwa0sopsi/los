@@ -1,6 +1,7 @@
 // Генерация раскладки мира (чистые данные, без Three.js) — проверяемо в node
 import { N, CELL, ROAD_W, SIDEWALK, CITY_SIZE, RNG, WORLD_SEED, assertBlock, inGrid, segDist, clamp } from './config';
 import { KIOSK_TYPES, VILLAGE_NAMES } from './data';
+import { SOSNOVKA_DZ, inOldSosnovka } from './sosnovka';
 
 export type RoadKind = 'city' | 'avenue' | 'highway' | 'village' | 'dirt' | 'industrial';
 export const AVENUE_J = 9; // главное шоссе — улица z = 9 * CELL
@@ -293,7 +294,7 @@ export function generateLayout(): WorldLayout {
     if (bd.fenced) return;
     bd.fenced = true;
     const dx0 = bd.door.x - bd.x, dz0 = bd.door.z - bd.z;
-    const extra = bd.kind === 'vhouse' ? 6 : 0;
+    const extra = bd.kind === 'vhouse' ? (bd.village === 'Егоровка' ? 10 : 9) : 0;
     const x0 = bd.x - bd.w / 2 - pad - (dx0 > Math.abs(dz0) ? extra : 0), x1 = bd.x + bd.w / 2 + pad + (-dx0 > Math.abs(dz0) ? extra : 0);
     const z0 = bd.z - bd.d / 2 - pad - (dz0 > Math.abs(dx0) ? extra : 0), z1 = bd.z + bd.d / 2 + pad + (-dz0 > Math.abs(dx0) ? extra : 0);
     const gate = 4.4;                        // ширина ворот: во двор заезжает машина
@@ -1993,6 +1994,29 @@ export function generateLayout(): WorldLayout {
   });
   for (const [x, z] of [...[310, 320, 330, 340, 350, 360, 370].map(x => [x, -141]), ...[908, 918, 928, 938, 948].map(x => [x, 1534])]) {
     clearVegetation(x, z, 9, 12); addGarage(x, z, 24000);
+  }
+
+  // Сосновка отодвинута от городской границы на 40 м. Переносим только
+  // северную сельскую зону: ID зданий и гаражей и связи дорожного графа прежние.
+  // Крайний узел дороги к городу остаётся на месте, поэтому подъезд удлиняется.
+  {
+    const dz = SOSNOVKA_DZ;
+    const inVillageZone = inOldSosnovka;
+    for (const n of nodes) if (n.gi === undefined && inVillageZone(n.x, n.z)) n.z += dz;
+    for (const b of buildings) if (inVillageZone(b.x, b.z)) {
+      b.z += dz; b.door.z += dz;
+      for (const bed of b.beds ?? []) bed.z += dz;
+    }
+    for (const p of props) if (inVillageZone(p.x, p.z)) p.z += dz;
+    for (const c of colliders) if (inVillageZone((c.x0 + c.x1) / 2, (c.z0 + c.z1) / 2)) { c.z0 += dz; c.z1 += dz; }
+    for (const g of garages) if (inVillageZone(g.x, g.z)) { g.z += dz; g.gateZ += dz; }
+    for (const o of [...staticVehicles, ...parked, ...parkedLot, ...scooterDocks, ...truckDests]) if (inVillageZone(o.x, o.z)) o.z += dz;
+    const v = villages.find(v => v.name === 'Сосновка');
+    if (v) { v.sz += dz; v.ez += dz; v.signZ += dz; v.cz += dz; }
+    // roadSegments используется проверками препятствий, навигацией и рендерером.
+    edges.forEach((e, i) => { Object.assign(roadSegments[i], { ax: nodes[e.a].x, az: nodes[e.a].z, bx: nodes[e.b].x, bz: nodes[e.b].z }); });
+    // На новом месте не оставляем старые лесные деревья внутри домов и бань.
+    for (const b of buildings) if (b.village === 'Сосновка') clearVegetation(b.x, b.z, b.w + 5, b.d + 5);
   }
 
   // Дополнительные леса отдельным генератором: он не меняет расположение

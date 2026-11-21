@@ -777,7 +777,8 @@ export function mat(key: string): THREE.Material {
     m = GFX.pbr && !k.includes('dirt')
       ? new THREE.MeshStandardMaterial({ map: getTex(k), roughness: 0.94, metalness: 0.02, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 })
       : L({ map: getTex(k), polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
-  } else if (key === 'zebra') m = L({ map: getTex('zebra'), transparent: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, depthWrite: false });
+  } else if (key === 'foam') m = L({ map: getTex('foam'), transparent: true, depthWrite: false });
+  else if (key === 'zebra') m = L({ map: getTex('zebra'), transparent: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, depthWrite: false });
   else if (key === 'poolWater') m = GFX.pbr
     ? new THREE.MeshStandardMaterial({ map: getTex('water'), color: 0x7fd4e8, transparent: true, opacity: 0.28, metalness: 0.25, roughness: 0.18, depthWrite: false })
     : new THREE.MeshPhongMaterial({ map: getTex('water'), color: 0x8ad7e8, transparent: true, opacity: 0.3, shininess: 90, depthWrite: false });

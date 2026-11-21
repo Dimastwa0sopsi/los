@@ -1,4 +1,5 @@
 // Состояние игры, экономика, сохранение с версионированием и миграцией
+import { SOSNOVKA_DZ, inOldSosnovka } from './sosnovka';
 import { SAVE_KEY, SAVE_KEY_ONLINE, SAVE_VERSION, START_MONEY, RNG } from './config';
 import { type Look, type Tuning, defaultLook, defaultTuning, VEHICLES, SELLER_NAMES } from './data';
 
@@ -44,12 +45,14 @@ export interface GameState {
   raceBest?: number;
   /** купленная одежда: переодеваться можно где угодно через инвентарь */
   wardrobe?: string[];
+  /** Позиции перенесены при смещении Сосновки (один раз). */
+  sosnovkaShifted?: boolean;
 }
 export function newState(gender: 'm' | 'f', spawn: { x: number; z: number; a: number }): GameState {
   return {
     version: SAVE_VERSION, money: START_MONEY, health: 100, food: 80, water: 80, energy: 90, look: defaultLook(gender),
     inventory: { water: 2, sandwich: 1 }, ammo: 0, properties: [], fridges: {}, garages: [], vehicles: [], kiosks: [],
-    promoUsed: false, wanted: 0, pos: { ...spawn }, location: null, gameTime: 9 * 60, playTime: 0, lastCar: null, created: true,
+    sosnovkaShifted: true, promoUsed: false, wanted: 0, pos: { ...spawn }, location: null, gameTime: 9 * 60, playTime: 0, lastCar: null, created: true,
   };
 }
 /** ключ онлайн-сохранения конкретного ника: у каждого ника в онлайне свой прогресс */
@@ -107,7 +110,7 @@ export function loadState(online = false, nick?: string | null): GameState | nul
   } catch { return null; }
 }
 /** безопасная миграция: недостающие поля заполняются, старые позиции сбрасываются */
-function migrate(s: Partial<GameState>): GameState | null {
+export function migrate(s: Partial<GameState>): GameState | null {
   if (!s || typeof s !== 'object') return null;
   const base = newState(s.look?.gender === 'f' ? 'f' : 'm', s.pos ?? { x: 516, z: 491.5, a: Math.PI });
   const out: GameState = { ...base, ...s } as GameState;
@@ -123,6 +126,12 @@ function migrate(s: Partial<GameState>): GameState | null {
   if (!Array.isArray(out.promos)) out.promos = s.promoUsed ? ['8585'] : [];
   // в городе нет ни штрафов, ни камер: старые сохранения чистим
   delete (out as unknown as Record<string, unknown>).fines;
+  if (!s.sosnovkaShifted) {
+    if (out.pos && inOldSosnovka(out.pos.x, out.pos.z)) out.pos = { ...out.pos, z: out.pos.z + SOSNOVKA_DZ };
+    out.vehicles = (out.vehicles ?? []).map(v => v.pos && inOldSosnovka(v.pos.x, v.pos.z)
+      ? { ...v, pos: { ...v.pos, z: v.pos.z + SOSNOVKA_DZ } } : v);
+  }
+  out.sosnovkaShifted = true;
   out.version = SAVE_VERSION;
   out.inventory = out.inventory ?? {};
   out.fridges = out.fridges ?? {};

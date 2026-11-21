@@ -1,0 +1,15 @@
+import { visibleRoadIntervals, type SurfaceSegment } from '../src/game/roadSurface';
+import { generateLayout } from '../src/game/worldgen';
+const assert = (ok: unknown, text: string) => { if (!ok) throw new Error(text); console.log('✓ ' + text); };
+const seg = (ax: number, az: number, bx: number, bz: number, kind: SurfaceSegment['kind']): SurfaceSegment => ({ ax, az, bx, bz, kind });
+let s = [seg(0, 0, 100, 0, 'village'), seg(20, 0, 70, 0, 'dirt')];
+assert(visibleRoadIntervals(s, 1).length === 0, 'грунт не рисуется поверх асфальта');
+s = [seg(0, 0, 100, 0, 'city'), seg(50, 0, 150, 0, 'village')];
+assert(JSON.stringify(visibleRoadIntervals(s, 1)) === JSON.stringify([[0.5, 1]]), 'частичное наложение обрезается');
+s = [seg(0, 0, 100, 0, 'city'), seg(50, -50, 50, 50, 'village')];
+assert(JSON.stringify(visibleRoadIntervals(s, 1)) === JSON.stringify([[0, 1]]), 'поперечный перекрёсток остаётся целым');
+s = [seg(0, 0, 100, 0, 'village'), seg(70, 0, 20, 0, 'village')];
+assert(visibleRoadIntervals(s, 1).length === 0, 'дубликат в обратном направлении скрыт');
+const L = generateLayout();
+const overlapping = L.roadSegments.filter((_, i) => { const v = visibleRoadIntervals(L.roadSegments, i); return v.length !== 1 || v[0][0] !== 0 || v[0][1] !== 1; });
+assert(overlapping.length >= 4, 'найдены и подрезаны реальные наложения на карте');
