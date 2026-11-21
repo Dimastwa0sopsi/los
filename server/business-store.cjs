@@ -74,10 +74,10 @@ function createBusinessStore(db, catalogue) {
       if (existing?.owner) fail('owned');
       if (account.state.money < info.price) fail('insufficient_funds');
       account.state.money -= info.price;
-      if (existing) db.prepare('UPDATE business_registry SET owner=? WHERE business_id=?').run(actor,id);
+      if (existing) db.prepare('UPDATE business_registry SET owner=?,stock=? WHERE business_id=?').run(actor,CAPACITY,id);
       else db.prepare('INSERT INTO business_registry VALUES (?,?,?)').run(id,actor,CAPACITY);
       save(account);
-      return { id, owner:actor, stock:existing?.stock ?? CAPACITY, revision:account.row.revision+1 };
+      return { id, owner:actor, stock:CAPACITY, revision:account.row.revision+1 };
     }))();
   }
   function buyItem(name, revision, id, item, quantity, requestId) {
@@ -87,8 +87,8 @@ function createBusinessStore(db, catalogue) {
       if (typeof item !== 'string' || ['__proto__','constructor','prototype'].includes(item) || !/^[a-zA-Z0-9_-]{1,64}$/.test(item) || !Object.hasOwn(info.items,item)) fail('invalid_item');
       const price = info.items[item];
       if (!Number.isSafeInteger(price) || price <= 0 || price > MAX_MONEY || !Number.isSafeInteger(quantity) || quantity < 1 || quantity > CAPACITY) fail('invalid_item');
-      const stock = business?.stock ?? CAPACITY;
-      if (stock < quantity) fail('out_of_stock');
+      const stock = business?.owner ? business.stock : null;
+      if (stock !== null && stock < quantity) fail('out_of_stock');
       const buyer = load(actor,revision), total = price * quantity;
       if (!Number.isSafeInteger(total) || buyer.state.money < total) fail('insufficient_funds');
       if (!buyer.state.inventory || typeof buyer.state.inventory !== 'object' || Array.isArray(buyer.state.inventory)) fail('invalid_inventory');
@@ -98,9 +98,8 @@ function createBusinessStore(db, catalogue) {
       if (business?.owner === actor) buyer.state.money += total;
       else if (business?.owner) { const owner = load(business.owner); owner.state.money += total; save(owner); }
       save(buyer);
-      if (!business) db.prepare('INSERT INTO business_registry VALUES (?,NULL,?)').run(id,stock);
-      db.prepare('UPDATE business_registry SET stock=stock-? WHERE business_id=?').run(quantity,id);
-      return { id,item,quantity,stock:stock-quantity,revision:buyer.row.revision+1 };
+      if (stock !== null) db.prepare('UPDATE business_registry SET stock=stock-? WHERE business_id=?').run(quantity,id);
+      return { id,item,quantity,stock:stock === null ? null : stock-quantity,revision:buyer.row.revision+1 };
     }))();
   }
   function order(name, revision, id, quantity, requestId, now = Date.now()) {
@@ -157,7 +156,7 @@ function createBusinessStore(db, catalogue) {
       return {id:orderId,refund,revision:owner.row.revision+1};
     }))();
   }
-  function get(id) { def(id); const b = getBusiness.get(id); return b ? { id,owner:b.owner,stock:b.stock } : {id,owner:null,stock:CAPACITY}; }
+  function get(id) { def(id); const b = getBusiness.get(id); return b?.owner ? { id,owner:b.owner,stock:b.stock } : {id,owner:null,stock:null}; }
   function openOrders(now = Date.now(), limit = 100) {
     if (!Number.isSafeInteger(now) || now < 0 || !Number.isSafeInteger(limit) || limit < 1 || limit > 100) fail('invalid_order');
     return db.prepare("SELECT id,business_id AS businessId,quantity,fee FROM business_deliveries WHERE status='open' OR (status='claimed' AND lease_until<=?) ORDER BY id LIMIT ?").all(now,limit);

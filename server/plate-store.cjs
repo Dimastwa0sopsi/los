@@ -6,6 +6,13 @@ const { normalizeLogin, MAX_STATE_BYTES } = require('./account-store.cjs');
 const { createRevisionHistory } = require('./account-revisions.cjs');
 const PRICE = 5000;
 const LETTERS = 'АВЕКМНОРСТУХ';
+// Латинские похожие буквы и пробелы не должны обходить уникальный индекс.
+function canonicalPlate(value) {
+  if (typeof value !== 'string' || value.length > 32) return null;
+  const s = value.toUpperCase().replace(/\s+/g, '').replace(/[ABEKMHOPCTYX]/g, c => LETTERS['ABEKMHOPCTYX'.indexOf(c)]);
+  return /^[АВЕКМНОРСТУХ]\d{3}[АВЕКМНОРСТУХ]{2}\d{2}$/.test(s) ? s : null;
+}
+function displayPlate(value) { return `${value.slice(0,6)} ${value.slice(6)}`; }
 function plate() { return `${LETTERS[randomInt(12)]}${String(randomInt(1000)).padStart(3, '0')}${LETTERS[randomInt(12)]}${LETTERS[randomInt(12)]}${String(randomInt(1,100)).padStart(2,'0')}`; }
 function fail(code) { const e = new Error(code); e.code = code; throw e; }
 function createPlateStore(db, generator = plate) {
@@ -26,7 +33,7 @@ function createPlateStore(db, generator = plate) {
     const key = normalizeLogin(name);
     if (!key || typeof uid !== 'string' || !uid || uid.length > 128 || typeof requestId !== 'string' || !/^[a-zA-Z0-9-]{16,80}$/.test(requestId)) fail('invalid');
     const prev = byRequest.get(key, requestId);
-    if (prev) { if (prev.vehicle_uid !== uid) fail('request_reused'); return { number: prev.number, revision: prev.revision, replay: true }; }
+    if (prev) { if (prev.vehicle_uid !== uid) fail('request_reused'); return { number: displayPlate(prev.number), revision: prev.revision, replay: true }; }
     if (!Number.isSafeInteger(revision) || revision < 0) fail('invalid');
     const row = account.get(key); if (!row || !row.state_json) fail('no_account_state');
     if (row.revision !== revision) fail('conflict');
@@ -38,21 +45,21 @@ function createPlateStore(db, generator = plate) {
     let num = '';
     // Предыдущий номер остаётся занят до выбора нового и не может выпасть вновь.
     for (let i = 0; i < 100; i++) {
-      const candidate = generator();
-      if (!/^[АВЕКМНОРСТУХ]\d{3}[АВЕКМНОРСТУХ]{2}\d{2}$/.test(candidate)) fail('invalid_generator');
+      const candidate = canonicalPlate(generator());
+      if (!candidate) fail('invalid_generator');
       if (!exists.get(candidate)) { num = candidate; break; }
     }
     if (!num) fail('no_numbers');
     deleteOld.run(key, uid); insert.run(num, key, uid, now);
     state.money -= PRICE;
-    Object.assign(cars[0].tuning, { plate: num, plateFront: true, plateBack: true });
+    Object.assign(cars[0].tuning, { plate: displayPlate(num), plateFront: true, plateBack: true });
     const json = JSON.stringify(state); if (Buffer.byteLength(json, 'utf8') > MAX_STATE_BYTES) fail('state_too_large');
     if (!update.run(json, key, revision).changes) fail('conflict');
     history.record(key, revision, row.state_json);
     history.record(key, revision + 1, json);
     db.prepare('INSERT INTO plate_requests VALUES (?,?,?,?,?)').run(key, requestId, uid, num, revision + 1);
-    return { number: num, revision: revision + 1, replay: false };
+    return { number: displayPlate(num), revision: revision + 1, replay: false };
   });
-  return { issue: (name, revision, uid, requestId, now = Date.now()) => issue(name, revision, uid, requestId, now), get: number => db.prepare('SELECT * FROM plate_registrations WHERE number=?').get(number) };
+  return { issue: (name, revision, uid, requestId, now = Date.now()) => issue(name, revision, uid, requestId, now), get: number => { const key = canonicalPlate(number); return key ? db.prepare('SELECT * FROM plate_registrations WHERE number=?').get(key) : undefined; } };
 }
-module.exports = { createPlateStore, PRICE };
+module.exports = { createPlateStore, PRICE, canonicalPlate, displayPlate };

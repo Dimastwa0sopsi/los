@@ -5,7 +5,7 @@ const Database = require('better-sqlite3');
 const {createAccountStore} = require('../server/account-store.cjs');
 const {createBusinessStore,LEASE_MS} = require('../server/business-store.cjs');
 const dir = fs.mkdtempSync(path.join(os.tmpdir(),'los-business-')), file = path.join(dir,'game.db');
-const catalog = {'kiosk:0':{price:100000,items:{water:75,bread:100}},'building:2':{price:200000,items:{water:75}}};
+const catalog = {'kiosk:0':{price:100000,items:{water:75,bread:100}},'building:2':{price:200000,items:{water:75}},'building:3':{price:200000,items:{water:75}}};
 const req = n => `request-${String(n).padStart(16,'0')}`, pass = 'password-for-testing';
 (async () => {
   let db = new Database(file), accounts = createAccountStore(db), biz = createBusinessStore(db,catalog);
@@ -15,12 +15,12 @@ const req = n => `request-${String(n).padStart(16,'0')}`, pass = 'password-for-t
   }
   const snapshot = async n => await accounts.login(n,pass);
   const fails = (fn,code) => assert.throws(fn,e=>e.code===code);
-  assert.deepEqual(biz.get('kiosk:0'),{id:'kiosk:0',owner:null,stock:100});
-  // Purchases at an unowned shop go to the state, and its stock survives acquisition.
+  assert.deepEqual(biz.get('kiosk:0'),{id:'kiosk:0',owner:null,stock:null});
+  // Государственный магазин не расходует склад; при покупке появляется 100 товаров.
   const gov = biz.buyItem('other',1,'building:2','water',2,req(20));
-  assert.equal(gov.stock,98); assert.equal((await snapshot('other')).state.money,499850);
+  assert.equal(gov.stock,null); assert.equal((await snapshot('other')).state.money,499850);
   const acquired = biz.purchaseBusiness('other',2,'building:2',req(21));
-  assert.equal(acquired.stock,98); assert.equal(biz.get('building:2').owner,'other');
+  assert.equal(acquired.stock,100); assert.equal(biz.get('building:2').owner,'other');
   const own = biz.purchaseBusiness('owner',1,'kiosk:0',req(1));
   assert.equal(own.stock,100); assert.deepEqual(biz.purchaseBusiness('owner',1,'kiosk:0',req(1)),own);
   fails(()=>biz.purchaseBusiness('other',3,'kiosk:0',req(2)),'owned');
@@ -70,6 +70,24 @@ const req = n => `request-${String(n).padStart(16,'0')}`, pass = 'password-for-t
   assert.throws(()=>biz.buyItem('buyer',buyerBefore.revision,'kiosk:0','water',1,req(17)));
   assert.deepEqual((await snapshot('owner')).state,ownerBefore.state);
   assert.deepEqual((await snapshot('buyer')).state,buyerBefore.state); assert.equal(biz.get('kiosk:0').stock,stock);
+  // Полный сценарий: 100 аптечек, 20 товаров и доставка за $1000.
+  db.exec('DROP TRIGGER fail_business_history');
+  const customer = await snapshot('buyer');
+  const empty = biz.buyItem('buyer',customer.revision,'building:2','water',100,req(30));
+  assert.equal(empty.stock,0);
+  fails(()=>biz.buyItem('buyer',empty.revision,'building:2','water',1,req(31)),'out_of_stock');
+  const shopOwner = await snapshot('other');
+  const supply = biz.order('other',shopOwner.revision,'building:2',20,req(32),3000000);
+  assert.equal(supply.cost,21000); assert.equal(biz.get('building:2').stock,0);
+  const supplyClaim = biz.claim('driver',supply.id,req(33),3000001);
+  assert.equal(supplyClaim.fee,1000); assert.equal(supplyClaim.quantity,20);
+  const deliveredSupply = biz.complete('driver',1,supply.id,supplyClaim.token,req(34),3000002);
+  assert.equal(deliveredSupply.stock,20); assert.equal((await snapshot('driver')).state.money,501000);
+  assert.equal((await snapshot('other')).state.money,shopOwner.state.money-21000);
+  // При государственном владении повторные покупки не уменьшают товар.
+  const b0 = await snapshot('buyer'); const s1 = biz.buyItem('buyer',b0.revision,'building:3','water',100,req(35));
+  const s2 = biz.buyItem('buyer',s1.revision,'building:3','water',100,req(36));
+  assert.equal(s1.stock,null); assert.equal(s2.stock,null); assert.equal(biz.get('building:3').stock,null);
   db.close(); fs.rmSync(dir,{recursive:true,force:true});
   console.log('✓ экспериментальный бизнес: владение, склад, покупки, выручка, заказ, доставка, повтор, возврат и рестарт');
 })().catch(e=>{console.error(e);process.exitCode=1;});
