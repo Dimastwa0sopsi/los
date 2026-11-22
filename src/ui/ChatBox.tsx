@@ -20,12 +20,11 @@ export function ChatBox({ g, mobile, online }: { g: Game; mobile: boolean; onlin
   const send = () => { const t = text.trim(); if (t) { g.chatSubmit(t); hist.current.unshift(t); hist.current = hist.current.slice(0, 20); } close(); };
   const now = Date.now();
   const shown = open ? msgs.slice(-50) : msgs.filter((m) => now - m.t < 14000).slice(-6);
-  // на телефоне: закрытый чат — маленькая кнопка сверху слева (не задевает джойстик),
-  // открытый — панель у нижнего края, чтобы поле ввода и история не наезжали на джойстик
+  // Открытый чат занимает нижнюю часть экрана; вход — на панели управления.
   const style: React.CSSProperties | undefined = mobile
     ? open
       ? { top: 'auto', bottom: 'calc(8px + var(--safe-b))', left: 'calc(8px + var(--safe-l))', right: 'calc(8px + var(--safe-r))', width: 'auto', padding: 8, borderRadius: 16, background: 'rgba(10,12,18,.94)', border: '1px solid var(--line2)' }
-      : { top: 'calc(176px + var(--safe-t))', bottom: 'auto', left: 'calc(10px + var(--safe-l))', width: 'min(300px, 66vw)' }
+      : undefined
     : undefined;
   return (
     <div className={`chat ${open ? 'open' : ''} ${mobile ? 'mob' : ''}`} style={style}
@@ -57,8 +56,7 @@ export function ChatBox({ g, mobile, online }: { g: Game; mobile: boolean; onlin
           <button onPointerDown={(e) => { e.preventDefault(); send(); }}>➤</button>
           {mobile && <button className="x" onPointerDown={(e) => { e.preventDefault(); close(); }}>✕</button>}
         </div>
-      ) : mobile ? <button className="chat-open" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); openNow(); }}>💬</button>
-        : null}
+      ) : null}
     </div>
   );
 }
