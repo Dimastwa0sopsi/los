@@ -163,7 +163,7 @@ export function Hud({ g, hud, mobile }: { g: Game; hud: HudState; mobile: boolea
           <span>⛽ {Math.round(v.fuel)}%{v.lights ? ' · 💡' : ''}{v.autopilot ? ' · 🤖' : ''}</span>
         </div>
       )}
-      {v?.beltAvailable && <div className="hx-belt">{v.belt ? '🔒 Ремень пристёгнут' : 'Ремень: удерживайте K'}</div>}
+      {!mobile && v?.beltAvailable && <div className="hx-belt">{v.belt ? '🔒 Ремень пристёгнут' : 'Ремень: удерживайте K'}</div>}
       {v && !v.passenger && !mobile && <Speedo kmh={v.kmh} rpm={v.rpm} gear={v.gear} heli={v.heli} alt={v.alt} fuel={v.fuel} name={v.name} lights={v.lights} auto={v.autopilot} cruise={v.cruise} diag={v.diag} canHydro={v.canHydro} hydro={v.hydro} onHydro={() => { if (v.hydro >= 100) g.hydroDown(); else g.hydroUp(); }} onCruise={() => { g.cruise = g.cruise > 0 ? 0 : Math.max(4.5, Math.abs(v.kmh / 3.6)); g.toast(g.cruise > 0 ? `Круиз-контроль: ${Math.round(g.cruise * 3.6)} км/ч` : 'Круиз-контроль выключен'); }} />}
       {hud.trip > 0 && <div className="hx-trip" style={{ opacity: hud.trip * 0.55 }} />}
       {hud.emote && <div className="hx-emote">{hud.emote}</div>}

@@ -1,0 +1,17 @@
+import './domstub';
+import { strict as assert } from 'node:assert';
+import { Vehicle, playerDrive, damagedSpeedLimit } from '../src/game/vehicles';
+const col:any={pushCircle:()=>null,groundAt:()=>0};
+const input={throttle:1,brake:0,steer:0,handbrake:false,wheelie:false,up:0};
+const v=new Vehicle('eclipse','owned');
+v.model.tuning.turbo=3; v.model.tuning.engine=3;
+v.condition=0.1; v.speed=150;
+playerDrive(v,input,0.016,col,false,()=>false);
+assert(v.speed*3.6<=80.00001);
+for(let i=0;i<10000;i++) playerDrive(v,input,0.016,col,false,()=>false);
+assert(v.speed*3.6<=80.00001);
+v.condition=0.3; v.speed=150; playerDrive(v,input,0.016,col,false,()=>false); assert(v.speed*3.6<=120.00001);
+v.condition=1; assert.equal(damagedSpeedLimit(v),Infinity);
+const promo=new Vehicle('losx','owned');promo.condition=0.1;assert.equal(damagedSpeedLimit(promo),Infinity);
+const heli=new Vehicle('strekoza','owned');assert.equal(damagedSpeedLimit(heli),Infinity);
+console.log('✓ ограничение повреждённого двигателя, тюнинг и исключения');

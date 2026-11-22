@@ -17,7 +17,7 @@ import { availableInMode, auctionBoxes, setAuctionMode } from './auctionMode';
 import { EconomyBarrier, type EconomyRequest, type EconomyRecovery } from './economyBarrier';
 import { EconomyJournal } from './economyJournal';
 import { Character, type Pose } from './character';
-import { Vehicle, AIDriver, playerDrive, heliLanded, nearestNodeFast, trafficCrash, type AICtx, type DriveResult } from './vehicles';
+import { Vehicle, AIDriver, playerDrive, damagedSpeedLimit, heliLanded, nearestNodeFast, trafficCrash, type AICtx, type DriveResult } from './vehicles';
 import { PedSystem, randomLook, type Ped } from './npc';
 import { buildInterior, interiorForBuilding, type Interior, type InteriorKind, type InteriorSeat } from './interiors';
 import { Sound } from './audio';
@@ -1399,9 +1399,11 @@ export class Game {
     const wheelie = (I.down(K.wheelie) || I.vDown('wheelie')) && v.canStunt;
     let res: DriveResult = { impact: 0, nx: 0, nz: 0 };
     if (this.autopilot && v.ai) {
-      if (brake > 0.5 || Math.abs(steer) > 0.5) { this.setAutopilot(false); this.toast('Автопилот отключён'); }
+      if (brake > 0.5 || Math.abs(steer) > 0.5 || I.down(K.handbrake) || I.vDown('handbrake')) { this.setAutopilot(false); this.toast('Автопилот отключён'); }
       else {
-        v.ai.step(v, dt, this.aiCtx());
+        const speedLimit = damagedSpeedLimit(v);
+        v.speed = clamp(v.speed, -speedLimit, speedLimit);
+        v.ai.step(v, dt, this.aiCtx(), speedLimit);
         const p = { x: v.x, z: v.z }; const h = this.col.pushCircle(p, v.spec.wid * 0.55, v.y, 1.6, 0.55); if (h) { v.x = p.x; v.z = p.z; v.speed *= 0.5; }
         v.y += (this.col.groundAt(v.x, v.z, v.y, 0.6, 0.5) - v.y) * Math.min(1, dt * 10);
         v.model.animate(v.speed * dt, v.steer * 0.5); v.mileage += Math.abs(v.speed * dt);

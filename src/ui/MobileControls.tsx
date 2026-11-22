@@ -257,7 +257,7 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
     foot: padCfg.foot.filter((id) => known('foot', id)),
     drive: padCfg.drive.filter((id) => known('drive', id)),
     moreFoot: PAD_BUTTONS.filter((b) => b.group === 'foot' && !padCfg.foot.includes(b.id)).map((b) => b.id),
-    moreDrive: PAD_BUTTONS.filter((b) => b.group === 'drive' && !padCfg.drive.includes(b.id)).map((b) => b.id),
+    moreDrive: PAD_BUTTONS.filter((b) => b.group === 'drive' && b.id !== 'handbrake' && !padCfg.drive.includes(b.id)).map((b) => b.id),
   };
   const setPad = (grp: 'foot' | 'drive', id: string, on: boolean) => {
     const cur = [...(grp === 'foot' ? padIds.foot : padIds.drive)];
@@ -400,14 +400,20 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
               <div className={`mui-arc ${g.settings.padStyle === 'grid' ? 'grid2' : 'col'}`}>
                 {hud.gun && <Btn g={g} name="fire" ico="🔫" cls="main red" />}
                 {hud.gun && <Btn g={g} name="aim" ico="🎯" hold={false} cls="mini" active={hud.gun.aiming} />}
-                {padIds.drive.map((id) => (v.heli && ['handbrake', 'lights', 'horn', 'hazard', 'gearUp', 'gearDown'].includes(id) ? null : padBtn(g, id, hud, v)))}
+                {padIds.drive.filter((id) => id !== 'handbrake').map((id) => (v.heli && ['handbrake', 'lights', 'horn', 'hazard', 'gearUp', 'gearDown'].includes(id) ? null : padBtn(g, id, hud, v)))}
                 {padIds.moreDrive.length > 0 && (
                   <Btn g={g} ico="⋯" hold={false} cls={`mini ${tray === 'drive' ? 'on' : ''}`} onTap={() => setTray(tray === 'drive' ? null : 'drive')} label="Ещё кнопки" />
                 )}
               </div>
               <div className="mui-pedals">
-                <Btn g={g} name={v.heli ? 'up' : 'gas'} ico={v.heli ? '⬆' : 'ГАЗ'} sub={v.heli ? 'вверх' : undefined} cls="pedal green" />
-                <Btn g={g} name={v.heli ? 'down' : 'brake'} ico={v.heli ? '⬇' : 'ТОРМ'} cls="pedal red" />
+                {v.heli ? <>
+                  <Btn g={g} name="up" ico="⬆" sub="вверх" cls="pedal green" />
+                  <Btn g={g} name="down" ico="⬇" cls="pedal red" />
+                </> : <>
+                  <Btn g={g} name="handbrake" ico="🅿" sub="ручник" label="Ручник" cls="handbrake" />
+                  <Btn g={g} name="brake" ico="ТОРМ" label="Тормоз" cls="pedal red" />
+                  <Btn g={g} name="gas" ico="ГАЗ" label="Газ" cls="pedal green" />
+                </>}
               </div>
             </>
           )}
