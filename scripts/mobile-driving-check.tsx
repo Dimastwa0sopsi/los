@@ -10,12 +10,17 @@ Object.assign(document,{addEventListener:()=>{},hidden:false});
 Object.assign(globalThis,{localStorage:{getItem:()=>null,setItem:()=>{}}});
 const held=new Set<string>();
 const input:any={enabled:true,joy:{x:0,y:0},setV:(n:string,on:boolean)=>on?held.add(n):held.delete(n),tapV:()=>{},releaseAll:()=>{held.clear();input.joy.x=0;input.joy.y=0;}};
-const g:any={input,voice:{active:false},toggleVoice:()=>{},settings:{moveStyle:'joy',padStyle:'grid',hints:'off'}};
+const g:any={input,voice:{micOn:false},toggleVoice:()=>{g.voice.micOn=!g.voice.micOn;},settings:{moveStyle:'joy',padStyle:'grid',hints:'off'}};
 const hud:any={online:{status:'online'},vehicle:null,promptKeys:[],prompt:null,gun:null};
 const ev=(pointerId:number)=>({pointerId,preventDefault(){},stopPropagation(){}});
 (async()=>{
  let view!:TestRenderer.ReactTestRenderer;await act(async()=>{view=TestRenderer.create(<MobileControls g={g} hud={hud}/>)});
  const find=(label:string)=>view.root.findAllByType('button').find(x=>x.props['aria-label']===label);
+ assert(find('Включить микрофон'));
+ assert.equal(view.root.findByProps({className:'mui-mic-top'}).findAllByType('button').length,1);
+ await act(async()=>{find('Включить микрофон')!.props.onPointerDown(ev(20)); view.update(<MobileControls g={g} hud={hud}/>);});
+ assert(find('Выключить микрофон'));
+ await act(async()=>{find('Выключить микрофон')!.props.onPointerDown(ev(21)); view.update(<MobileControls g={g} hud={hud}/>);});
  assert(find('Включить микрофон'));
  hud.online=null; await act(async()=>view.update(<MobileControls g={g} hud={hud}/>)); assert(!find('Включить микрофон'));
  hud.online={status:'online'}; await act(async()=>view.update(<MobileControls g={g} hud={hud}/>));

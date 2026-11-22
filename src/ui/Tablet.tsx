@@ -265,6 +265,7 @@ function SettingsApp({ g, close }: { g: Game; close: () => void }) {
       </div>}
       {tab === 'sound' && <div className="lg-settings">
         <label>Громкость</label><Range k="volume" min={0} max={1} step={0.05} fmt={(v) => Math.round(v * 100) + '%'} />
+        <label>Громкость голосового чата</label><Range k="voiceVolume" min={0} max={1} step={0.05} fmt={(v) => Math.round(v * 100) + '%'} />
         <label>Звук</label><Seg k="muted" opts={[[false, 'Включён'], [true, 'Выключен']]} />
       </div>}
       {tab === 'game' && <div className="lg-settings">

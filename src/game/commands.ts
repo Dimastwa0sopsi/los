@@ -52,25 +52,20 @@ function myBiz(g: Game, arg: string) {
 }
 
 export const COMMANDS: Cmd[] = [
-  { name: 'voice', aliases: ['войс'], args: '[on/listen/off/status]', cat: 'world', desc: 'голос рядом: on — микрофон, listen — только слушать, off — выключить, status — состояние (только онлайн)', run: (g, arg) => {
+  { name: 'voice', aliases: ['войс'], args: '[on/off/status]', cat: 'world', desc: 'микрофон: on — включить, off — выключить, status — состояние (только онлайн)', run: (g, arg) => {
     const action = arg.toLowerCase();
     if (!g.online || !g.net?.ready) { say(g, 'Голос доступен только при подключении к онлайн-серверу'); return; }
     if (!g.net.voiceSupported) { say(g, 'Голос недоступен: сервер необходимо обновить'); return; }
-    if (!action || action === 'status' || action === 'статус') { say(g, `🎙 Голос: ${g.voice.starting ? 'ожидание разрешения' : g.voice.listeningOnly ? 'только слушать' : g.voice.active ? 'микрофон включён' : 'выключен'}. /voice on, /voice listen или /voice off`); return; }
+    if (!action || action === 'status' || action === 'статус') { say(g, `🎙 Микрофон: ${g.voice.starting ? 'ожидание разрешения' : g.voice.micOn ? 'включён' : 'выключен'}. Голос рядом слышен автоматически.`); return; }
     if (action === 'on' || action === 'вкл') {
-      if ((g.voice.active && !g.voice.listeningOnly) || g.voice.starting) { say(g, 'Микрофон уже включён или запрашивается'); return; }
+      if (g.voice.micOn || g.voice.starting) { say(g, 'Микрофон уже включён или запрашивается'); return; }
       g.toggleVoice(); say(g, 'Запрашиваем доступ к микрофону'); return;
     }
-    if (action === 'listen' || action === 'слушать') {
-      if (g.voice.listeningOnly) { g.voice.resumeAudio(); say(g, 'Прослушивание уже включено'); return; }
-      if (g.voice.active || g.voice.starting) g.voice.stop();
-      g.toggleVoiceListening(); return;
-    }
     if (action === 'off' || action === 'выкл') {
-      if (!g.voice.active && !g.voice.starting) { say(g, 'Микрофон уже выключен'); return; }
-      g.voice.stop(); say(g, 'Голос выключен'); return;
+      if (!g.voice.micOn && !g.voice.starting) { say(g, 'Микрофон уже выключен'); return; }
+      g.voice.stopMicrophone(); say(g, 'Микрофон выключен'); return;
     }
-    say(g, 'Использование: /voice on, /voice listen, /voice off, /voice status');
+    say(g, 'Использование: /voice on, /voice off, /voice status');
   } },
   // ---------- недвижимость ----------
   { name: 'sellhouse', aliases: ['sellhome'], args: '[номер]', cat: 'prop', desc: 'продать дом/квартиру государству за 60%', run: (g, a) => g.sellHome(a) },

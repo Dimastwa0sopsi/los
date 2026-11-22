@@ -271,18 +271,10 @@ export class Game {
   private economyLabInstalledId: string | null = null;
   voice = new NearbyVoice((id,signal)=>this.net?.sendVoice(id,signal), text=>this.toast(text));
   toggleVoice() {
-    if (this.voice.listeningOnly) this.voice.stop();
-    else if (this.voice.active || this.voice.starting) { this.voice.stop(); return; }
+    if (this.voice.micOn || this.voice.starting) { this.voice.stopMicrophone(); return; }
     if (!this.online || !this.net?.ready) { this.toast('Голос доступен только в онлайне'); return; }
     if (!this.net.voiceSupported) { this.toast('Для голосового чата необходимо обновить сервер'); return; }
     void this.voice.start();
-  }
-  toggleVoiceListening() {
-    if (this.voice.listeningOnly) { this.voice.resumeAudio(); return; }
-    if (this.voice.active || this.voice.starting) this.voice.stop();
-    if (!this.online || !this.net?.ready) { this.toast('Голос доступен только в онлайне'); return; }
-    if (!this.net.voiceSupported) { this.toast('Для голосового чата необходимо обновить сервер'); return; }
-    this.voice.startListening();
   }
   online = false; private onlineInitialMoney: number | null = null; net: NetClient | null = null; remotes = new Map<number, Remote>(); private remoteSmokeT = new Map<number, number>();
   private netT = 0; private netMoveT = 0; private netN = 0; private lastSpeed = 0;
@@ -391,7 +383,7 @@ export class Game {
     this.mapIdx = new MapIndex(this.L);
     P(0.98, 'Размещение игрока');
     this.restorePosition();
-    this.sound.setVolume(this.settings.volume, this.settings.muted);
+    this.sound.setVolume(this.settings.volume, this.settings.muted); this.voice.setVolume(this.settings.voiceVolume);
     P(1, 'Готово');
     this.setupQuest();
     this.intro = { t: 0, dur: this.state.location ? 0.01 : 9 };
@@ -480,7 +472,7 @@ export class Game {
     const shadowsChanged = s.shadows !== this.settings.shadows;
     this.settings = { ...s }; this.mobile = resolveMobile(s);
     if (this.input) { this.input.wantLock = !this.mobile; this.input.touchMode = this.mobile; }
-    this.applyRenderSettings(); this.sound.setVolume(s.volume, s.muted);
+    this.applyRenderSettings(); this.sound.setVolume(s.volume, s.muted); this.voice.setVolume(s.voiceVolume);
     this.trafficGoal = Math.round(s.traffic * (this.mobile ? 28 : 50));
     void shadowsChanged;
   }
@@ -4971,6 +4963,7 @@ export class Game {
   }
   private updateNet(dt: number) {
     const net = this.net; if (!net) return;
+    if (this.online && net.ready && net.voiceSupported && net.id !== null && !this.voice.active) this.voice.startListening();
     this.netT += dt; this.netMoveT += dt;
     net.setMoney(this.state.money);
     // Баланс сохраняется вместе с полным снимком аккаунта.
