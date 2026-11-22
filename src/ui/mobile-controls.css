@@ -105,3 +105,41 @@
 
 .mui .mui-tray-cell { align-items: center; justify-content: center; }
 .mui .mui-tray-cell .mui-btn { flex: none; }
+
+/* Низкая горизонтальная область (браузер на телефоне): HUD и управление
+   занимают разные зоны, чат открывается с верхней панели. */
+.chat.mob:not(.open) .chat-open { display: none; }
+@media (max-height: 430px) and (orientation: landscape) {
+  .hx.mob .hx-map { flex-direction: row; align-items: flex-start; gap: 6px; }
+  .hx.mob .hx-mini canvas { width: 104px !important; height: 74px !important; }
+  .hx.mob .hx-mini-btns button { width: 19px; height: 19px; font-size: 10px; }
+  .hx.mob .hx-mini-btns { gap: 2px; }
+  .hx.mob .hx-loc { font-size: 9px; right: 24px; }
+  .hx.mob .hx-stats { width: 70px; gap: 2px; }
+  .hx.mob .hx-stat { font-size: 10px; line-height: 12px; gap: 3px; padding: 1px 4px; }
+  .hx.mob .hx-stat span { width: 12px; }
+  .hx.mob .hx-stat div { height: 5px; }
+  .hx.mob .hx-tr { top: calc(6px + var(--safe-t)); gap: 3px; }
+  .hx.mob .hx-money { font-size: 20px; padding: 2px 9px; }
+  .hx.mob .hx-weapon { padding: 2px 7px; }
+  .hx.mob .hx-tl { left: calc(50% + 34px); right: calc(150px + var(--safe-r)); top: calc(8px + var(--safe-t));
+    bottom: auto; max-width: none; max-height: 56px; overflow-y: auto; align-items: stretch; pointer-events: auto; }
+  .hx.mob .hx-task { padding: 3px 7px; font-size: 10px; }
+  .hx.mob .hx-online { gap: 4px; padding: 3px 7px; font-size: 10px; }
+  .hx.mob .hx-online small { font-size: 9px; }
+  .mui .mui-top { top: calc(80px + var(--safe-t)); left: calc(128px + var(--safe-l)); right: auto; }
+  .chat.mob:not(.open) { top: auto; bottom: calc(12px + var(--safe-b)); left: calc(138px + var(--safe-l));
+    right: auto; width: max(0px, min(170px, calc(50vw - 175px))); }
+  .chat.mob:not(.open) .chat-list { max-height: 64px !important; padding: 3px; }
+  .chat.mob:not(.open) .chat-msg { font-size: 11px; }
+  .chat.mob:not(.open) .chat-msg.sys { font-size: 10px; }
+}
+
+@media (max-height: 430px) and (max-width: 650px) and (orientation: landscape) {
+  .hx.mob .hx-sp-pill { left: auto; right: calc(10px + var(--safe-r)); transform: none; top: calc(78px + var(--safe-t)); padding: 3px 8px; gap: 4px; }
+  .hx.mob .hx-sp-pill b { font-size: 18px; }
+  .hx.mob .hx-sp-pill span { display: none; }
+  .hx.mob .hx-tl { left: calc(190px + var(--safe-l)); right: calc(50% + 34px); }
+  .mui .mui-ctx { left: calc(50% - 44px); }
+  .chat.mob:not(.open) { display: none; }
+}
