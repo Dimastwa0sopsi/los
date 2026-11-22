@@ -1247,3 +1247,10 @@ button.tb-card:hover { background: rgba(255,255,255,.09); } button.tb-card:activ
 }
 
 .mui-mic-top { position: absolute; top: calc(12px + var(--safe-t)); left: 50%; transform: translateX(-50%); }
+
+/* Микрофон закреплён сверху по центру и показывает состояние без открытия меню. */
+.mui-mic-top { z-index: 2; }
+.mui-btn.voice-mic { width: 56px; height: 56px; border: 2px solid rgba(255,255,255,.8); background: rgba(16,20,28,.9); box-shadow: 0 3px 12px rgba(0,0,0,.55); }
+.mui-btn.voice-mic .mui-ico { font-size: 25px; }
+.mui-btn.voice-mic small { font-size: 9px; opacity: 1; }
+.mui-btn.voice-mic.on { background: #087b51; border-color: #9effd5; }
