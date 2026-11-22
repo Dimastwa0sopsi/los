@@ -135,6 +135,7 @@ export function GameView({ settings, newGame, gender, nick = '', mode = 'solo', 
       {netErr !== null && (
         <ServerDownModal
           text={netErr || undefined}
+          serverUrl={game?.net?.url}
           onMenu={() => { setNetErr(null); game?.fallbackOffline(); }}
           // повторный вход без перезагрузки страницы: сервер мог только что перехватить старую сессию
           onRetry={game?.net ? () => { setNetErr(null); if (game) { game.input.enabled = true; game.net?.retryLogin(); } } : undefined}
