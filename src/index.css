@@ -1245,3 +1245,5 @@ button.tb-card:hover { background: rgba(255,255,255,.09); } button.tb-card:activ
   .mui-btn.pedal { width: 57px; height: 61px; }
   .mui-btn.handbrake { width: 46px; height: 46px; }
 }
+
+.mui-mic-top { position: absolute; top: calc(12px + var(--safe-t)); left: 50%; transform: translateX(-50%); }

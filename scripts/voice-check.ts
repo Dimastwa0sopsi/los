@@ -12,7 +12,8 @@ async function main() {
   const start=voice.start(); assert.equal(voice.starting,true); voice.stop(); resolve(stream); await start;
   assert.equal(stopped,1); assert.equal(voice.active,false); assert.equal(voice.starting,false);
   const next=voice.start(); resolve(stream); await next; assert.equal(voice.active,true);
-  voice.stop(); assert.equal(stopped,2); assert.equal(voice.active,false);
+  voice.stopMicrophone(); assert.equal(stopped,2); assert.equal(voice.active,true); assert.equal(voice.micOn,false);
+  voice.stop(); assert.equal(voice.active,false);
   console.log('✓ voice permission cancellation and track cleanup');
 }
 void main();

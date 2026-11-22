@@ -293,10 +293,11 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
         onPointerUp={(e) => { look.current.delete(e.pointerId); presses.delete(e.pointerId); }}
         onPointerCancel={(e) => { look.current.delete(e.pointerId); presses.delete(e.pointerId); }} />
 
+      {hud.online && <div className="mui-mic-top"><Btn g={g} ico={g.voice.micOn ? '🎙️' : '🎤'} hold={false} onTap={() => g.toggleVoice()} cls="glass" active={g.voice.micOn} label={g.voice.micOn ? 'Выключить микрофон' : 'Включить микрофон'} /></div>}
+
       {/* верх справа: системные кнопки (слева — мини-карта HUD) */}
       <div className="mui-top">
         <Btn g={g} ico="📱" hold={false} onTap={() => { buzz(); g.openPanel({ type: 'phone' }); }} cls="glass" label="Телефон" />
-        {hud.online && <Btn g={g} ico={g.voice.active && !g.voice.listeningOnly ? '🎙️' : '🎤'} hold={false} onTap={() => g.toggleVoice()} cls="glass" active={g.voice.active && !g.voice.listeningOnly} label={g.voice.active && !g.voice.listeningOnly ? 'Выключить микрофон' : 'Включить микрофон'} />}
         <Btn g={g} ico="💬" hold={false} onTap={() => { buzz(); g.chatFocus?.(); }} cls="glass" label="Чат" />
         <Btn g={g} ico={menu ? '✕' : '☰'} hold={false} onTap={() => { setMenu(!menu); buzz(10); }} cls={`glass ${menu ? 'on' : ''}`} label="Меню" />
       </div>

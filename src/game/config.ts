@@ -86,6 +86,7 @@ export interface Settings {
   traffic: number; // 0..1
   peds: number; // 0..1
   volume: number; // 0..1
+  voiceVolume: number; // громкость голосов других игроков, 0..1
   muted: boolean;
   sensitivity: number; // 0.3..2
   minimapZoom: number; // 0.5..3
@@ -140,7 +141,7 @@ export function defaultSettings(): Settings {
   return {
     control: 'auto', moveStyle: 'joy', quality: mob ? 'low' : 'high', drawDistance: mob ? 220 : 560,
     renderScale: mob ? 0.68 : 1, shadows: !mob, effects: !mob, traffic: mob ? 0.35 : 0.8,
-    peds: mob ? 0.35 : 0.8, volume: 0.6, muted: false, sensitivity: 1, minimapZoom: 1.2,
+    peds: mob ? 0.35 : 0.8, volume: 0.6, voiceVolume: 1, muted: false, sensitivity: 1, minimapZoom: 1.2,
     minimapRotate: true, transmission: 'auto', autoQuality: true, hints: 'short',
     padStyle: 'arc', padFoot: [...PAD_DEFAULT.foot], padDrive: [...PAD_DEFAULT.drive],
   };
