@@ -1,6 +1,7 @@
+import './mobile-controls.css';
 import { useEffect, useRef, useState } from 'react';
 import type { Game, HudState } from '../game/game';
-import { PAD_BUTTONS, PAD_DEFAULT, PAD_LABEL, type Settings } from '../game/config';
+import { PAD_BUTTONS, PAD_DEFAULT, PAD_LABEL } from '../game/config';
 
 /** вибро-отклик на касание (если телефон поддерживает) */
 const buzz = (ms = 8) => { try { navigator.vibrate?.(ms); } catch { /* нет поддержки — молча */ } };
@@ -56,7 +57,7 @@ function Btn({ g, name, ico, sub, hold = true, cls = '', onTap, active, label }:
   };
   return (
     <button className={`mui-btn ${cls} ${on || active ? 'on' : ''}`} onPointerDown={down} onPointerUp={up}
-      onPointerCancel={up} onContextMenu={(e) => e.preventDefault()} aria-label={label ?? sub ?? name}>
+      onPointerCancel={up} onContextMenu={(e) => e.preventDefault()} aria-label={label ?? sub ?? name} aria-pressed={!!(on || active)}>
       <span className="mui-ico">{ico}</span>
       {sub && <small>{sub}</small>}
     </button>
@@ -166,7 +167,7 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
   // Отпускаем удержанные элементы при переходе пешком / водитель / пассажир.
   // Иначе скрытый джойстик или педаль могут продолжить рулить после посадки.
   const controlMode = !v ? 'foot' : v.passenger ? 'passenger' : 'driver';
-  useEffect(() => { releaseAll(); resetStick(); g.input.releaseAll(); setRun(false); }, [controlMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { releaseAll(); resetStick(); g.input.releaseAll(); setRun(false); setTray(null); setMenu(false); }, [controlMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const stickMove = (e: React.PointerEvent) => {
     if (stickId.current !== e.pointerId) return;
@@ -257,21 +258,13 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
     foot: padCfg.foot.filter((id) => known('foot', id)),
     drive: padCfg.drive.filter((id) => known('drive', id)),
     moreFoot: PAD_BUTTONS.filter((b) => b.group === 'foot' && !padCfg.foot.includes(b.id)).map((b) => b.id),
-    moreDrive: PAD_BUTTONS.filter((b) => b.group === 'drive' && b.id !== 'handbrake' && !padCfg.drive.includes(b.id)).map((b) => b.id),
+    moreDrive: PAD_BUTTONS.filter((b) => b.group === 'drive' && b.id !== 'handbrake' && b.id !== 'exit' && !padCfg.drive.includes(b.id)).map((b) => b.id),
   };
-  const setPad = (grp: 'foot' | 'drive', id: string, on: boolean) => {
-    const cur = [...(grp === 'foot' ? padIds.foot : padIds.drive)];
-    const next = on ? [...cur, id] : cur.filter((x) => x !== id);
-    const s2 = { ...g.settings } as Settings;
-    if (grp === 'foot') s2.padFoot = next; else s2.padDrive = next;
-    g.setSettings(s2);
-  };
-
   /** подсказка действия для большой кнопки E: обрезаем служебный префикс */
   const actLabel = hud.prompt ? hud.prompt.replace(/^(E|F|R|L)\s*—\s*/, '').replace(/[·•].*$/, '').trim().slice(0, 26) : 'действие';
 
   return (
-    <div className="mui">
+    <div className={`mui mode-${controlMode}`}>
       {/* обзор: свайп по правой части, щипок двумя пальцами — зум */}
       <div className="mui-look"
         onPointerDown={(e) => {
@@ -297,9 +290,9 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
 
       {/* верх справа: системные кнопки (слева — мини-карта HUD) */}
       <div className="mui-top">
-        <Btn g={g} ico="📱" hold={false} onTap={() => { buzz(); g.openPanel({ type: 'phone' }); }} cls="glass" label="Телефон" />
-        <Btn g={g} ico="💬" hold={false} onTap={() => { buzz(); g.chatFocus?.(); }} cls="glass" label="Чат" />
-        <Btn g={g} ico={menu ? '✕' : '☰'} hold={false} onTap={() => { setMenu(!menu); buzz(10); }} cls={`glass ${menu ? 'on' : ''}`} label="Меню" />
+        <Btn g={g} ico="📱" hold={false} onTap={() => { buzz(); g.openPanel({ type: 'phone' }); }} sub="телефон" cls="glass" label="Телефон" />
+        <Btn g={g} ico="💬" hold={false} onTap={() => { buzz(); g.chatFocus?.(); }} sub="чат" cls="glass" label="Чат" />
+        <Btn g={g} ico={menu ? '✕' : '☰'} hold={false} onTap={() => { releaseAll(); resetStick(); g.input.releaseAll(); setRun(false); setTray(null); setMenu(!menu); buzz(10); }} sub="меню" cls={`glass ${menu ? 'on' : ''}`} label="Меню" />
       </div>
 
       {/* портрет: подсказка повернуть телефон (один раз) */}
@@ -311,19 +304,23 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
         </div>
       )}
 
-      {/* «ещё»: кнопки, которые не поместились в дугу — их можно включить в настройках */}
+      {/* Остальные действия доступны сразу; постоянную раскладку меняют настройки. */}
       {tray && (
         <>
           <div className="mui-sheet-back" onPointerDown={() => setTray(null)} />
           <div className={`mui-tray ${tray}`}>
-            <div className="mui-tray-head">{tray === 'foot' ? 'Ещё действия' : 'Ещё в машине'}</div>
+            <div className="mui-tray-head">{tray === 'foot' ? 'Действия' : 'Действия транспорта'}</div>
             <div className="mui-tray-grid">
-              {(tray === 'foot' ? padIds.moreFoot : padIds.moreDrive).map((id) => (
-                <button key={id} className="mui-tray-cell" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); setPad(tray, id, true); setTray(null); buzz(8); }}>
-                  <span className="mui-ico">{PAD_BUTTONS.find((b) => b.id === id)?.ico}</span>
-                  <small>{PAD_LABEL[id] ?? id}</small>
-                </button>
-              ))}
+              {(tray === 'foot' ? padIds.moreFoot : padIds.moreDrive)
+                .filter((id) => !(v?.heli && ['lights', 'horn', 'hazard', 'gearUp', 'gearDown', 'drift'].includes(id)))
+                .filter((id) => id !== 'hydro' || !!v?.canHydro)
+                .filter((id) => id !== 'wheelie' || !!v?.moto)
+                .map((id) => (
+                  <div key={id} className="mui-tray-cell">
+                    {padBtn(g, id, hud, v)}
+                    <small>{PAD_LABEL[id] ?? id}</small>
+                  </div>
+                ))}
             </div>
           </div>
         </>
@@ -381,7 +378,7 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
       <div className="mui-ctx">
         {hud.promptKeys.includes('R') && <Btn g={g} name="work" ico="💼" sub="R" hold={false} cls="mini" />}
         <div className="mui-main-wrap">
-          <Btn g={g} name="interact" ico="✋" hold={false} cls="ctx-big" />
+          <Btn g={g} name="interact" ico="✋" sub="действие" hold={false} cls="ctx-big" label="Действие" />
           {g.settings.hints !== 'off' && <span className="mui-ctx-label">{actLabel}</span>}
         </div>
         {hud.promptKeys.includes('L') && <Btn g={g} name="rob" ico="💰" sub="L" hold={false} cls="mini red" />}
@@ -394,16 +391,17 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
             <>
               {hud.gun && <Btn g={g} name="fire" ico="🔫" cls="main red" />}
               {hud.gun && <Btn g={g} name="aim" ico="🎯" hold={false} cls="mid" />}
-              <Btn g={g} name="enter" ico="🚪" sub="выйти" hold={false} cls="mid grey" />
+              <Btn g={g} name="enter" ico="🚪" sub="выйти" hold={false} cls="mid grey" label="Выйти из транспорта" />
             </>
           ) : (
             <>
               <div className={`mui-arc ${g.settings.padStyle === 'grid' ? 'grid2' : 'col'}`}>
                 {hud.gun && <Btn g={g} name="fire" ico="🔫" cls="main red" />}
                 {hud.gun && <Btn g={g} name="aim" ico="🎯" hold={false} cls="mini" active={hud.gun.aiming} />}
-                {padIds.drive.filter((id) => id !== 'handbrake').map((id) => (v.heli && ['handbrake', 'lights', 'horn', 'hazard', 'gearUp', 'gearDown'].includes(id) ? null : padBtn(g, id, hud, v)))}
+                <Btn g={g} name="enter" ico="🚪" sub="выйти" hold={false} cls="mini grey" label="Выйти из транспорта" />
+                {padIds.drive.filter((id) => id !== 'handbrake' && id !== 'exit').map((id) => (v.heli && ['handbrake', 'lights', 'horn', 'hazard', 'gearUp', 'gearDown'].includes(id) ? null : padBtn(g, id, hud, v)))}
                 {padIds.moreDrive.length > 0 && (
-                  <Btn g={g} ico="⋯" hold={false} cls={`mini ${tray === 'drive' ? 'on' : ''}`} onTap={() => setTray(tray === 'drive' ? null : 'drive')} label="Ещё кнопки" />
+                  <Btn g={g} ico="⋯" hold={false} cls={`mini ${tray === 'drive' ? 'on' : ''}`} onTap={() => { releaseAll(); resetStick(); g.input.releaseAll(); setTray(tray === 'drive' ? null : 'drive'); }} label="Ещё кнопки" />
                 )}
               </div>
               <div className="mui-pedals">
@@ -425,7 +423,7 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
             {hud.gun && <Btn g={g} name="aim" ico="🎯" hold={false} cls="mid" active={hud.gun.aiming} />}
             {padIds.foot.map((id) => padBtn(g, id, hud, null))}
             {padIds.moreFoot.length > 0 && (
-              <Btn g={g} ico="⋯" hold={false} cls={`mini ${tray === 'foot' ? 'on' : ''}`} onTap={() => setTray(tray === 'foot' ? null : 'foot')} label="Ещё кнопки" />
+              <Btn g={g} ico="⋯" hold={false} cls={`mini ${tray === 'foot' ? 'on' : ''}`} onTap={() => { releaseAll(); resetStick(); g.input.releaseAll(); setRun(false); setTray(tray === 'foot' ? null : 'foot'); }} label="Ещё кнопки" />
             )}
           </div>
           <div className="mui-main-wrap">

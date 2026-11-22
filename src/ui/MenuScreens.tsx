@@ -172,7 +172,7 @@ export function SettingsPanel({ value, onChange, onClose, inGame, onResetSave, o
         </div>
         <label>В машине на телефоне</label>
         <div className="lg-pad-grid">
-          {PAD_BUTTONS.filter((b) => b.group === 'drive').map((b) => {
+          {PAD_BUTTONS.filter((b) => b.group === 'drive' && b.id !== 'handbrake' && b.id !== 'exit').map((b) => {
             const on = (s.padDrive ?? PAD_DEFAULT.drive).includes(b.id);
             return <button key={b.id} className={`lg-chip ${on ? 'on' : ''}`} onClick={() => set('padDrive', on ? (s.padDrive ?? PAD_DEFAULT.drive).filter((x) => x !== b.id) : [...(s.padDrive ?? PAD_DEFAULT.drive), b.id])}><span>{b.ico}</span>{PAD_LABEL[b.id] ?? b.id}</button>;
           })}
