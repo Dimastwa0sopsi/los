@@ -52,6 +52,21 @@ function myBiz(g: Game, arg: string) {
 }
 
 export const COMMANDS: Cmd[] = [
+  { name: 'voice', aliases: ['войс'], args: '[on/off/status]', cat: 'world', desc: 'голос рядом: on — включить, off — выключить, status — состояние (только онлайн)', run: (g, arg) => {
+    const action = arg.toLowerCase();
+    if (!g.online || !g.net?.ready) { say(g, 'Голос доступен только при подключении к онлайн-серверу'); return; }
+    if (!g.net.voiceSupported) { say(g, 'Голос недоступен: сервер необходимо обновить'); return; }
+    if (!action || action === 'status' || action === 'статус') { say(g, `🎙 Голос: ${g.voice.starting ? 'ожидание разрешения' : g.voice.active ? 'включён' : 'выключен'}. /voice on или /voice off`); return; }
+    if (action === 'on' || action === 'вкл') {
+      if (g.voice.active || g.voice.starting) { say(g, 'Микрофон уже включён или запрашивается'); return; }
+      g.toggleVoice(); say(g, 'Запрашиваем доступ к микрофону'); return;
+    }
+    if (action === 'off' || action === 'выкл') {
+      if (!g.voice.active && !g.voice.starting) { say(g, 'Микрофон уже выключен'); return; }
+      g.toggleVoice(); say(g, 'Микрофон выключен'); return;
+    }
+    say(g, 'Использование: /voice on, /voice off, /voice status');
+  } },
   // ---------- недвижимость ----------
   { name: 'sellhouse', aliases: ['sellhome'], args: '[номер]', cat: 'prop', desc: 'продать дом/квартиру государству за 60%', run: (g, a) => g.sellHome(a) },
   { name: 'myhouses', aliases: ['homes'], cat: 'prop', desc: 'список вашей недвижимости', run: (g) => {

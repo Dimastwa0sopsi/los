@@ -1240,7 +1240,7 @@ wss.on('connection', (ws) => {
       me = row; active.set(row.id, { ws, row }); ws.playerId = row.id;
       if (normalizeLogin(row.name) === 'kitty_kittys') ws.adminSession = crypto.randomBytes(32).toString('hex');
       console.log(`[login] ${row.name} вошёл (онлайн: ${active.size})`);
-      send(ws, { type: 'login_success', accountState: account.state, accountRevision: account.revision, accountSaveId: account.saveId, adminSession: ws.adminSession || undefined, caps: { state: 1, peds: 1, adm: 1, relay: 1, accounts: 1, saveIds: 1 }, player: {
+      send(ws, { type: 'login_success', accountState: account.state, accountRevision: account.revision, accountSaveId: account.saveId, adminSession: ws.adminSession || undefined, caps: { state: 1, peds: 1, adm: 1, relay: 1, accounts: 1, saveIds: 1, voice: 1 }, player: {
         id: row.id, name: row.name, gender: row.gender, money: row.money,
         x: row.pos_x, z: row.pos_z, rot: row.pos_rot, number: row.car_number, carNumber: row.car_number,
       } });
@@ -1251,6 +1251,20 @@ wss.on('connection', (ws) => {
 
     if (!me || active.get(me.id)?.ws !== ws) return;
     const row = me;
+
+    // Voice signaling is routed only to the target; never broadcast SDP/ICE.
+    // Both browsers opt in and independently check proximity. This is not a
+    // trusted distance guarantee: ordinary player positions are client supplied.
+    if (m.type === 'voice_signal') {
+      const now=Date.now();
+      if (!ws.voiceRate || now-ws.voiceRate.time>=1000) ws.voiceRate={time:now,count:0};
+      if (++ws.voiceRate.count>60 || !Number.isSafeInteger(m.to) || m.to===row.id || !m.signal || typeof m.signal!=='object' || Array.isArray(m.signal)) return;
+      const signal=m.signal, kind=signal.kind;
+      if (!['hello','offer','answer','ice','bye'].includes(kind) || JSON.stringify(signal).length>12000) return;
+      const target=active.get(m.to); if(!target) return;
+      if(kind!=='bye' && Math.hypot(row.pos_x-target.row.pos_x,row.pos_z-target.row.pos_z)>55) return;
+      send(target.ws,{type:'voice_signal',from:row.id,signal}); return;
+    }
 
     if (m.type === 'kiosk_owners') {
       const now = Date.now();

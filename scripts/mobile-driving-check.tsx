@@ -10,12 +10,15 @@ Object.assign(document,{addEventListener:()=>{},hidden:false});
 Object.assign(globalThis,{localStorage:{getItem:()=>null,setItem:()=>{}}});
 const held=new Set<string>();
 const input:any={enabled:true,joy:{x:0,y:0},setV:(n:string,on:boolean)=>on?held.add(n):held.delete(n),tapV:()=>{},releaseAll:()=>{held.clear();input.joy.x=0;input.joy.y=0;}};
-const g:any={input,settings:{moveStyle:'joy',padStyle:'grid',hints:'off'}};
-const hud:any={vehicle:null,promptKeys:[],prompt:null,gun:null};
+const g:any={input,voice:{active:false},toggleVoice:()=>{},settings:{moveStyle:'joy',padStyle:'grid',hints:'off'}};
+const hud:any={online:{status:'online'},vehicle:null,promptKeys:[],prompt:null,gun:null};
 const ev=(pointerId:number)=>({pointerId,preventDefault(){},stopPropagation(){}});
 (async()=>{
  let view!:TestRenderer.ReactTestRenderer;await act(async()=>{view=TestRenderer.create(<MobileControls g={g} hud={hud}/>)});
  const find=(label:string)=>view.root.findAllByType('button').find(x=>x.props['aria-label']===label);
+ assert(find('Включить микрофон'));
+ hud.online=null; await act(async()=>view.update(<MobileControls g={g} hud={hud}/>)); assert(!find('Включить микрофон'));
+ hud.online={status:'online'}; await act(async()=>view.update(<MobileControls g={g} hud={hud}/>));
  assert(!find('Руль влево'));assert(view.root.findAll(x=>x.props.className?.includes('mui-stick')).length);
  input.joy.x=1;
  hud.vehicle={passenger:false,heli:false,name:'Car',canAuto:false,canHydro:false};
