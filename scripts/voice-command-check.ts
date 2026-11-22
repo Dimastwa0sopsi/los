@@ -1,0 +1,13 @@
+import { strict as assert } from 'node:assert';
+import { runCommand } from '../src/game/commands';
+const messages:string[]=[];
+let toggles=0;
+const g:any={online:false,net:{ready:true,voiceSupported:true},voice:{active:false,starting:false},sysMsg:(s:string)=>messages.push(s),toggleVoice:()=>{toggles++;}};
+assert(runCommand(g,'/voice on')); assert.equal(toggles,0); assert.match(messages.pop()!,/только/);
+g.online=true; g.net.voiceSupported=false; runCommand(g,'/voice on'); assert.equal(toggles,0);
+g.net.voiceSupported=true; runCommand(g,'/voice on'); assert.equal(toggles,1);
+g.voice.starting=true; runCommand(g,'/voice on'); assert.equal(toggles,1);
+runCommand(g,'/voice off'); assert.equal(toggles,2);
+g.voice.starting=false; runCommand(g,'/войс статус'); assert.match(messages.pop()!,/выключен/);
+runCommand(g,'/voice nonsense'); assert.match(messages.pop()!,/Использование/);
+console.log('✓ команды войса и ограничение онлайном');

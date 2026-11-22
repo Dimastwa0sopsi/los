@@ -1,3 +1,4 @@
+import type { VoiceSignal } from './voice';
 // Онлайн-режим: клиент WebSocket под протокол сервера.
 //
 // Основной протокол (как в задании):
@@ -165,9 +166,10 @@ interface Msg {
   /** авторизация онлайна: токен устройства и пароль-подсказка */
   token?: string; pass?: string;
   /** что умеет сервер (наш сервер пересылает §-протокол и умеет админ-команды) */
-  caps?: { state?: number; peds?: number; adm?: number; relay?: number; accounts?: number; saveIds?: number };
+  caps?: { state?: number; peds?: number; adm?: number; relay?: number; accounts?: number; saveIds?: number; voice?: number };
   /** реклама на щитах: полный список от сервера и ответ на покупку */
   ads?: Record<string, RemoteAd>; ok?: boolean; error?: string;
+  from?: number; signal?: VoiceSignal;
   lots?: unknown; serverTime?: number; owners?: unknown; complete?: boolean;
   /** машиночитаемая причина отказа входа: banned / maintenance / device / replaced / name */
   code?: string;
@@ -292,6 +294,9 @@ export class NetClient {
   kicked: string | null = null;
   onChange: (() => void) | null = null;
   onEvent: ((from: number, ev: NetEvent) => void) | null = null;
+  voiceSupported = false;
+  onVoice: ((from:number, signal:VoiceSignal)=>void) | null = null;
+  onVoiceDisconnect: (()=>void) | null = null;
   onPeds: ((from: number, list: number[][], vehs: (string | number)[][]) => void) | null = null;
   onNews: ((name: string, text: string) => void) | null = null;
   /** объявления на щитах: сервер прислал полный список (общий для всех игроков) */
@@ -384,6 +389,7 @@ export class NetClient {
     ws.onclose = () => {
       if (this.ws !== ws) return;
       window.clearTimeout(this.connectTimer);
+      this.onVoiceDisconnect?.(); this.voiceSupported=false;
       this.ws = null; this.id = null; this.authenticated = false; this.adminSession = ''; this.lastSaveMoney = NaN; this.auction = null; this.kioskOwners = null; this.kioskOwnersRequested = 0;
       if (this.dead || !this.want) { this.status = 'offline'; this.onChange?.(); return; }
       this.fail();
@@ -439,6 +445,9 @@ export class NetClient {
       case 'login_success':
         if (!this.handshake || !m.caps?.accounts || !Number.isSafeInteger(m.accountRevision)) { this.die('Сервер не поддерживает безопасные аккаунты'); return; }
         this.onLoginSuccess(m, now); return;
+      case 'voice_signal':
+        if (this.authenticated && this.voiceSupported && Number.isSafeInteger(m.from) && m.signal && typeof m.signal==='object') this.onVoice?.(m.from!, m.signal);
+        return;
       case 'account_saved':
         if (!this.flight || (this.saveIds && m.saveId !== this.flight.id)) return;
         if (!m.ok || m.revision !== this.flight.revision + 1) { this.conflict = true; this.onSaveError?.('Сохранение отклонено. Не выходите: проверьте соединение и обратитесь к администратору.'); return; }
@@ -518,6 +527,7 @@ export class NetClient {
     if (m.caps && (m.caps.state || m.caps.relay)) this.legacy = true;
     this.probeSent = false;
     this.saveIds = m.caps?.saveIds === 1;
+    this.voiceSupported = m.caps?.voice === 1;
     const next = m.accountRevision!;
     if (this.loggedOnce && this.revision !== null) {
       const expected = this.flight?.revision ?? this.revision;
@@ -727,6 +737,7 @@ export class NetClient {
     this.send({ type: 'chat', text: PREFIX + JSON.stringify(st) });
   }
   sendPeds(list: number[][], vehs: (string | number)[][] = []) { if (this.legacy) this.send({ type: 'chat', text: PEDS + JSON.stringify({ p: list, v: vehs }) }); }
+  sendVoice(to:number, signal:VoiceSignal) { if(this.authenticated && this.voiceSupported) this.send({type:'voice_signal',to,signal}); }
   sendEvent(ev: NetEvent) { if (this.legacy) this.send({ type: 'chat', text: EV + JSON.stringify(ev) }); }
   /** перевод игроку: работает на любом сервере, который пересылает чат */
   sendGift(k: 'money' | 'item', v: number | string, n: number, nick: string) {

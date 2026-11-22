@@ -1,3 +1,4 @@
+import { NearbyVoice } from './voice';
 import { canDrive, issueDocument, type DocumentKind } from './documents';
 import { generateSpeedCameras, cameraDetects, cameraFine, type SpeedCamera } from './speedCameras';
 // Игровой движок «Лос-Город»: цикл, игрок, транспорт, интерьеры, работа, полиция, такси, автопилот
@@ -268,6 +269,13 @@ export class Game {
   private economyLabPaused = false;
   private economyLabBase: string | null = null;
   private economyLabInstalledId: string | null = null;
+  voice = new NearbyVoice((id,signal)=>this.net?.sendVoice(id,signal), text=>this.toast(text));
+  toggleVoice() {
+    if (this.voice.active || this.voice.starting) { this.voice.stop(); return; }
+    if (!this.online || !this.net?.ready) { this.toast('Голос доступен только в онлайне'); return; }
+    if (!this.net.voiceSupported) { this.toast('Для голосового чата необходимо обновить сервер'); return; }
+    void this.voice.start();
+  }
   online = false; private onlineInitialMoney: number | null = null; net: NetClient | null = null; remotes = new Map<number, Remote>(); private remoteSmokeT = new Map<number, number>();
   private netT = 0; private netMoveT = 0; private netN = 0; private lastSpeed = 0;
   sky: THREE.Mesh | null = null; stars: THREE.Points | null = null; clouds: THREE.Group | null = null; private skyMat: THREE.ShaderMaterial | null = null;
@@ -700,6 +708,7 @@ export class Game {
     if (code === K.help) { if (this.panel?.type === 'help') this.closePanel(); else this.openPanel({ type: 'help' }); return; }
     if (code === K.pause) { if (this.panel) this.closePanel(); else this.openPanel({ type: 'settings' }); return; }
     if (this.panel && this.panel.type !== 'map') { if (code === K.inventory && this.panel.type === 'inventory') this.closePanel(); return; }
+    if (code === 'KeyO' && this.online && !this.inVeh && !this.rideRemote) { this.toggleVoice(); return; }
     if (code === K.camera) { this.toggleFirstPerson(); return; }
     if (code === K.inventory) this.togglePanel({ type: 'inventory' });
     else if (code === K.map) this.togglePanel({ type: 'map', mode: 'waypoint' });
@@ -4726,6 +4735,8 @@ export class Game {
     try { localStorage.setItem('losgorod_nick', clean); } catch { /* */ }
     this.net = new NetClient(clean, gender, undefined, credentials);
     this.net.onEvent = (from, ev) => this.handleNetEvent(from, ev);
+    this.net.onVoice = (from, signal) => { if (this.net?.id !== null && this.net?.id !== undefined) void this.voice.receive(this.net.id,from,signal); };
+    this.net.onVoiceDisconnect = () => this.voice.stop();
     this.net.onChange = null;
     this.net.onNews = (nm, txt) => this.toast(`📰 СМИ · ${nm}: ${txt}`);
     // объявления на щитах общие: сервер держит их и рассылает всем
@@ -4860,7 +4871,7 @@ export class Game {
     if (!this.online || this.net !== net) return;
     this.admFreeze = false;
     if (this.rideRemote) this.exitRemoteRide(true);
-    this.net?.close(); this.net = null; this.onlineInitialMoney = null; this.pendingBuy = null; this.socialInvite = null; this.socialSent = null;
+    this.voice.stop(); this.net?.close(); this.net = null; this.onlineInitialMoney = null; this.pendingBuy = null; this.socialInvite = null; this.socialSent = null;
     for (const r of this.remotes.values()) this.disposeRemote(r);
     this.remotes.clear(); this.peds.clearPuppets(); this.removeCarPuppets(); this.peds.onlineMode = false; this.trade = null; this.tradeInvite = null;
     const solo = loadState(false) ?? newState(this.state.look.gender, this.L.playerSpawn);
@@ -4995,6 +5006,7 @@ export class Game {
     this.updateCarPuppets(dt);
     if (this.pendingBuy && performance.now() - this.pendingBuy.t > 10000) { this.state.money += this.pendingBuy.price; this.pendingBuy = null; this.toast('Продавец не ответил — деньги возвращены'); }
     this.updateRemotes(dt);
+    this.voice.tick(dt, net.id, [...this.remotes.values()].map(r => ({id:r.id,near:r.ikey===this.interiorKey() && Math.hypot(r.x-this.px,r.z-this.pz)<40})));
   }
   private disposeRemote(r: Remote) {
     for (const lv of r.listings) this.removeVehicle(lv); r.listings = [];
@@ -5717,6 +5729,7 @@ export class Game {
   }
   dispose() {
     this.disposed = true;
+    this.voice.stop();
     cancelAnimationFrame(this.raf);
     this.net?.close(); this.net = null;
     try { this.save(); } catch { /* */ }

@@ -1219,3 +1219,5 @@ button.tb-card:hover { background: rgba(255,255,255,.09); } button.tb-card:activ
 .hx-map-results { max-height: min(40vh, 300px); overflow-y: auto; background: rgba(12,14,20,.96); border-radius: 10px; margin-top: 4px; }
 .hx-map-results button { display: flex; flex-direction: column; align-items: flex-start; width: 100%; padding: 8px 10px; border-bottom: 1px solid var(--line2); text-align: left; }
 .hx-map-results small, .hx-map-results > span { opacity: .7; font-size: 12px; padding: 4px; }
+
+.hx-voice { pointer-events: auto; cursor: pointer; color: #fff; }

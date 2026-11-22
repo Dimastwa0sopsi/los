@@ -296,6 +296,7 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
       {/* верх справа: системные кнопки (слева — мини-карта HUD) */}
       <div className="mui-top">
         <Btn g={g} ico="📱" hold={false} onTap={() => { buzz(); g.openPanel({ type: 'phone' }); }} cls="glass" label="Телефон" />
+        {hud.online && <Btn g={g} ico={g.voice.active ? '🎙️' : '🎤'} hold={false} onTap={() => g.toggleVoice()} cls="glass" active={g.voice.active} label={g.voice.active ? 'Выключить микрофон' : 'Включить микрофон'} />}
         <Btn g={g} ico="💬" hold={false} onTap={() => { buzz(); g.chatFocus?.(); }} cls="glass" label="Чат" />
         <Btn g={g} ico={menu ? '✕' : '☰'} hold={false} onTap={() => { setMenu(!menu); buzz(10); }} cls={`glass ${menu ? 'on' : ''}`} label="Меню" />
       </div>
