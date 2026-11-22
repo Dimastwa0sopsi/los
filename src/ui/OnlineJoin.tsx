@@ -1,30 +1,20 @@
-import { useEffect, useState } from 'react';
-import { connectionDiagnosis } from '../game/connectionDiagnosis';
+import { useState } from 'react';
 import menuBg from '../assets/menu.jpg';
 import type { Game } from '../game/game';
 import { Modal } from './MenuScreens';
 
 /** текст, который показываем, если сервер не отвечает */
-export const SERVER_DOWN_TEXT = 'Не удалось подключиться к серверу. Это не обязательно означает, что он выключен.';
+export const SERVER_DOWN_TEXT = 'Сервер отключен, заходите позже';
 
 export type JoinLaunch = { mode: 'solo' | 'online'; nick: string; gender: 'm' | 'f'; credentials?: { mode: 'login' | 'register'; password: string; backup?: string } };
 
 /** Ошибка подключения без отдельной проверки сервера. */
-export function ServerDownModal({ text, serverUrl, onMenu, onRetry, onSolo }: { text?: string | null; serverUrl?: string; onMenu: () => void; onRetry?: () => void; onSolo?: () => void }) {
-  const [diagnostic, setDiagnostic] = useState('');
-  useEffect(() => {
-    if (text || !serverUrl) return;
-    let active = true;
-    setDiagnostic('Проверяем соединение…');
-    void connectionDiagnosis(serverUrl).then(result => { if (active) setDiagnostic(result); });
-    return () => { active = false; };
-  }, [text, serverUrl]);
+export function ServerDownModal({ text, onMenu, onRetry, onSolo }: { text?: string | null; onMenu: () => void; onRetry?: () => void; onSolo?: () => void }) {
   return <div className="lg-modal-back" onPointerDown={(e) => e.stopPropagation()}>
-    <div className="lg-modal" style={{ width: 'min(460px, 100%)', maxHeight: '90vh', overflowY: 'auto' }}>
+    <div className="lg-modal" style={{ width: 'min(460px, 100%)' }}>
       <div className="lg-modal-head"><h2>⚠️ Нет связи с сервером</h2></div>
       <div className="lg-modal-body">
         <p>{text?.trim() || SERVER_DOWN_TEXT}</p>
-        {!text && diagnostic && <p className="text-xs mt-2" style={{ overflowWrap: 'anywhere' }}>{diagnostic}</p>}
         {onRetry && <button className="lg-btn lg-btn-main w-full mt-2" onClick={onRetry}>🔄 Повторить вход</button>}
         {onSolo && <button className="lg-btn w-full mt-2" onClick={onSolo}>🎮 Продолжить офлайн</button>}
         <button className="lg-btn w-full mt-2" onClick={onMenu}>← Назад</button>
