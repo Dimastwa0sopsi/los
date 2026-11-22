@@ -63,6 +63,8 @@ export class NearbyVoice {
   private create(id:number){
     const pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
     const audio=document.createElement('audio');audio.volume=this.volume;audio.autoplay=true;audio.setAttribute('playsinline','');
+    // Some mobile browsers require the audio element to be attached to the page.
+    audio.hidden=true; document.body.appendChild(audio);
     const peer={pc,audio,pending:[] as RTCIceCandidateInit[],created:Date.now()};this.peers.set(id,peer);
     if (this.stream) for(const track of this.stream.getAudioTracks())pc.addTrack(track,this.stream);
     else pc.addTransceiver('audio',{direction:'recvonly'});

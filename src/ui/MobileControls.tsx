@@ -293,7 +293,7 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
         onPointerUp={(e) => { look.current.delete(e.pointerId); presses.delete(e.pointerId); }}
         onPointerCancel={(e) => { look.current.delete(e.pointerId); presses.delete(e.pointerId); }} />
 
-      {hud.online && <div className="mui-mic-top"><Btn g={g} ico={g.voice.micOn ? '🎙️' : '🎤'} hold={false} onTap={() => g.toggleVoice()} cls="glass" active={g.voice.micOn} label={g.voice.micOn ? 'Выключить микрофон' : 'Включить микрофон'} /></div>}
+      {hud.online && <div className="mui-mic-top"><Btn g={g} ico={g.voice.micOn ? '🎙️' : '🎤'} sub={g.voice.starting ? 'ЖДИ' : g.voice.micOn ? 'ВКЛ' : 'ВЫКЛ'} hold={false} onTap={() => g.toggleVoice()} cls="voice-mic" active={g.voice.micOn || g.voice.starting} label={g.voice.micOn || g.voice.starting ? 'Выключить микрофон' : 'Включить микрофон'} /></div>}
 
       {/* верх справа: системные кнопки (слева — мини-карта HUD) */}
       <div className="mui-top">

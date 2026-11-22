@@ -15,7 +15,7 @@ class MockPC {
   async addIceCandidate(){} close(){this.closed=true;}
 }
 (globalThis as any).RTCPeerConnection=MockPC;
-(globalThis as any).document={createElement:()=>{const audio={volume:1,autoplay:false,srcObject:null,setAttribute(){},play:async()=>{},pause(){},remove(){}};audios.push(audio);return audio;}};
+(globalThis as any).document={body:{appendChild(){}},createElement:()=>{const audio={volume:1,autoplay:false,srcObject:null,setAttribute(){},play:async()=>{},pause(){},remove(){}};audios.push(audio);return audio;}};
 async function run(listenerId:number){
  const q:{from:number,to:number,signal:VoiceSignal}[]=[];
  const voices:Record<number,NearbyVoice>={};
