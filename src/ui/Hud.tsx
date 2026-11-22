@@ -147,7 +147,9 @@ export function Hud({ g, hud, mobile }: { g: Game; hud: HudState; mobile: boolea
       </div>
       {/* левый верх: онлайн, работа */}
       <div className="hx-tl">
-        {hud.online && !mobile && <button className="hx-task hx-voice" onClick={() => g.toggleVoice()} title="Голос поблизости: O пешком">{g.voice.active ? '🎙 Микрофон включён' : '🎤 Включить голос (O)'}</button>}
+        {hud.online && !mobile && <button className="hx-task hx-voice" onClick={() => g.toggleVoice()} title="Голос поблизости: O пешком">{g.voice.active && !g.voice.listeningOnly ? '🎙 Микрофон включён' : '🎤 Включить микрофон (O)'}</button>}
+        {hud.online && !mobile && <button className="hx-task hx-voice" onClick={() => { if (g.voice.listeningOnly) g.voice.stop(); else g.toggleVoiceListening(); }} title="Слушать ближайших игроков без микрофона">{g.voice.listeningOnly ? '🎧 Выключить прослушивание' : '🎧 Только слушать'}</button>}
+        {hud.online && !mobile && g.voice.listeningOnly && <button className="hx-task hx-voice" onClick={() => g.voice.resumeAudio()}>🔊 Включить звук</button>}
         {hud.online && <div className={`hx-online ${hud.online.status}`}><i /><b>{hud.online.nick}</b><small>{STATUS[hud.online.status] ?? hud.online.status} · {hud.online.players} игр.</small></div>}
         {hud.quest && <div className="hx-task quest">📜 {hud.quest}</div>}
         {hud.job && <div className="hx-task">💼 {hud.job}</div>}

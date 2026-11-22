@@ -271,10 +271,18 @@ export class Game {
   private economyLabInstalledId: string | null = null;
   voice = new NearbyVoice((id,signal)=>this.net?.sendVoice(id,signal), text=>this.toast(text));
   toggleVoice() {
-    if (this.voice.active || this.voice.starting) { this.voice.stop(); return; }
+    if (this.voice.listeningOnly) this.voice.stop();
+    else if (this.voice.active || this.voice.starting) { this.voice.stop(); return; }
     if (!this.online || !this.net?.ready) { this.toast('Голос доступен только в онлайне'); return; }
     if (!this.net.voiceSupported) { this.toast('Для голосового чата необходимо обновить сервер'); return; }
     void this.voice.start();
+  }
+  toggleVoiceListening() {
+    if (this.voice.listeningOnly) { this.voice.resumeAudio(); return; }
+    if (this.voice.active || this.voice.starting) this.voice.stop();
+    if (!this.online || !this.net?.ready) { this.toast('Голос доступен только в онлайне'); return; }
+    if (!this.net.voiceSupported) { this.toast('Для голосового чата необходимо обновить сервер'); return; }
+    this.voice.startListening();
   }
   online = false; private onlineInitialMoney: number | null = null; net: NetClient | null = null; remotes = new Map<number, Remote>(); private remoteSmokeT = new Map<number, number>();
   private netT = 0; private netMoveT = 0; private netN = 0; private lastSpeed = 0;
