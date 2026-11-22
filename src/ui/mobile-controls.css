@@ -1,0 +1,107 @@
+/* Игровое управление только для сенсорного режима: движение слева,
+   действия справа, микрофон вверху; центральная зона остаётся для обзора. */
+.mui {
+  --touch-bg: rgba(14, 23, 32, .82);
+  --touch-edge: rgba(219, 244, 245, .24);
+  --touch-ink: #f3fbfb;
+  --touch-accent: #5de6c0;
+}
+.mui .mui-btn {
+  color: var(--touch-ink); background: var(--touch-bg);
+  border: 1px solid var(--touch-edge); box-shadow: 0 4px 12px rgba(0,0,0,.3);
+  backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
+  border-radius: 16px; width: 48px; height: 48px;
+}
+.mui .mui-btn:active, .mui .mui-btn.on {
+  color: #fff; background: rgba(12, 113, 91, .94); border-color: #8fffe0;
+  box-shadow: 0 0 0 2px rgba(93,230,192,.22); transform: scale(.95);
+}
+.mui .mui-ico { font-size: 20px; line-height: 1; letter-spacing: 0; }
+.mui .mui-btn small { font-size: 9px; line-height: 1; opacity: .85; letter-spacing: 0; }
+.mui .mui-btn.mini { width: 44px; height: 44px; border-radius: 14px; }
+.mui .mui-btn.mini small { display: none; }
+.mui .mui-btn.mid { width: 54px; height: 54px; }
+.mui .mui-btn.main { width: 68px; height: 68px; border-radius: 23px; }
+.mui .mui-btn.main .mui-ico { font-size: 27px; }
+.mui .mui-btn.red { background: rgba(112, 38, 49, .88); border-color: rgba(255,155,163,.6); }
+.mui .mui-btn.green { background: rgba(15, 102, 79, .9); border-color: rgba(115,245,195,.65); }
+.mui .mui-btn.blue { background: rgba(27, 72, 98, .9); }
+.mui .mui-btn.pink { background: rgba(100, 38, 73, .9); }
+.mui .mui-btn.grey { background: var(--touch-bg); }
+
+/* Быстрые действия в одном ряду; деньги и мини-карта остаются видимыми. */
+.mui .mui-top { top: calc(70px + var(--safe-t)); right: calc(10px + var(--safe-r)); bottom: auto;
+  flex-direction: row; gap: 6px; align-items: center; }
+.mui .mui-top .mui-btn { width: 46px; height: 46px; }
+.mui .mui-top .mui-btn small { display: none; }
+.mui .mui-mic-top { z-index: 2; top: calc(8px + var(--safe-t)); }
+.mui .mui-btn.voice-mic { width: 54px; height: 54px; border-radius: 18px; border: 1px solid rgba(255,255,255,.55); }
+.mui .mui-btn.voice-mic .mui-ico { font-size: 23px; }
+.mui .mui-btn.voice-mic small { display: block; }
+.mui .mui-btn.voice-mic.on { background: #087b51; border-color: #a5ffdf; }
+
+.mui .mui-move { left: calc(16px + var(--safe-l)); bottom: calc(18px + var(--safe-b)); gap: 8px; }
+.mui .mui-stick { width: 130px; height: 130px; border: 1px solid rgba(224,255,248,.28);
+  background: rgba(14,23,32,.36); box-shadow: inset 0 0 24px rgba(0,0,0,.3); }
+.mui .mui-stick .ring { inset: 20px; border-color: rgba(222,255,250,.24); }
+.mui .mui-stick .knob { width: 54px; height: 54px; margin: -27px 0 0 -27px;
+  background: linear-gradient(145deg, rgba(231,255,250,.92), rgba(111,156,150,.75)); }
+.mui .mui-run { left: calc(30px + var(--safe-l)); bottom: calc(160px + var(--safe-b)); }
+.mui .mui-btn.pill { width: auto; min-width: 82px; height: 38px; border-radius: 14px; padding: 0 12px; }
+.mui .mui-btn.pill .mui-ico { font-size: 14px; }
+.mui .mui-steering .mui-btn { width: 62px; height: 62px; border-radius: 20px; }
+.mui .mui-steering .mui-ico { font-size: 24px; }
+.mui .mui-dpad { grid-template-columns: repeat(3, 48px); grid-template-rows: repeat(3, 48px); }
+.mui .mui-dpad .mui-btn.dpadk { width: 48px; height: 48px; }
+
+/* Основные действия и педали — отдельные зоны с подписями. */
+.mui .mui-right { right: calc(12px + var(--safe-r)); bottom: calc(16px + var(--safe-b)); gap: 8px; }
+.mui .mui-arc, .mui .mui-arc.col, .mui .mui-arc.grid2 { grid-template-columns: repeat(2, 44px); gap: 6px; }
+.mui .mui-arc .mui-btn.mid { width: 44px; height: 44px; }
+.mui .mui-arc .mui-btn.main { width: 44px; height: 44px; border-radius: 14px; }
+.mui .mui-arc .mui-btn.main .mui-ico { font-size: 20px; }
+.mui .mui-main-hint { font-size: 9px; color: #d5eae7; letter-spacing: .8px; }
+.mui .mui-ctx { bottom: calc(18px + var(--safe-b)); gap: 6px; }
+.mui .mui-btn.ctx-big { width: 64px; height: 64px; border-radius: 22px; border-color: rgba(255,217,130,.8); background: rgba(120,78,18,.88); }
+.mui .mui-btn.ctx-big .mui-ico { font-size: 24px; }
+.mui .mui-ctx-label { font-size: 10px; max-width: 120px; }
+.mui .mui-pedals { gap: 6px; align-items: flex-end; }
+.mui .mui-btn.pedal { width: 65px; height: 82px; border-radius: 19px; }
+.mui .mui-btn.pedal .mui-ico { font-size: 13px; letter-spacing: 0; }
+.mui .mui-btn.handbrake { width: 48px; height: 50px; border-radius: 15px; }
+.mui .mui-btn.handbrake small { display: block; }
+
+/* Шторки всегда выше кнопок и не пропускают касания в игру. */
+.mui .mui-sheet-back { z-index: 40; background: rgba(2,8,13,.68); }
+.mui .mui-sheet { z-index: 41; bottom: calc(12px + var(--safe-b)); max-height: min(78vh, 520px);
+  background: #101e27; border: 1px solid rgba(152,205,198,.25); border-radius: 22px; }
+.mui .mui-sheet-head { position: sticky; top: -10px; z-index: 1; background: #101e27; padding: 8px 2px 12px; }
+.mui .mui-group h5 { color: #96b8b2; letter-spacing: 1px; }
+.mui .mui-tile, .mui .mui-tray-cell { min-height: 58px; background: rgba(255,255,255,.055); border-color: rgba(200,240,234,.14); }
+.mui .mui-tile small, .mui .mui-tray-cell small { color: #d7e8e4; font-size: 11px; }
+.mui .mui-tray { z-index: 46; max-height: 65vh; overflow-y: auto; background: #101e27; }
+.mui .mui-rot { z-index: 3; }
+
+/* Не перекрывать микрофон спидометром. */
+.hx.mob .hx-sp-pill { top: calc(70px + var(--safe-t)); }
+@media (orientation: portrait) {
+  .mui .mui-top { top: calc(70px + var(--safe-t)); }
+  .mui .mui-move { bottom: calc(86px + var(--safe-b)); }
+  .mui .mui-run { bottom: calc(230px + var(--safe-b)); }
+  .mui .mui-ctx { bottom: calc(200px + var(--safe-b)); }
+  .mui .mui-stick { width: 122px; height: 122px; }
+  .hx.mob .hx-sp-pill { top: calc(125px + var(--safe-t)); bottom: auto; }
+}
+@media (max-height: 430px) and (orientation: landscape) {
+  .mui .mui-stick { width: 104px; height: 104px; }
+  .mui .mui-stick .knob { width: 46px; height: 46px; margin: -23px 0 0 -23px; }
+  .mui .mui-run { bottom: calc(128px + var(--safe-b)); }
+  .mui .mui-steering .mui-btn { width: 54px; height: 54px; }
+  .mui .mui-btn.pedal { width: 56px; height: 68px; }
+  .mui .mui-btn.handbrake { width: 44px; height: 46px; }
+  .mui .mui-btn.ctx-big { width: 54px; height: 54px; }
+  .mui .mui-top { top: calc(62px + var(--safe-t)); }
+}
+
+.mui .mui-tray-cell { align-items: center; justify-content: center; }
+.mui .mui-tray-cell .mui-btn { flex: none; }
