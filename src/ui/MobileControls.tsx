@@ -163,6 +163,10 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
 
   const resetStick = () => { stickId.current = null; g.input.joy.x = 0; g.input.joy.y = 0; setKnob({ x: 0, y: 0 }); };
   useEffect(() => resetStick, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Отпускаем удержанные элементы при переходе пешком / водитель / пассажир.
+  // Иначе скрытый джойстик или педаль могут продолжить рулить после посадки.
+  const controlMode = !v ? 'foot' : v.passenger ? 'passenger' : 'driver';
+  useEffect(() => { releaseAll(); resetStick(); g.input.releaseAll(); setRun(false); }, [controlMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const stickMove = (e: React.PointerEvent) => {
     if (stickId.current !== e.pointerId) return;
@@ -345,8 +349,13 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
         </>
       )}
 
-      {/* лево низ: движение — джойстик или крестовина (настройки → «Движение на телефоне») */}
-      {g.settings.moveStyle === 'pad' ? (
+      {/* Пешком — выбранное управление; за рулём — отдельные кнопки поворота. */}
+      {controlMode === 'driver' ? (
+        <div className="mui-move mui-steering">
+          <Btn g={g} name="steerL" ico="◀" cls="mid" label="Руль влево" />
+          <Btn g={g} name="steerR" ico="▶" cls="mid" label="Руль вправо" />
+        </div>
+      ) : controlMode === 'passenger' ? null : g.settings.moveStyle === 'pad' ? (
         <div className="mui-move padwrap">
           <Dpad g={g} />
         </div>

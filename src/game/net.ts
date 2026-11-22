@@ -95,7 +95,7 @@ export interface RemoteState {
   p?: string; k?: number; w?: number; pt?: number; // поза, фаза 0..1, оружие в руке, наклон прицела
   hp?: number;
   l?: [string, string, string, string, string, string, string, string, string]; // gender, skin, hair, hairColor, top, topColor, bottom, bottomColor, shoes
-  lean?: number; wh?: number; lt?: number;
+  lean?: number; wh?: number; lt?: number; steer?: number; slip?: number;
   pn?: string; pf?: number; pb?: number;
   cr?: number;                                    // присед
   lk?: number;                                    // машина заперта

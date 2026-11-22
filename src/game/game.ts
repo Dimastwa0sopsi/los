@@ -268,7 +268,7 @@ export class Game {
   private economyLabPaused = false;
   private economyLabBase: string | null = null;
   private economyLabInstalledId: string | null = null;
-  online = false; private onlineInitialMoney: number | null = null; net: NetClient | null = null; remotes = new Map<number, Remote>();
+  online = false; private onlineInitialMoney: number | null = null; net: NetClient | null = null; remotes = new Map<number, Remote>(); private remoteSmokeT = new Map<number, number>();
   private netT = 0; private netMoveT = 0; private netN = 0; private lastSpeed = 0;
   sky: THREE.Mesh | null = null; stars: THREE.Points | null = null; clouds: THREE.Group | null = null; private skyMat: THREE.ShaderMaterial | null = null;
   minimap: HTMLCanvasElement | null = null; private miniT = 0;
@@ -4954,7 +4954,7 @@ export class Game {
         i: this.interiorKey(), hp: Math.round(this.state.health),
       };
       if (this.rideRemote) st.r = this.rideRemote.id;
-      if (v) { st.lean = r2(v.lean); st.wh = r2(v.wheelie); st.lt = v.model.lightsOn ? 1 : 0; st.pn = v.model.tuning.plate ?? ''; st.pf = v.model.tuning.plateFront === false ? 0 : 1; st.pb = v.model.tuning.plateBack === false ? 0 : 1; }
+      if (v) { st.lean = r2(v.lean); st.wh = r2(v.wheelie); st.steer = r2(v.steer); st.slip = r2(v.slip); st.lt = v.model.lightsOn ? 1 : 0; st.pn = v.model.tuning.plate ?? ''; st.pf = v.model.tuning.plateFront === false ? 0 : 1; st.pb = v.model.tuning.plateBack === false ? 0 : 1; }
       if (!host) { st.p = this.lying ? 'lie' : this.fallT > 0 ? 'fall' : this.netPose.p; st.k = this.netPose.k; st.pt = this.netPose.pt; st.w = Math.max(0, WEAPON_ORDER.indexOf(this.weapon)); }
       if (this.crouch && !host) st.cr = 1;
       if (v?.owned?.locked && !this.passenger) st.lk = 1;
@@ -4986,15 +4986,15 @@ export class Game {
   private disposeRemote(r: Remote) {
     for (const lv of r.listings) this.removeVehicle(lv); r.listings = [];
     this.peds.removeOwner(r.id); this.removeCarPuppets(r.id);
-    if (this.player.root.parent && r.veh && this.player.root.parent === r.veh.model.body) this.scene.add(this.player.root);
+    if (this.player.root.parent && r.veh && this.player.root.parent === r.veh.model.body) { this.scene.add(this.player.root); this.player.root.scale.setScalar(1); }
     r.char.dispose(); this.scene.remove(r.tag); (r.tag.material as THREE.SpriteMaterial).map?.dispose(); (r.tag.material as THREE.SpriteMaterial).dispose();
     if (r.veh) this.removeRemoteVeh(r);
   }
   private removeRemoteVeh(r: Remote) {
     const v = r.veh; if (!v) return;
     // вынести всех сидящих из модели перед удалением
-    if (this.player.root.parent === v.model.body) this.scene.add(this.player.root);
-    for (const q of this.remotes.values()) if (q.char.root.parent === v.model.body) this.scene.add(q.char.root);
+    if (this.player.root.parent === v.model.body) { this.scene.add(this.player.root); this.player.root.scale.setScalar(1); }
+    for (const q of this.remotes.values()) if (q.char.root.parent === v.model.body) { this.scene.add(q.char.root); q.char.root.scale.setScalar(1); }
     this.removeVehicle(v); r.veh = null;
   }
   private makeTag(name: string, color: string) {
@@ -5077,7 +5077,13 @@ export class Game {
         // водитель за рулём → машина у игрока; вышел → машина остаётся стоять там, где её оставили
         if (R.driving) { nv.x = R.x; nv.z = R.z; nv.y = R.y; nv.heading = R.a; }
         nv.lean = st?.lean ?? 0; nv.wheelie = st?.wh ?? 0; nv.speed = R.driving ? R.spd : 0;
-        if (R.driving) nv.model.animate(Math.hypot(nv.x - ox, nv.z - oz) * Math.sign(R.spd || 1), 0);
+        const steer = typeof st?.steer === 'number' && Number.isFinite(st.steer) ? clamp(st.steer, -1, 1) : 0;
+        const slip = typeof st?.slip === 'number' && Number.isFinite(st.slip) ? clamp(st.slip, -2, 2) : 0;
+        if (R.driving) nv.model.animate(Math.hypot(nv.x - ox, nv.z - oz) * Math.sign(R.spd || 1), steer * 0.5);
+        const smokeAt = (this.remoteSmokeT.get(R.id) ?? 0) - dt;
+        if (R.driving && R.visible && Math.abs(slip) > 0.25 && Math.abs(nv.speed) > 6 && smokeAt <= 0) {
+          this.spawnSmoke(nv); this.remoteSmokeT.set(R.id, 0.08);
+        } else this.remoteSmokeT.set(R.id, Math.max(0, smokeAt));
         if (nv.isHeli) { nv.rotorSpeed = R.driving ? 1 : 0; if (nv.model.rotor) nv.model.rotor.rotation.y += dt * (R.driving ? 30 : 0); if (nv.model.tailRotor) nv.model.tailRotor.rotation.x += dt * (R.driving ? 40 : 0); }
         if (R.driving && typeof st?.pn === 'string') {
           const pn = st.pn.slice(0, 16), pf = st.pf !== 0, pb = st.pb !== 0;
@@ -5118,7 +5124,10 @@ export class Game {
         R.tag.visible = R.char.root.visible;
         continue;
       }
-      if (R.char.root.parent !== this.scene) { this.scene.add(R.char.root); R.char.root.scale.setScalar(1); }
+      if (R.char.root.parent !== this.scene) this.scene.add(R.char.root);
+      // Reparenting during vehicle removal may already have moved it to the
+      // scene while leaving the smaller seat scale behind.
+      R.char.root.scale.setScalar(1);
       const w = st?.w ?? 0; if (w !== R.weapon) { R.weapon = w; R.char.setItem(WEAPON_ORDER[w] ?? 'none'); }
       R.char.root.position.set(R.x, R.y, R.z); R.char.root.rotation.set(0, R.a, 0);
       const sp = Math.abs(R.spd);
@@ -5132,7 +5141,7 @@ export class Game {
       R.char.root.visible = R.visible;
       R.tag.position.set(R.x, R.y + 2.35, R.z); R.tag.visible = R.visible;
     }
-    for (const [id, r] of this.remotes) if (!alive.has(id)) { if (this.rideRemote?.id === id) this.exitRemoteRide(true); this.disposeRemote(r); this.remotes.delete(id); }
+    for (const [id, r] of this.remotes) if (!alive.has(id)) { if (this.rideRemote?.id === id) this.exitRemoteRide(true); this.disposeRemote(r); this.remotes.delete(id); this.remoteSmokeT.delete(id); }
   }
   // ---------- поездка пассажиром у другого игрока ----------
   private startRide(r: Remote) {
