@@ -14,6 +14,7 @@ const tick = () => new Promise<void>((r) => setTimeout(r, 0));
 export interface LightIntersection { node: number; x: number; z: number; gi: number; gj: number; state: number }
 export interface WorldMeshes {
   root: THREE.Group;
+  auctionGroup: THREE.Group;
   chunks: { group: THREE.Group; cx: number; cz: number }[];
   lights: LightIntersection[];
   bulbs: THREE.InstancedMesh;
@@ -493,11 +494,17 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
   // ---------- здания ----------
   progress(0.3, 'Здания');
   const BUILD_STEP = 120;
+  const auctionBatcher = new Batcher();
   for (let i = 0; i < L.buildings.length; i++) {
     if (L.buildings[i].removed) continue;
+    if (L.buildings[i].kind === 'auction') { buildBuilding(auctionBatcher, L.buildings[i]); continue; }
     if (L.buildings[i].kind === 'parkade') buildParkade(B(L.buildings[i].x, L.buildings[i].z), L.buildings[i]); else buildBuilding(B(L.buildings[i].x, L.buildings[i].z), L.buildings[i]);
     if (i % BUILD_STEP === 0) { progress(0.3 + (i / L.buildings.length) * 0.22, `Здания ${i}/${L.buildings.length}`); await tick(); }
   }
+  const auctionGroup = new THREE.Group();
+  auctionGroup.name = 'online-auction'; auctionGroup.visible = false;
+  for (const m of auctionBatcher.build({cast:true,receive:true})) auctionGroup.add(m);
+  root.add(auctionGroup);
   // ---------- гаражи ----------
   const garageGates: THREE.Mesh[] = [];
   for (const g of L.garages) {
@@ -683,7 +690,7 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
     root.add(gates);
   }
   await tick();
-  return { root, chunks, lights, bulbs, wheat, wheatCells, garageGates, waters, gates, gateLeaves, shore, billboards: billboardFaces };
+  return { root, auctionGroup, chunks, lights, bulbs, wheat, wheatCells, garageGates, waters, gates, gateLeaves, shore, billboards: billboardFaces };
 }
 
 // ---------- многоуровневый паркинг ----------

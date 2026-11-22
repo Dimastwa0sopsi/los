@@ -12,6 +12,9 @@ import { MapIndex, drawMap, drawIcons, drawPlayerArrow, toScreen, type MapIcon, 
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { buildWorldMeshes, type WorldMeshes } from './worldMesh';
 import { Collision } from './collision';
+import { availableInMode, auctionBoxes, setAuctionMode } from './auctionMode';
+import { EconomyBarrier, type EconomyRequest, type EconomyRecovery } from './economyBarrier';
+import { EconomyJournal } from './economyJournal';
 import { Character, type Pose } from './character';
 import { Vehicle, AIDriver, playerDrive, heliLanded, nearestNodeFast, trafficCrash, type AICtx, type DriveResult } from './vehicles';
 import { PedSystem, randomLook, type Ped } from './npc';
@@ -260,6 +263,11 @@ export class Game {
   discoOn = false;
   /** остаток «опьянения» в секундах: руль чуть плавает */
   buzzT = 0;
+  // Experimental freeze hook; no live auction action invokes it yet.
+  private readonly economyLabBarrier = new EconomyBarrier();
+  private economyLabPaused = false;
+  private economyLabBase: string | null = null;
+  private economyLabInstalledId: string | null = null;
   online = false; private onlineInitialMoney: number | null = null; net: NetClient | null = null; remotes = new Map<number, Remote>();
   private netT = 0; private netMoveT = 0; private netN = 0; private lastSpeed = 0;
   sky: THREE.Mesh | null = null; stars: THREE.Points | null = null; clouds: THREE.Group | null = null; private skyMat: THREE.ShaderMaterial | null = null;
@@ -314,12 +322,14 @@ export class Game {
     this.speedCameras = generateSpeedCameras(this.L.roadSegments);
     await new Promise((r) => setTimeout(r, 0));
     P(0.1, 'Коллизии');
-    this.col = new Collision(this.L.colliders); this.activeCol = this.col;
+    const onlineOnly = new Set(auctionBoxes(this.L.buildings, this.L.colliders));
+    this.col = new Collision(this.L.colliders.filter(b => !onlineOnly.has(b))); this.activeCol = this.col;
     for (const g of this.L.garages) this.col.dynamic.push({ x0: g.x - g.w / 2 + 0.3, x1: g.x + g.w / 2 - 0.3, z0: g.gateZ, z1: g.gateZ + 0.25, y0: 0, y1: 2.6, tag: 'gate' + g.id });
     GFX.pbr = this.settings.quality !== 'low';
     // слабые телефоны сразу начинают с пониженного разрешения и без лишних эффектов
     if (this.mobile && ((navigator as Navigator & { hardwareConcurrency?: number }).hardwareConcurrency ?? 4) <= 4) this.qualityLevel = 1;
     this.W = await buildWorldMeshes(this.L, P);
+    setAuctionMode(this.online, this.W.auctionGroup, this.col, auctionBoxes(this.L.buildings, this.L.colliders));
     this.rides = new ParkRides(this.L.parkRides);
     this.scene.add(this.rides.group);
     this.ads = new AdsSystem(this.L.billboards, this.W.billboards);
@@ -478,12 +488,12 @@ export class Game {
       (c as Vehicle & { lane?: number; field?: typeof f }).lane = 0; (c as Vehicle & { field?: typeof f }).field = f;
     }
   }
-  private spawnOwnedVehicles() {
+  private spawnOwnedVehicles(preserveSnapshot = false) {
     for (const o of this.state.vehicles) {
       const v = new Vehicle(o.type, 'owned', o.color, o);
       const p = o.pos ?? this.freeSpotNear(this.L.dealerLot.x, this.L.dealerLot.z);
-      if (!o.pos) o.pos = { ...p, a: 0 };
-      v.place(p.x, p.z, o.pos.a ?? 0, 0);
+      if (!o.pos && !preserveSnapshot) o.pos = { ...p, a: 0 };
+      v.place(p.x, p.z, o.pos?.a ?? 0, 0);
       this.addVehicle(v);
     }
   }
@@ -538,6 +548,7 @@ export class Game {
     const loc = s.location;
     if (loc) {
       const b = this.L.buildings[loc.b];
+      if (b?.kind === 'auction' && !this.online) { s.location = null; this.placeOutsideAt(b); return; }
       if (b && b.enter && this.canEnterSaved(b, loc.unit)) {
         this.placeOutsideAt(b); // корректная точка выхода
         this.enterBuilding(b, true);
@@ -590,6 +601,7 @@ export class Game {
     if (this.sky) this.sky.visible = false; if (this.stars) this.stars.visible = false; if (this.clouds) this.clouds.visible = false;
   }
   enterBuilding(b: Building, silent = false) {
+    if (!availableInMode(b.kind, this.online)) return;
     const kind = interiorForBuilding(b.kind);
     if (!kind) return;
     if (b.kind === 'casino' && this.state.money < 50000) { this.sound.error(); this.toast('🕴 Охрана разворачивает вас: нужно $50 000'); return; }
@@ -694,7 +706,7 @@ export class Game {
     else if (code === K.promo) this.togglePanel({ type: 'promo' });
   }
   togglePanel(p: Panel) { if (this.panel && this.panel.type === p.type) this.closePanel(); else this.openPanel(p); }
-  openPanel(p: Panel) { this.beltHold = 0; this.beltTriggered = false; this.panel = p; this.input?.releaseAll(); if (this.input) this.input.enabled = false; this.input?.unlock(); this.cb.onPanel(p); this.sound.click(); }
+  openPanel(p: Panel) { if (this.economyLabPaused) return; this.beltHold = 0; this.beltTriggered = false; this.panel = p; this.input?.releaseAll(); if (this.input) this.input.enabled = false; this.input?.unlock(); this.cb.onPanel(p); this.sound.click(); }
   closePanel() {
     this.panel = null; this.lookOrbit = 0; if (this.input) { this.input.enabled = true; this.input.releaseAll(); } this.cb.onPanel(null);
   }
@@ -721,6 +733,8 @@ export class Game {
     else if (avg < 1 / 55 && this.qualityLevel > 0) { if (++this.goodWindows >= 4) { this.qualityLevel--; this.goodWindows = 0; this.applyRenderSettings(); } }
   }
   private update(dt: number) {
+    // Freeze timers, movement, jobs and autosaves while reconciling; rendering continues.
+    if (this.economyLabPaused) return;
     const s = this.state;
     this.ensureOwnedMask();
     if (!this.panel) s.playTime += dt;
@@ -2484,7 +2498,7 @@ export class Game {
     // двери зданий
     let best: Building | null = null; let bd = 2.4;
     for (const b of this.L.buildings) {
-      if (b.removed || Math.abs(b.door.x - px) > 3 || Math.abs(b.door.z - pz) > 3) continue;
+      if (b.removed || !availableInMode(b.kind, this.online) || Math.abs(b.door.x - px) > 3 || Math.abs(b.door.z - pz) > 3) continue;
       const d = Math.hypot(b.door.x - px, b.door.z - pz); if (d < bd) { bd = d; best = b; }
     }
     if (best) {
@@ -3502,6 +3516,7 @@ export class Game {
     const out: MapIcon[] = [];
     for (const c of this.speedCameras) out.push({ x:c.x, z:c.z, icon:'📷', color:'#f97316', size:0.8, label:`Камера ${c.limit}`, small:true });
     for (const b of this.L.buildings) {
+      if (!availableInMode(b.kind, this.online)) continue;
       const ic = POI_ICON[b.kind];
       if (ic) out.push({ x: b.x, z: b.z, icon: ic, color: POI_COLOR[b.kind] ?? '#334155' });
       else if ((b.kind === 'vhouse' || b.kind === 'house') && b.forSale) {
@@ -3589,7 +3604,7 @@ export class Game {
     g.save();
     const rr = 14 * dpr;
     g.beginPath(); g.roundRect(0, 0, W, H, rr); g.clip();
-    drawMap(g, this.mapIdx, v, W, H, { route: this.gpsRoute, buildings: true });
+    drawMap(g, this.mapIdx, v, W, H, { route: this.gpsRoute, buildings: true, online: this.online });
     this.poiT--; if (!this.poiCache || this.poiT <= 0) { this.poiCache = this.markers(); this.poiT = 30; }
     g.save(); g.scale(dpr, dpr);
     const vS = { ...v, scale: v.scale / dpr, ox: v.ox / dpr, oy: v.oy / dpr };
@@ -3610,7 +3625,7 @@ export class Game {
     const g = cv.getContext('2d'); if (!g || !this.mapIdx) return;
     const W = cv.width, H = cv.height;
     const v: MapView = { cx: view.cx, cz: view.cz, scale: view.scale * dpr, rot: 0, ox: W / 2, oy: H / 2 };
-    drawMap(g, this.mapIdx, v, W, H, { route: this.gpsRoute, labels: true, buildings: view.scale > 0.25 });
+    drawMap(g, this.mapIdx, v, W, H, { route: this.gpsRoute, labels: true, buildings: view.scale > 0.25, online: this.online });
     g.save(); g.scale(dpr, dpr);
     const vS = { ...v, scale: view.scale, ox: W / dpr / 2, oy: H / dpr / 2 };
     const sz = Math.max(0.75, Math.min(1.3, view.scale * 1.4));
@@ -3625,7 +3640,7 @@ export class Game {
     const r = cv.getContext('2d'); if (!r || !this.mapIdx) return;
     const W = cv.width, H = cv.height;
     const v: MapView = { cx: view.cx, cz: view.cz, scale: view.scale * dpr, rot: 0, ox: W / 2, oy: H / 2 };
-    drawMap(r, this.mapIdx, v, W, H, { labels: true, buildings: view.scale > 0.3, bus: { routes: this.L.busRoutes, active } });
+    drawMap(r, this.mapIdx, v, W, H, { labels: true, buildings: view.scale > 0.3, online: this.online, bus: { routes: this.L.busRoutes, active } });
     r.save(); r.scale(dpr, dpr);
     const vS = { ...v, scale: view.scale, ox: W / dpr / 2, oy: H / dpr / 2 };
     const icons: MapIcon[] = [];
@@ -4665,7 +4680,7 @@ export class Game {
     if (b) this.placeOutsideAt(b);
   }
   /** смена активного прогресса (соло ↔ онлайн): сохраняет текущий, выгружает его мир и загружает новый */
-  private swapState(next: GameState, nextOnline: boolean) {
+  private swapState(next: GameState, nextOnline: boolean, preserveSnapshot = false) {
     this.closePanel();
     this.save();
     if (this.inVeh) this.exitVehicle(true);
@@ -4679,11 +4694,12 @@ export class Game {
     this.rental = null; this.emote = null; this.drugT = 0; this.renderer.domElement.style.filter = '';
     for (const v of [...this.vehicles]) if (v.owned || (v.role === 'police' && v.sirens)) this.removeVehicle(v);
     this.online = nextOnline;
+    setAuctionMode(this.online, this.W.auctionGroup, this.col, auctionBoxes(this.L.buildings, this.L.colliders));
     this.cameraSeen.clear();
     this.state = next;
     this.weapon = 'fists'; this.player.setItem('none'); this.combat.reset(); this.combat.clearFx();
     this.player.setLook(next.look);
-    this.spawnOwnedVehicles();
+    this.spawnOwnedVehicles(preserveSnapshot);
     this.poiCache = null; this.gpsRoute = null; this.bustT = 0;
     this.restorePosition();
     this.camera.position.set(this.px - Math.sin(this.camYaw) * 5, this.py + 3, this.pz - Math.cos(this.camYaw) * 5);
@@ -4818,6 +4834,7 @@ export class Game {
     this.sound.coin();
   }
   async leaveOnline() {
+    if (this.economyLabPaused) { this.toast('Дождитесь восстановления состояния'); return; }
     if (!this.online) return;
     this.save();
     const net = this.net;
@@ -4840,6 +4857,7 @@ export class Game {
   }
   /** сервер отвалился: продолжаем играть офлайн, ничего не теряя */
   fallbackOffline() {
+    if (this.economyLabPaused) { this.toast('Дождитесь восстановления состояния'); return; }
     if (this.online) { void this.leaveOnline(); this.input.enabled = true; this.input.releaseAll(); return; }
     this.net?.close(); this.net = null;
     this.input.enabled = true; this.input.releaseAll();
@@ -5552,12 +5570,109 @@ export class Game {
   }
   // ================= СОХРАНЕНИЕ =================
   save() {
-    if (!this.state) return;
+    if (this.economyLabPaused || !this.state) return;
     const s = this.state;
     if (!this.interior) { const p = this.playerWorldPos(); s.pos = { x: p.x, z: p.z, a: p.a }; }
     for (const v of this.vehicles) if (v.owned) { v.owned.pos = { x: v.x, z: v.z, a: v.heading }; v.owned.condition = v.condition; v.owned.fuel = v.fuel; v.owned.mileage = Math.round(v.mileage); v.owned.missing = v.model.missingParts(); }
     saveState(s, this.online, s.nick);
     if (this.online) this.net?.saveAccount(s);
+  }
+  private economyJournalLab(): EconomyJournal | null {
+    try { return this.net ? new EconomyJournal(localStorage,this.net.url,this.net.nick) : null; } catch { return null; }
+  }
+  /** Used on the same authenticated account to resume, never as proof of success. */
+  pendingEconomyRecoveryLab() { return this.economyJournalLab()?.read() ?? {ok:false as const,error:'storage_error'}; }
+  /** LAB ONLY: flush the current world to the normal save queue, then freeze.
+   * This does not send any economy request or enable a server capability.
+   * All asynchronous sources still need auditing before live use. */
+  prepareEconomySyncLab(): boolean {
+    if (this.economyLabPaused || !this.online || !this.net?.ready || !this.state || this.inVeh || this.rideRemote || this.rideOn || this.job || this.taxi || this.service || this.carrying) return false;
+    const journal = this.economyJournalLab();
+    const pending = journal?.read();
+    if (!pending?.ok || pending.request) return false;
+    this.closePanel();
+    this.save();
+    try { this.economyLabBase = JSON.stringify(this.state); } catch { this.economyLabBase = null; return false; }
+    this.economyLabPaused = true;
+    this.input?.releaseAll(); if (this.input) this.input.enabled = false;
+    return true;
+  }
+  /** Only after the save was acknowledged, with no local mutation meanwhile. */
+  beginEconomySyncLab(requestId: string, action: string, payload: unknown): EconomyRequest | null {
+    if (!this.economyLabPaused || this.economyLabBarrier.blocked || !this.net?.ready || !this.net.accountSaved || this.net.accountRevision === null) return null;
+    try { if (JSON.stringify(this.state) !== this.economyLabBase) return null; } catch { return null; }
+    const request={requestId,action,payload,revision:this.net.accountRevision};
+    // Write before the caller can send. If storage fails, do not start.
+    const journal=this.economyJournalLab();
+    if (!journal?.write(request)) return null;
+    return this.economyLabBarrier.begin(request,true,this.state) ? this.economyLabBarrier.retry() : null;
+  }
+  /** LAB ONLY: resume a journalled request after authentication and a fresh
+   * server snapshot. The journal is not a receipt; caller must ask the server
+   * to recover the exact request. Do not send a new normal save first. */
+  resumeEconomyRecoveryLab(): EconomyRequest | null {
+    if (this.economyLabPaused || !this.online || !this.net?.ready || !this.net.accountSaved || this.net.accountRevision===null || !this.state || this.inVeh || this.rideRemote || this.rideOn || this.job || this.taxi || this.service || this.carrying) return null;
+    const journal=this.economyJournalLab()?.read();
+    if (!journal?.ok || !journal.request || this.net.accountRevision<journal.request.revision) return null;
+    try {
+      const base=JSON.stringify(this.state);
+      this.closePanel();
+      if (!this.economyLabBarrier.begin(journal.request,true,this.state)) return null;
+      this.economyLabBase=base; this.economyLabPaused=true;
+      if (this.input) { this.input.enabled=false; this.input.releaseAll(); }
+      return this.economyLabBarrier.retry();
+    } catch { return null; }
+  }
+  /** Lab only: apply an authoritative recovery result. Fail closed on any
+   * unexpected mutation; never use a stale operation receipt as a snapshot. */
+  installEconomyRecoveryLab(receipt: EconomyRecovery): {ok:boolean;error?:string} {
+    if (!this.economyLabPaused || this.economyLabInstalledId || !this.net?.ready) return {ok:false,error:'not_ready'};
+    const request=this.economyLabBarrier.retry(), journal=this.economyJournalLab()?.read();
+    const baseRevision=this.net.accountRevision;
+    if (!request || !journal?.ok || !journal.request || JSON.stringify(journal.request)!==JSON.stringify(request) || baseRevision===null || baseRevision<request.revision) return {ok:false,error:'not_ready'};
+    const accepted=this.economyLabBarrier.acceptRecovery(receipt,this.state);
+    if (!accepted.ok) return accepted;
+    if (accepted.revision<baseRevision) return {ok:false,error:'newer_snapshot_required'};
+    // Refuse states that require migration (which could silently alter assets).
+    const candidate=accepted.state as GameState;
+    try {
+      const canonical=(v: unknown): string => {
+        if (Array.isArray(v)) return '['+v.map(canonical).join(',')+']';
+        if (v && typeof v==='object') return '{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+canonical((v as Record<string,unknown>)[k])).join(',')+'}';
+        return JSON.stringify(v);
+      };
+      if (!candidate || !Array.isArray(candidate.vehicles) || !Array.isArray(candidate.kiosks) || !Array.isArray(candidate.properties) || !candidate.inventory || !candidate.pos || !candidate.look || !Number.isSafeInteger(candidate.money) || candidate.money<0 || candidate.money>2147483647) return {ok:false,error:'invalid_state'};
+      const migrated=migrate(JSON.parse(JSON.stringify(candidate)) as Partial<GameState>);
+      if (!migrated || canonical(candidate)!==canonical(migrated)) return {ok:false,error:'state_requires_migration'};
+      const expected=JSON.stringify(candidate);
+      this.swapState(candidate,true,true);
+      if (JSON.stringify(this.state)!==expected) return {ok:false,error:'world_changed_snapshot'};
+      if (!this.net.adoptEconomyRevisionLab(baseRevision,accepted.revision)) return {ok:false,error:'revision_changed'};
+      this.net.setMoney(candidate.money);
+      if (!this.economyLabBarrier.installed(request.requestId,this.state,accepted.revision)) return {ok:false,error:'install_conflict'};
+      this.economyLabInstalledId=request.requestId;
+      return this.finishEconomyRecoveryLab() ? {ok:true} : {ok:false,error:'storage_error'};
+    } catch { return {ok:false,error:'install_failed'}; }
+    finally { if (this.economyLabPaused && this.input) { this.input.enabled=false; this.input.releaseAll(); } }
+  }
+  /** Retry only journal cleanup if its first removal failed; no repeat operation. */
+  finishEconomyRecoveryLab(): boolean {
+    if (!this.economyLabPaused || !this.economyLabInstalledId) return false;
+    if (!this.economyJournalLab()?.clear(this.economyLabInstalledId)) return false;
+    this.economyLabInstalledId=null; this.economyLabPaused=false; this.economyLabBase=null;
+    if (this.input) { this.input.enabled=true; this.input.releaseAll(); }
+    return true;
+  }
+  notifyEconomyRevisionLab(revision: number): boolean { return this.economyLabBarrier.notifyRevision(revision); }
+  /** Safe only before a request has been started. Once started, recovery must
+   * determine the server outcome; this hook intentionally cannot unfreeze it. */
+  cancelEconomySyncPreparationLab(): boolean {
+    if (!this.economyLabPaused || this.economyLabBarrier.blocked) return false;
+    const journal=this.economyJournalLab()?.read();
+    if (!journal?.ok || journal.request) return false;
+    this.economyLabPaused = false; this.economyLabBase = null;
+    if (this.input) { this.input.enabled = true; this.input.releaseAll(); }
+    return true;
   }
   getState() { return this.state; }
   ownedVehicleNear(uidv: string) { return this.vehicles.find((v) => v.owned?.uid === uidv) ?? null; }

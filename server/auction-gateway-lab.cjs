@@ -9,14 +9,25 @@ const {normalizeLogin} = require('./account-store.cjs');
 const {createAuctionStore} = require('./auction-store.cjs');
 const {createListingPolicy} = require('./auction-listing-policy.cjs');
 const {createEconomyTransactions} = require('./economy-transaction.cjs');
+const {createShopPurchasesLab} = require('./shop-purchases-lab.cjs');
+const {createBusinessAuctionLab} = require('./business-auction-lab.cjs');
 const SAFE = new Set(['look','health','food','water','energy','gameTime','playTime']);
-function createAuctionGatewayLab(db, accounts, catalogue, notify = () => {}) {
-  const auction = createAuctionStore(db,{authorizeListing:createListingPolicy(db,catalogue)});
+function createAuctionGatewayLab(db, accounts, catalogue, notify = () => {}, shopConfig = null, businessCatalogue = null) {
+  const authorizeListing=createListingPolicy(db,catalogue);
+  // Explicit opt-in on the isolated gateway; registry tables must already exist.
+  // Legacy active business lots must be handled separately, not silently mixed.
+  if (businessCatalogue && shopConfig && shopConfig.options?.ownership!=='registry') throw TypeError('registry_shop_required');
+  let auction=createAuctionStore(db,{authorizeListing});
+  if (businessCatalogue) {
+    const businessAdapter=createBusinessAuctionLab(db,businessCatalogue);
+    auction=createAuctionStore(db,{authorizeListing,businessAdapter});
+  }
   const receipts = createEconomyTransactions(db);
+  const shopBuy = shopConfig ? createShopPurchasesLab(db,shopConfig.catalogue,shopConfig.authorize,shopConfig.options) : null;
   const get = db.prepare('SELECT state_json,revision FROM accounts WHERE login_key=?');
   function updateNotice(names) {
     for (const name of new Set(names.filter(Boolean))) {
-      try { notify(name); } catch { /* committed operation must not be reported as failed */ }
+      try { const row=get.get(name); if (row) notify(name,row.revision); } catch { /* committed operation must not be reported as failed */ }
     }
   }
   function load(name) {
@@ -43,13 +54,20 @@ function createAuctionGatewayLab(db, accounts, catalogue, notify = () => {}) {
     let prior=null, result;
     try {
       result=receipts.execute(actor,revision,requestId,action,payload,({actor,revision,requestId,payload})=>{
+        if (action==='shop_buy' && shopBuy) return shopBuy({actor,revision,payload});
         if (action==='list') return auction.list(actor,revision,payload.kind,payload.key,payload.price,requestId,now);
         if (action==='bid') { prior=Number.isSafeInteger(payload.id) ? auction.get(payload.id)?.bidder : null; return auction.bid(actor,revision,payload.id,payload.bid,requestId,now); }
         const e=Error('invalid_action');e.code='invalid_action';throw e;
       });
     } catch(e) { return {ok:false,requestId,error:typeof e?.code==='string' && /^[a-z_]{1,40}$/.test(e.code) ? e.code : 'internal'}; }
-    if (result.ok && !result.replay) updateNotice([actor,prior]);
+    if (result.ok && !result.replay) updateNotice([actor,prior,action==='shop_buy' ? result.result.owner : null]);
     return result;
+  }
+  // Test-only recovery; actor comes from authenticated adapter, never payload.
+  function recover(actor,request) {
+    if(typeof actor!=='string' || !actor || normalizeLogin(actor)!==actor || !request || typeof request!=='object' || Array.isArray(request)) return {ok:false,error:'invalid'};
+    try { return receipts.recover(actor,request.revision,request.requestId,request.action,request.payload); }
+    catch { return {ok:false,error:'internal'}; }
   }
   function finish(id,now=Date.now()) {
     if (!Number.isSafeInteger(id) || id<=0 || !Number.isSafeInteger(now) || now<0) return {ok:false,error:'invalid'};
@@ -60,6 +78,6 @@ function createAuctionGatewayLab(db, accounts, catalogue, notify = () => {}) {
       return {ok:true,settled:done};
     } catch(e) { return {ok:false,error:typeof e?.code==='string' && /^[a-z_]{1,40}$/.test(e.code) ? e.code : 'internal'}; }
   }
-  return {snapshot:load,save:(actor,revision,saveId,state)=>saveTx(actor,revision,saveId,state),execute,finish,publicLots:now=>auction.publicLots(now),due:now=>auction.due(now)};
+  return {snapshot:load,save:(actor,revision,saveId,state)=>saveTx(actor,revision,saveId,state),execute,recover,finish,publicLots:now=>auction.publicLots(now),due:now=>auction.due(now)};
 }
 module.exports={createAuctionGatewayLab};

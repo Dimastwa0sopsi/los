@@ -1,0 +1,17 @@
+import { EconomyJournal } from '../src/game/economyJournal';
+const assert=(v:unknown,m:string)=>{if(!v)throw Error(m);};
+const map=new Map<string,string>();
+const storage={getItem:(k:string)=>map.get(k)??null,setItem:(k:string,v:string)=>{map.set(k,v);},removeItem:(k:string)=>{map.delete(k);}};
+const id='request-0000000000000001',request={requestId:id,revision:4,action:'bid',payload:{id:1,bid:50000}};
+const j=new EconomyJournal(storage,'wss://example.test/game','Тест');
+assert(j.write(request),'запись до отправки');assert(!j.write({...request,requestId:'request-0000000000000002'}),'нельзя перезаписать незавершённый запрос');
+const again=new EconomyJournal(storage,'wss://example.test/game','тест');const loaded=again.read();assert(loaded.ok&&loaded.request?.requestId===id,'перезапуск с тем же аккаунтом');
+const other=new EconomyJournal(storage,'wss://example.test/game','Другой');const o=other.read();assert(o.ok&&o.request===null,'другой аккаунт');
+const otherServer=new EconomyJournal(storage,'wss://other.test/game','Тест');const s=otherServer.read();assert(s.ok&&s.request===null,'другой сервер');
+assert(!new EconomyJournal(storage,'wss://user:secret@example.test/game','Тест').write(request),'нет секретов в ключе');
+assert(!j.clear('request-0000000000000002'),'чужой результат не очищает запись');
+assert(j.clear(id)&&j.read().ok,'точный результат разрешает очистку');
+assert(!j.write({...request,payload:{...request.payload,secret:'password'}}),'нельзя сохранить посторонние поля');
+const inaccessible={...storage,setItem:()=>{throw Error('quota');}};assert(!new EconomyJournal(inaccessible,'wss://example.test/game','Тест').write(request),'ошибка хранилища блокирует отправку');
+assert(j.write(request),'новая запись');const key=[...map.keys()][0];map.set(key,'{broken');const bad=j.read();assert(!bad.ok && !j.write(request),'повреждённая запись не удаляется и блокирует новую операцию');
+console.log('✓ журнал запросов: до отправки, перезапуск, аккаунт/сервер, повреждение и отказ хранилища');

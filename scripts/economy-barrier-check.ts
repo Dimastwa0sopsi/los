@@ -20,4 +20,18 @@ assert(barrier.installed(id,receipt.state,5) && !barrier.blocked,'установ
 assert(barrier.begin({...request,revision:5,requestId:'request-0000000000000002'},true,state),'следующий запрос');
 const expired = barrier.accept({ok:false,requestId:'request-0000000000000002',committed:true,error:'receipt_expired'},state);
 assert(!expired.ok && expired.error==='committed_recovery_required' && barrier.blocked,'нет повторного списания при истечении истории');
+const wrong = barrier.acceptRecovery({ok:true,requestId:'request-0000000000000002',outcome:'committed',revision:5,committedRevision:6,state},state);
+assert(!wrong.ok && wrong.error==='invalid_receipt','неверная ревизия фиксации');
+assert(barrier.notifyRevision(8),'сервер сообщил о новой ревизии');
+let recovery=barrier.acceptRecovery({ok:true,requestId:'request-0000000000000002',outcome:'committed',revision:7,committedRevision:6,state},state);
+assert(!recovery.ok && recovery.error==='newer_snapshot_required','старый результат не перезаписывает уведомление');
+recovery=barrier.acceptRecovery({ok:true,requestId:'request-0000000000000002',outcome:'committed',revision:8,committedRevision:6,state:{money:12000}},state);
+assert(recovery.ok && recovery.revision===8,'восстановление последнего снимка после истечения квитанции');
+barrier.notifyRevision(9);
+assert(!barrier.installed('request-0000000000000002',{money:12000},8),'уведомление перед установкой не теряется');
+recovery=barrier.acceptRecovery({ok:true,requestId:'request-0000000000000002',outcome:'committed',revision:9,committedRevision:6,state:{money:13000}},state);
+assert(recovery.ok && barrier.installed('request-0000000000000002',{money:13000},9),'разблокировка после установки актуального снимка');
+assert(barrier.begin({...request,revision:9,requestId:'request-0000000000000003'},true,state),'новый запрос');
+recovery=barrier.acceptRecovery({ok:true,requestId:'request-0000000000000003',outcome:'cancelled',revision:9,state},state);
+assert(recovery.ok && recovery.outcome==='cancelled' && barrier.installed('request-0000000000000003',state,9),'восстановление отменённого запроса');
 console.log('✓ экспериментальный барьер: очередь, повтор, конфликт, установка, истекший ответ');

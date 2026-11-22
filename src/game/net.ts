@@ -316,6 +316,13 @@ export class NetClient {
   private handshake = false;
   private saveIds = false;
   get accountSaved() { return !this.flight && !this.pending && !this.conflict && this.authenticated; }
+  /** Experimental synchronization must wait for this exact acknowledged revision. */
+  get accountRevision() { return this.accountSaved ? this.revision : null; }
+  /** Lab only: install an authoritative revision only with an idle save queue. */
+  adoptEconomyRevisionLab(base: number, next: number): boolean {
+    if (!this.ready || !this.accountSaved || this.revision !== base || !Number.isSafeInteger(next) || next < base) return false;
+    this.revision = next; this.lastSaveMoney = NaN; return true;
+  }
   /** {type:'error'} — бан/кик: показать текст и отключиться */
   onError: ((text: string) => void) | null = null;
   /** сервер недоступен (не удалось подключиться) */

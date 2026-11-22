@@ -15,6 +15,7 @@ const t = (name: string, ok: boolean, extra = '') => {
 
 async function main() {
 const W = await buildWorldMeshes(L, () => {});
+t('аукцион построен отдельно и скрыт до включения онлайн', W.auctionGroup.parent === W.root && !W.auctionGroup.visible && W.auctionGroup.children.length > 0);
 t('прибой имеет прозрачный материал, а не фиолетовый fallback', !!W.shore && W.shore.userData.matKey === 'foam' && (W.shore.material as THREE.MeshLambertMaterial).transparent && (W.shore.material as THREE.MeshLambertMaterial).color.getHex() !== 0xff00ff);
 t('чанки мира собраны', W.chunks.length > 100, `${W.chunks.length}`);
 t('щитов в геометрии столько же, сколько в лейауте', W.billboards.length === L.billboards.length, `${W.billboards.length}`);

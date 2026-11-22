@@ -219,7 +219,7 @@ export function MapCanvas({ g, mode, onDone, height }: { g: Game; mode: 'waypoin
   const view = useRef({ cx: p0.x, cz: p0.z, scale: 0.75 });
   const [, f] = useState(0);
   const [query, setQuery] = useState('');
-  const places = searchPlaces(g.L.buildings, query, g.playerWorldPos());
+  const places = searchPlaces(g.L.buildings, query, g.playerWorldPos(), 8, g.online);
   const drag = useRef<{ moved: number; pts: Map<number, { x: number; y: number }> } | null>(null);
   useEffect(() => {
     const c = cv.current!; let timer = 0; let alive = true;
