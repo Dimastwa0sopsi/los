@@ -41,3 +41,12 @@ n3.handle(JSON.stringify({type:'account_saved',ok:false,error:'conflict',revisio
 assert(!n3.accountSaved && !n3.conflict,'запоздавший отказ предыдущего сохранения игнорируется');
 n3.handle(JSON.stringify({type:'account_saved',ok:true,revision:6,saveId:sent3[1].saveId}));
 assert(n3.accountSaved,'новая очередь подтверждена');
+
+const n4 = new NetClient('tester','m','wss://test',{mode:'login',password:'password-123'}) as any;
+const sent4:any[]=[];n4.ws={readyState:1,send:(s:string)=>sent4.push(JSON.parse(s))};n4.status='online';n4.handshake=true;
+n4.handle(JSON.stringify({type:'login_success',caps:{accounts:1,saveIds:1},accountRevision:4,accountState:{money:1},player:{id:1}}));
+assert(!n4.adoptEconomyRevisionLab(3,5) && n4.accountRevision===4,'нельзя установить результат на чужую базовую ревизию');
+n4.saveAccount({money:2});assert(!n4.adoptEconomyRevisionLab(4,5),'нельзя установить ревизию при неподтверждённом сохранении');
+n4.handle(JSON.stringify({type:'account_saved',ok:true,revision:5,saveId:sent4[0].saveId}));
+assert(n4.adoptEconomyRevisionLab(5,7) && n4.accountRevision===7,'установка серверной ревизии только при пустой очереди');
+n4.saveAccount({money:3});assert(sent4[1].revision===7,'следующий снимок использует установленную ревизию');

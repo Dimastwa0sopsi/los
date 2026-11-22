@@ -1,7 +1,7 @@
 {
   "name": "react-vite-tailwind",
   "private": true,
-  "version": "0.6.16",
+  "version": "0.6.17",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -44,7 +44,12 @@
     "check:colab-economy-audit": "python3 scripts/colab_economy_audit_check.py",
     "check:account-client": "esbuild scripts/account-client-check.ts --bundle --platform=node --format=cjs --outfile=.check/account-client.cjs --log-level=error --define:import.meta.env={} && node .check/account-client.cjs",
     "check:auction-catalogue": "esbuild scripts/export-auction-catalogue.ts --bundle --platform=node --format=cjs --outfile=.check/export-auction-catalogue.cjs --log-level=error && node .check/export-auction-catalogue.cjs --check",
-    "check:auction-panel": "esbuild scripts/auction-panel-check.tsx --bundle --platform=node --format=cjs --outfile=.check/auction-panel.cjs --log-level=error --loader:.png=empty --loader:.jpg=empty --loader:.md=text --define:import.meta.env={} && node .check/auction-panel.cjs"
+    "check:auction-panel": "esbuild scripts/auction-panel-check.tsx --bundle --platform=node --format=cjs --outfile=.check/auction-panel.cjs --log-level=error --loader:.png=empty --loader:.jpg=empty --loader:.md=text --define:import.meta.env={} && node .check/auction-panel.cjs",
+    "check:shop-catalogue": "esbuild scripts/export-shop-catalogue.ts --bundle --platform=node --format=cjs --outfile=.check/export-shop-catalogue.cjs --log-level=error && node .check/export-shop-catalogue.cjs --check",
+    "check:auction-mode": "esbuild scripts/auction-mode-check.ts --bundle --platform=node --format=cjs --outfile=.check/auction-mode.cjs --log-level=error --loader:.png=empty --define:import.meta.env={} && node .check/auction-mode.cjs",
+    "check:economy-barrier": "esbuild scripts/economy-barrier-check.ts --bundle --platform=node --format=cjs --outfile=.check/economy-barrier.cjs --log-level=error && node .check/economy-barrier.cjs",
+    "check:economy-game-lab": "esbuild scripts/economy-game-lab-check.ts --bundle --platform=node --format=cjs --outfile=.check/economy-game.cjs --log-level=error --loader:.png=empty --define:import.meta.env={} && node .check/economy-game.cjs",
+    "check:economy-journal": "esbuild scripts/economy-journal-check.ts --bundle --platform=node --format=cjs --outfile=.check/economy-journal.cjs --log-level=error && node .check/economy-journal.cjs"
   },
   "dependencies": {
     "clsx": "2.1.1",

@@ -1,0 +1,1294 @@
+{
+  "schema": 1,
+  "shops": {
+    "kiosk:0": [
+      "shawarma",
+      "cola",
+      "water"
+    ],
+    "kiosk:1": [
+      "coffee",
+      "croissant",
+      "tea"
+    ],
+    "kiosk:2": [
+      "icecream",
+      "water",
+      "juice"
+    ],
+    "kiosk:3": [
+      "cigarettes",
+      "chocolate",
+      "energy"
+    ],
+    "kiosk:4": [
+      "apple",
+      "banana",
+      "juice"
+    ],
+    "kiosk:5": [
+      "sausage",
+      "cola",
+      "chips"
+    ],
+    "kiosk:6": [
+      "shawarma",
+      "cola",
+      "water"
+    ],
+    "kiosk:7": [
+      "coffee",
+      "croissant",
+      "tea"
+    ],
+    "kiosk:8": [
+      "icecream",
+      "water",
+      "juice"
+    ],
+    "kiosk:9": [
+      "cigarettes",
+      "chocolate",
+      "energy"
+    ],
+    "kiosk:10": [
+      "icecream",
+      "water",
+      "juice"
+    ],
+    "building:32": [
+      "water",
+      "cola",
+      "kvass",
+      "coffee",
+      "sandwich",
+      "hotdog",
+      "donut",
+      "chips",
+      "cigarettes",
+      "energy"
+    ],
+    "building:104": [
+      "mask",
+      "water",
+      "cola",
+      "kvass",
+      "lemonade",
+      "coffee",
+      "bread",
+      "sandwich",
+      "hotdog",
+      "chips",
+      "chocolate",
+      "donut",
+      "gum",
+      "energy",
+      "cigarettes"
+    ],
+    "building:142": [
+      "mask",
+      "water",
+      "cola",
+      "kvass",
+      "lemonade",
+      "coffee",
+      "bread",
+      "sandwich",
+      "hotdog",
+      "chips",
+      "chocolate",
+      "donut",
+      "gum",
+      "energy",
+      "cigarettes"
+    ],
+    "building:220": [
+      "knife",
+      "machete",
+      "seed_durman",
+      "pistol",
+      "revolver",
+      "smg",
+      "shotgun",
+      "rifle",
+      "sniper",
+      "ammo",
+      "ammo_m",
+      "shells",
+      "ammo_r"
+    ],
+    "building:265": [
+      "mask",
+      "water",
+      "cola",
+      "kvass",
+      "lemonade",
+      "coffee",
+      "bread",
+      "sandwich",
+      "hotdog",
+      "chips",
+      "chocolate",
+      "donut",
+      "gum",
+      "energy",
+      "cigarettes"
+    ],
+    "building:309": [
+      "rod",
+      "rod_pro",
+      "bait",
+      "lure",
+      "net",
+      "bucket",
+      "water",
+      "sandwich",
+      "kvass"
+    ],
+    "building:337": [
+      "coffee",
+      "tea",
+      "burger",
+      "hotdog",
+      "pizza",
+      "soup",
+      "borscht",
+      "croissant",
+      "donut",
+      "cake",
+      "juice",
+      "lemonade"
+    ],
+    "building:414": [
+      "medkit",
+      "pills",
+      "vitamins",
+      "bandage",
+      "antiseptic",
+      "sunscreen",
+      "water"
+    ],
+    "building:438": [
+      "water",
+      "cola",
+      "kvass",
+      "coffee",
+      "sandwich",
+      "hotdog",
+      "donut",
+      "chips",
+      "cigarettes",
+      "energy"
+    ],
+    "building:459": [
+      "coffee",
+      "tea",
+      "burger",
+      "hotdog",
+      "pizza",
+      "soup",
+      "borscht",
+      "croissant",
+      "donut",
+      "cake",
+      "juice",
+      "lemonade"
+    ],
+    "building:478": [
+      "mask",
+      "water",
+      "cola",
+      "kvass",
+      "lemonade",
+      "coffee",
+      "bread",
+      "sandwich",
+      "hotdog",
+      "chips",
+      "chocolate",
+      "donut",
+      "gum",
+      "energy",
+      "cigarettes"
+    ],
+    "building:494": [
+      "mask",
+      "seed_tomato",
+      "seed_cucumber",
+      "seed_strawberry",
+      "water",
+      "cola",
+      "juice",
+      "smoothie",
+      "milk",
+      "bread",
+      "sausage",
+      "salo",
+      "cheese",
+      "eggs",
+      "pelmeni",
+      "pizza",
+      "apple",
+      "banana",
+      "grapes",
+      "watermelon",
+      "corn",
+      "honey",
+      "chocolate",
+      "icecream",
+      "chips",
+      "cigarettes"
+    ],
+    "building:513": [
+      "mask",
+      "seed_tomato",
+      "seed_cucumber",
+      "seed_strawberry",
+      "water",
+      "cola",
+      "juice",
+      "smoothie",
+      "milk",
+      "bread",
+      "sausage",
+      "salo",
+      "cheese",
+      "eggs",
+      "pelmeni",
+      "pizza",
+      "apple",
+      "banana",
+      "grapes",
+      "watermelon",
+      "corn",
+      "honey",
+      "chocolate",
+      "icecream",
+      "chips",
+      "cigarettes"
+    ],
+    "building:520": [
+      "coffee",
+      "tea",
+      "burger",
+      "hotdog",
+      "pizza",
+      "soup",
+      "borscht",
+      "croissant",
+      "donut",
+      "cake",
+      "juice",
+      "lemonade"
+    ],
+    "building:547": [
+      "coffee",
+      "tea",
+      "burger",
+      "hotdog",
+      "pizza",
+      "soup",
+      "borscht",
+      "croissant",
+      "donut",
+      "cake",
+      "juice",
+      "lemonade"
+    ],
+    "building:569": [
+      "water",
+      "cola",
+      "kvass",
+      "coffee",
+      "sandwich",
+      "hotdog",
+      "donut",
+      "chips",
+      "cigarettes",
+      "energy"
+    ],
+    "building:571": [
+      "mask",
+      "water",
+      "cola",
+      "kvass",
+      "lemonade",
+      "coffee",
+      "bread",
+      "sandwich",
+      "hotdog",
+      "chips",
+      "chocolate",
+      "donut",
+      "gum",
+      "energy",
+      "cigarettes"
+    ],
+    "building:582": [
+      "coffee",
+      "tea",
+      "burger",
+      "hotdog",
+      "pizza",
+      "soup",
+      "borscht",
+      "croissant",
+      "donut",
+      "cake",
+      "juice",
+      "lemonade"
+    ],
+    "building:601": [
+      "water",
+      "cola",
+      "kvass",
+      "coffee",
+      "sandwich",
+      "hotdog",
+      "donut",
+      "chips",
+      "cigarettes",
+      "energy"
+    ],
+    "building:614": [
+      "coffee",
+      "tea",
+      "burger",
+      "hotdog",
+      "pizza",
+      "soup",
+      "borscht",
+      "croissant",
+      "donut",
+      "cake",
+      "juice",
+      "lemonade"
+    ],
+    "building:627": [
+      "water",
+      "cola",
+      "kvass",
+      "coffee",
+      "sandwich",
+      "hotdog",
+      "donut",
+      "chips",
+      "cigarettes",
+      "energy"
+    ],
+    "building:641": [
+      "knife",
+      "machete",
+      "seed_durman",
+      "pistol",
+      "revolver",
+      "smg",
+      "shotgun",
+      "rifle",
+      "sniper",
+      "ammo",
+      "ammo_m",
+      "shells",
+      "ammo_r"
+    ],
+    "building:658": [
+      "medkit",
+      "pills",
+      "vitamins",
+      "bandage",
+      "antiseptic",
+      "sunscreen",
+      "water"
+    ],
+    "building:665": [
+      "medkit",
+      "pills",
+      "vitamins",
+      "bandage",
+      "antiseptic",
+      "sunscreen",
+      "water"
+    ],
+    "building:683": [
+      "mask",
+      "seed_tomato",
+      "seed_cucumber",
+      "seed_strawberry",
+      "water",
+      "cola",
+      "juice",
+      "smoothie",
+      "milk",
+      "bread",
+      "sausage",
+      "salo",
+      "cheese",
+      "eggs",
+      "pelmeni",
+      "pizza",
+      "apple",
+      "banana",
+      "grapes",
+      "watermelon",
+      "corn",
+      "honey",
+      "chocolate",
+      "icecream",
+      "chips",
+      "cigarettes"
+    ],
+    "building:693": [
+      "rod",
+      "rod_pro",
+      "bait",
+      "lure",
+      "net",
+      "bucket",
+      "water",
+      "sandwich",
+      "kvass"
+    ],
+    "building:746": [
+      "mask",
+      "water",
+      "cola",
+      "kvass",
+      "lemonade",
+      "coffee",
+      "bread",
+      "sandwich",
+      "hotdog",
+      "chips",
+      "chocolate",
+      "donut",
+      "gum",
+      "energy",
+      "cigarettes"
+    ],
+    "building:805": [
+      "knife",
+      "machete",
+      "seed_durman",
+      "pistol",
+      "revolver",
+      "smg",
+      "shotgun",
+      "rifle",
+      "sniper",
+      "ammo",
+      "ammo_m",
+      "shells",
+      "ammo_r"
+    ],
+    "building:841": [
+      "mask",
+      "water",
+      "cola",
+      "kvass",
+      "lemonade",
+      "coffee",
+      "bread",
+      "sandwich",
+      "hotdog",
+      "chips",
+      "chocolate",
+      "donut",
+      "gum",
+      "energy",
+      "cigarettes"
+    ],
+    "building:893": [
+      "mask",
+      "seed_tomato",
+      "seed_cucumber",
+      "seed_strawberry",
+      "water",
+      "cola",
+      "juice",
+      "smoothie",
+      "milk",
+      "bread",
+      "sausage",
+      "salo",
+      "cheese",
+      "eggs",
+      "pelmeni",
+      "pizza",
+      "apple",
+      "banana",
+      "grapes",
+      "watermelon",
+      "corn",
+      "honey",
+      "chocolate",
+      "icecream",
+      "chips",
+      "cigarettes"
+    ],
+    "building:945": [
+      "medkit",
+      "pills",
+      "vitamins",
+      "bandage",
+      "antiseptic",
+      "sunscreen",
+      "water"
+    ],
+    "building:1021": [
+      "mask",
+      "seed_tomato",
+      "seed_cucumber",
+      "seed_strawberry",
+      "water",
+      "cola",
+      "juice",
+      "smoothie",
+      "milk",
+      "bread",
+      "sausage",
+      "salo",
+      "cheese",
+      "eggs",
+      "pelmeni",
+      "pizza",
+      "apple",
+      "banana",
+      "grapes",
+      "watermelon",
+      "corn",
+      "honey",
+      "chocolate",
+      "icecream",
+      "chips",
+      "cigarettes"
+    ],
+    "building:1023": [
+      "coffee",
+      "tea",
+      "burger",
+      "hotdog",
+      "pizza",
+      "soup",
+      "borscht",
+      "croissant",
+      "donut",
+      "cake",
+      "juice",
+      "lemonade"
+    ],
+    "building:1036": [
+      "mask",
+      "water",
+      "cola",
+      "kvass",
+      "lemonade",
+      "coffee",
+      "bread",
+      "sandwich",
+      "hotdog",
+      "chips",
+      "chocolate",
+      "donut",
+      "gum",
+      "energy",
+      "cigarettes"
+    ],
+    "building:1080": [
+      "water",
+      "cola",
+      "kvass",
+      "coffee",
+      "sandwich",
+      "hotdog",
+      "donut",
+      "chips",
+      "cigarettes",
+      "energy"
+    ],
+    "building:1116": [
+      "mask",
+      "knife",
+      "seed_tomato",
+      "seed_potato",
+      "seed_cucumber",
+      "seed_strawberry",
+      "seed_sunflower",
+      "bread",
+      "milk",
+      "water",
+      "kvass",
+      "sausage",
+      "eggs",
+      "cheese",
+      "honey",
+      "apple",
+      "cigarettes",
+      "tea"
+    ],
+    "building:1118": [
+      "medkit",
+      "pills",
+      "vitamins",
+      "bandage",
+      "antiseptic",
+      "sunscreen",
+      "water"
+    ],
+    "building:1119": [
+      "knife",
+      "machete",
+      "seed_durman",
+      "pistol",
+      "revolver",
+      "smg",
+      "shotgun",
+      "rifle",
+      "sniper",
+      "ammo",
+      "ammo_m",
+      "shells",
+      "ammo_r"
+    ],
+    "building:1142": [
+      "rod",
+      "rod_pro",
+      "bait",
+      "lure",
+      "net",
+      "bucket",
+      "water",
+      "sandwich",
+      "kvass"
+    ],
+    "building:1143": [
+      "medkit",
+      "pills",
+      "vitamins",
+      "bandage",
+      "antiseptic",
+      "sunscreen",
+      "water"
+    ],
+    "building:1144": [
+      "knife",
+      "machete",
+      "seed_durman",
+      "pistol",
+      "revolver",
+      "smg",
+      "shotgun",
+      "rifle",
+      "sniper",
+      "ammo",
+      "ammo_m",
+      "shells",
+      "ammo_r"
+    ],
+    "building:1148": [
+      "mask",
+      "knife",
+      "seed_tomato",
+      "seed_potato",
+      "seed_cucumber",
+      "seed_strawberry",
+      "seed_sunflower",
+      "bread",
+      "milk",
+      "water",
+      "kvass",
+      "sausage",
+      "eggs",
+      "cheese",
+      "honey",
+      "apple",
+      "cigarettes",
+      "tea"
+    ],
+    "building:1168": [
+      "medkit",
+      "pills",
+      "vitamins",
+      "bandage",
+      "antiseptic",
+      "sunscreen",
+      "water"
+    ],
+    "building:1169": [
+      "knife",
+      "machete",
+      "seed_durman",
+      "pistol",
+      "revolver",
+      "smg",
+      "shotgun",
+      "rifle",
+      "sniper",
+      "ammo",
+      "ammo_m",
+      "shells",
+      "ammo_r"
+    ],
+    "building:1206": [
+      "mask",
+      "seed_tomato",
+      "seed_cucumber",
+      "seed_strawberry",
+      "water",
+      "cola",
+      "juice",
+      "smoothie",
+      "milk",
+      "bread",
+      "sausage",
+      "salo",
+      "cheese",
+      "eggs",
+      "pelmeni",
+      "pizza",
+      "apple",
+      "banana",
+      "grapes",
+      "watermelon",
+      "corn",
+      "honey",
+      "chocolate",
+      "icecream",
+      "chips",
+      "cigarettes"
+    ],
+    "building:1207": [
+      "medkit",
+      "pills",
+      "vitamins",
+      "bandage",
+      "antiseptic",
+      "sunscreen",
+      "water"
+    ],
+    "building:1208": [
+      "knife",
+      "machete",
+      "seed_durman",
+      "pistol",
+      "revolver",
+      "smg",
+      "shotgun",
+      "rifle",
+      "sniper",
+      "ammo",
+      "ammo_m",
+      "shells",
+      "ammo_r"
+    ],
+    "building:1210": [
+      "mask",
+      "knife",
+      "seed_tomato",
+      "seed_potato",
+      "seed_cucumber",
+      "seed_strawberry",
+      "seed_sunflower",
+      "bread",
+      "milk",
+      "water",
+      "kvass",
+      "sausage",
+      "eggs",
+      "cheese",
+      "honey",
+      "apple",
+      "cigarettes",
+      "tea"
+    ],
+    "building:1311": [
+      "water",
+      "cola",
+      "kvass",
+      "coffee",
+      "sandwich",
+      "hotdog",
+      "donut",
+      "chips",
+      "cigarettes",
+      "energy"
+    ]
+  },
+  "items": {
+    "ammo": {
+      "price": 60,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 30,
+      "ammoType": "p"
+    },
+    "ammo_m": {
+      "price": 70,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 18,
+      "ammoType": "m"
+    },
+    "ammo_r": {
+      "price": 140,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 30,
+      "ammoType": "r"
+    },
+    "antiseptic": {
+      "price": 10,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "apple": {
+      "price": 1,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "bait": {
+      "price": 15,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "banana": {
+      "price": 1,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "bandage": {
+      "price": 8,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "borscht": {
+      "price": 7,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "bread": {
+      "price": 2,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "bucket": {
+      "price": 90,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "burger": {
+      "price": 8,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "cake": {
+      "price": 7,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "cheese": {
+      "price": 6,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "chips": {
+      "price": 3,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "chocolate": {
+      "price": 3,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "cigarettes": {
+      "price": 7,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "coffee": {
+      "price": 4,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "cola": {
+      "price": 3,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "corn": {
+      "price": 2,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "croissant": {
+      "price": 3,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "donut": {
+      "price": 3,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "eggs": {
+      "price": 4,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "energy": {
+      "price": 5,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "grapes": {
+      "price": 4,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "gum": {
+      "price": 1,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "honey": {
+      "price": 9,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "hotdog": {
+      "price": 5,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "icecream": {
+      "price": 3,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "juice": {
+      "price": 4,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "knife": {
+      "price": 900,
+      "weapon": true,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "kvass": {
+      "price": 3,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "lemonade": {
+      "price": 4,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "lure": {
+      "price": 120,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "machete": {
+      "price": 1900,
+      "weapon": true,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "mask": {
+      "price": 75,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "medkit": {
+      "price": 60,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "milk": {
+      "price": 3,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "net": {
+      "price": 450,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "pelmeni": {
+      "price": 6,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "pills": {
+      "price": 15,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "pistol": {
+      "price": 1500,
+      "weapon": true,
+      "firearm": true,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "pizza": {
+      "price": 10,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "revolver": {
+      "price": 2600,
+      "weapon": true,
+      "firearm": true,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "rifle": {
+      "price": 9500,
+      "weapon": true,
+      "firearm": true,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "rod": {
+      "price": 900,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "rod_pro": {
+      "price": 3200,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "salo": {
+      "price": 8,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "sandwich": {
+      "price": 5,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "sausage": {
+      "price": 6,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "seed_cucumber": {
+      "price": 12,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "seed_durman": {
+      "price": 150,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "seed_potato": {
+      "price": 10,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "seed_strawberry": {
+      "price": 18,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "seed_sunflower": {
+      "price": 8,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "seed_tomato": {
+      "price": 12,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "shawarma": {
+      "price": 6,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "shells": {
+      "price": 80,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 16,
+      "ammoType": "s"
+    },
+    "shotgun": {
+      "price": 4800,
+      "weapon": true,
+      "firearm": true,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "smg": {
+      "price": 5200,
+      "weapon": true,
+      "firearm": true,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "smoothie": {
+      "price": 6,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "sniper": {
+      "price": 14000,
+      "weapon": true,
+      "firearm": true,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "soup": {
+      "price": 6,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "sunscreen": {
+      "price": 12,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "tea": {
+      "price": 2,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "vitamins": {
+      "price": 12,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "water": {
+      "price": 2,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    },
+    "watermelon": {
+      "price": 6,
+      "weapon": false,
+      "firearm": false,
+      "ammo": 0,
+      "ammoType": null
+    }
+  }
+}

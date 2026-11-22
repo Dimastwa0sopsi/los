@@ -1,5 +1,6 @@
 // Векторная отрисовка мини-карты и большой карты (чёткая при любом масштабе)
 import { CELL, ROAD_W } from './config';
+import { availableInMode } from './auctionMode';
 import type { WorldLayout, Building, REdge, BusRoute } from './worldgen';
 
 // запасной вариант для старых браузеров без roundRect
@@ -42,7 +43,7 @@ export function toWorld(v: MapView, sx: number, sy: number) {
   return { x: v.cx + (dx * c - dy * s) / v.scale, z: v.cz + (dx * s + dy * c) / v.scale };
 }
 
-export function drawMap(g: CanvasRenderingContext2D, idx: MapIndex, v: MapView, W: number, H: number, opts: { route?: { x: number; z: number }[] | null; labels?: boolean; buildings?: boolean; bus?: { routes: BusRoute[]; active?: number | null } }) {
+export function drawMap(g: CanvasRenderingContext2D, idx: MapIndex, v: MapView, W: number, H: number, opts: { route?: { x: number; z: number }[] | null; labels?: boolean; buildings?: boolean; online?: boolean; bus?: { routes: BusRoute[]; active?: number | null } }) {
   const L = idx.L;
   const R = Math.hypot(W, H) / v.scale; // радиус видимой области в метрах
   const x0 = v.cx - R, x1 = v.cx + R, z0 = v.cz - R, z1 = v.cz + R;
@@ -86,6 +87,7 @@ export function drawMap(g: CanvasRenderingContext2D, idx: MapIndex, v: MapView, 
   // здания
   if (opts.buildings !== false) {
     for (const bd of idx.query(idx.b, x0, z0, x1, z1)) {
+      if (!availableInMode(bd.kind, opts.online ?? true)) continue;
       const civic = bd.kind === 'cityhall' || bd.kind === 'police' || bd.kind === 'hospital' || bd.kind === 'fire' || bd.kind === 'bank' || bd.kind === 'vadmin' || bd.kind === 'office';
       const shop = bd.kind === 'shop24' || bd.kind === 'supermarket' || bd.kind === 'cafe' || bd.kind === 'mall' || bd.kind === 'clothes' || bd.kind === 'pharmacy' || bd.kind === 'dealer' || bd.kind === 'market' || bd.kind === 'vshop' || bd.kind === 'fishshop' || bd.kind === 'bar' || bd.kind === 'ozgim';
       g.fillStyle = civic ? PAL.civic : shop ? PAL.shop

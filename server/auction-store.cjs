@@ -11,7 +11,7 @@ const STEPS = Object.freeze({ vehicle: 1000, business: 10000, apartment: 10000, 
 function fail(code) { const e = new Error(code); e.code = code; throw e; }
 function amount(n) { return Number.isSafeInteger(n) && n > 0 && n <= MAX_MONEY; }
 
-function createAuctionStore(db, { authorizeListing } = {}) {
+function createAuctionStore(db, { authorizeListing, businessAdapter } = {}) {
   db.exec(`CREATE TABLE IF NOT EXISTS auction_lots (
     id INTEGER PRIMARY KEY AUTOINCREMENT, seller TEXT NOT NULL, kind TEXT NOT NULL,
     asset_key TEXT NOT NULL, asset_json TEXT NOT NULL, start_price INTEGER NOT NULL,
@@ -115,10 +115,11 @@ function createAuctionStore(db, { authorizeListing } = {}) {
       // Fail closed: public lot viewing remains available, but a future adapter
       // must explicitly supply the server-side listing policy.
       if (typeof authorizeListing !== 'function') fail('listing_disabled');
-      authorizeListing({actor,kind,key});
+      if (kind === 'business' && businessAdapter) businessAdapter.authorize({actor,key});
+      else authorizeListing({actor,kind,key});
       if (db.prepare("SELECT 1 FROM auction_lots WHERE kind=? AND asset_key=? AND status='active'").get(kind, key)) fail('already_listed');
       if ((kind === 'apartment' || kind === 'house') && db.prepare("SELECT 1 FROM auction_lots WHERE kind IN ('apartment','house') AND asset_key=? AND status='active'").get(key)) fail('already_listed');
-      const asset = removeAsset(seller.state, kind, key);
+      const asset = kind === 'business' && businessAdapter ? businessAdapter.reserve({actor,key}) : removeAsset(seller.state, kind, key);
       const r = insertLot.run(actor, kind, key, JSON.stringify(asset), price, STEPS[kind], now + DURATION);
       save(seller);
       return { id: Number(r.lastInsertRowid), endsAt: now + DURATION, revision: seller.row.revision + 1 };
@@ -147,13 +148,20 @@ function createAuctionStore(db, { authorizeListing } = {}) {
     const lot = getLot.get(id);
     if (!lot || lot.status !== 'active' || now < lot.ends_at) return false;
     const asset = JSON.parse(lot.asset_json), seller = load(lot.seller);
+    // Status and registry transfer share this transaction; on any failure both roll back.
+    db.prepare("UPDATE auction_lots SET status=?,finished_at=? WHERE id=?").run(lot.bidder ? 'sold' : 'unsold', now, id);
+    if (lot.kind === 'business' && businessAdapter) {
+      businessAdapter.settle({key:lot.asset_key,seller:lot.seller,winner:lot.bidder,asset});
+      if (lot.bidder) { const winner = load(lot.bidder); seller.state.money += lot.bid; save(winner); }
+      save(seller);
+      return true;
+    }
     if (lot.bidder) {
       const winner = load(lot.bidder);
       addAsset(winner.state, lot.kind, asset, now, true);
       seller.state.money += lot.bid;
       save(winner); save(seller);
     } else { addAsset(seller.state, lot.kind, asset, now, false); save(seller); }
-    db.prepare("UPDATE auction_lots SET status=?,finished_at=? WHERE id=?").run(lot.bidder ? 'sold' : 'unsold', now, id);
     return true;
   });
   // Ограниченный публичный снимок: не выдаём сохранённое имущество, холодильник,
