@@ -73,6 +73,9 @@ export class PedSystem {
   group = new THREE.Group();
   L: WorldLayout;
   private dayBeach = true;
+  // Отдельный генератор позиций: раскладка отдыхающих меняется при каждом запуске,
+  // но не меняет фиксированные идентификаторы NPC или геометрию мира.
+  private beachRandom = new RNG(Math.floor(Math.random() * 0x100000000));
   constructor(L: WorldLayout) { this.L = L; }
   private uidN = 0;
   private make(kind: PedKind, look?: Look, seed?: number): Ped {
@@ -130,12 +133,14 @@ export class PedSystem {
     for (let k = 0; k < 26; k++) {
       const p = this.make('beach');
       const mode = k % 4; // 0 лежит, 1 стоит, 2 гуляет, 3 плавает
-      // купальщики — подальше от кромки: у пляжа отмель, метров с 12 уже по грудь
-      p.homeX = mode === 3 ? b.x0 - 12 - rng.next() * 14 : b.x0 + 10 + rng.next() * (b.x1 - b.x0 - 20);
-      p.homeZ = b.z0 + 15 + rng.next() * (b.z1 - b.z0 - 30);
-      p.spot = mode; p.x = p.homeX; p.z = p.homeZ; p.a = rng.next() * 6;
+      const br = this.beachRandom;
+      p.homeZ = b.z0 + 18 + br.next() * (b.z1 - b.z0 - 36);
+      const bank = this.L.river.center(p.homeZ) + this.L.river.half;
+      // Вода и песок привязаны к фактической изогнутой линии берега.
+      p.homeX = mode === 3 ? bank - 12 - br.next() * 12 : bank + 10 + br.next() * Math.max(1, b.x1 - bank - 25);
+      p.spot = mode; p.x = p.homeX; p.z = p.homeZ; p.a = br.next() * Math.PI * 2;
       p.state = mode === 0 ? 'lie' : mode === 1 ? 'stand' : mode === 3 ? 'swim' : 'walk';
-      p.tx = p.homeX; p.tz = p.homeZ + 30; p.speed = 1.0;
+      p.tx = p.homeX; p.tz = p.homeZ + (mode === 3 ? 5 : 30); p.speed = 1.0;
     }
   }
   /** новая точка прогулки в парке: кольцо, аллея или площадь у ракеты */
@@ -296,7 +301,7 @@ export class PedSystem {
           } else if (p.kind === 'beach') {
             const d = toward(p.tx, p.tz, p.speed);
             if (d < 0.4) {
-              if (p.timer === -1) { p.timer = 0; p.state = p.spot === 0 ? 'lie' : p.spot === 1 ? 'stand' : p.spot === 3 ? 'swim' : 'walk'; p.tx = p.homeX; p.tz = p.homeZ + (p.tz > p.homeZ ? -30 : 30); }
+              if (p.timer === -1) { p.timer = 0; p.state = p.spot === 0 ? 'lie' : p.spot === 1 ? 'stand' : p.spot === 3 ? 'swim' : 'walk'; p.tx = p.homeX; p.tz = p.homeZ + (p.tz > p.homeZ ? -1 : 1) * (p.spot === 3 ? 5 : 30); }
               else { p.tz = p.tz > p.homeZ ? p.homeZ - 30 : p.homeZ + 30; }
             }
           }
@@ -308,7 +313,13 @@ export class PedSystem {
         case 'stand': pose = 'idle'; break;
         case 'dance': { p.phase += dt * 5.2; pose = (['dance1', 'dance3', 'dance5', 'dance9'] as const)[p.seed % 4]; break; }
         case 'lie': pose = 'lie'; break;
-        case 'swim': pose = 'swim'; p.phase += dt * 3; break;
+        case 'swim': {
+          // Небольшой заплыв вдоль берега, не выходя в фарватер.
+          pose = 'swim'; p.phase += dt * 3;
+          const d = toward(p.tx, p.tz, 0.65);
+          if (d < 0.4) { p.tz = p.tz > p.homeZ ? p.homeZ - 5 : p.homeZ + 5; p.tx = this.L.river.center(p.tz) + this.L.river.half - (this.L.river.center(p.homeZ) + this.L.river.half - p.homeX); }
+          break;
+        }
         case 'hands': pose = 'handsup'; p.timer -= dt; if (p.timer <= 0) p.state = 'stand'; break;
         case 'leave': { const d = toward(p.tx, p.tz, 1.4); pose = 'walk'; if (d < 0.5) { p.state = 'gone'; p.char.root.visible = false; } break; }
         case 'flee': {
@@ -377,7 +388,7 @@ export class PedSystem {
       if (moving && pose === 'run') p.phase += dt * 11;
       if (moving && pose === 'guard') p.phase += dt * 7;
       if (visible) {
-        p.char.root.position.set(p.x, p.y + (p.kind === 'beach' && p.state === 'lie' ? 0.12 : 0), p.z);
+        p.char.root.position.set(p.x, p.state === 'swim' && p.kind === 'beach' ? this.L.waterY : p.y + (p.kind === 'beach' && p.state === 'lie' ? 0.12 : 0), p.z);
         p.char.root.rotation.y = p.a;
         p.char.pose(pose, t + p.phase, ph >= 0 ? ph : p.phase, 0, mv);
       }
@@ -563,7 +574,7 @@ export class PedSystem {
     const legs = pose === 'walk' || pose === 'run' || pose === 'guard';
     if (legs) p.phase += dt * (pose === 'run' ? 11 : 6);
     if (visible) {
-      p.char.root.position.set(p.x, p.y + (pose === 'lie' ? 0.12 : 0), p.z); p.char.root.rotation.y = p.a;
+      p.char.root.position.set(p.x, pose === 'swim' ? this.L.waterY : p.y + (pose === 'lie' ? 0.12 : 0), p.z); p.char.root.rotation.y = p.a;
       p.char.pose(pose, t, legs ? p.phase : p.netPh ?? 0, 0, pose === 'guard' ? 1 : 0);
     }
   }

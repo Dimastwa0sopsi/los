@@ -123,10 +123,10 @@ try {
   console.log(`  пляж: зонты ${beachProps.umbrella}, лежаки ${beachProps.sunbed}, лодки ${beachProps.boat}, буйки ${beachProps.buoy}, ` +
     `круги ${beachProps.ring}, гирлянды ${beachProps.flagline}, дюнная трава ${beachProps.dunegrass}, ракушки ${beachProps.shell}, мячи ${beachProps.ball}`);
   if (beachProps.dune < 6 || beachProps.cabin < 2) throw new Error('пляж собран не полностью');
-  // настоящий пляж: зонты, лежаки, лодки у воды, буйки, спасательные круги и гирлянды
+  // настоящий пляж: зонты, лежаки, лодки у воды, спасательные круги и гирлянды
   if (beachProps.sunbed < 20 || beachProps.umbrella < 20) throw new Error('на пляже мало зонтов и лежаков');
   if (beachProps.boat < 2) throw new Error('у лодочной станции нет лодок');
-  if (beachProps.buoy < 5) throw new Error('в воде нет линии буйков');
+  if (beachProps.buoy !== 0) throw new Error('на пляже остались буйки');
   if (beachProps.ring < 3) throw new Error('на пляже нет спасательных кругов');
   if (beachProps.flagline < 4) throw new Error('на пляже нет гирлянд флажков');
   if (beachProps.dunegrass < 10) throw new Error('дюны без травы');
