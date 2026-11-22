@@ -2357,6 +2357,7 @@ export class Game {
     if (this.plateHold?.vehicle !== near.vehicle || this.plateHold.side !== near.side) this.plateHold = { ...near, time: 0 };
     this.plateHold.time += dt;
     if (this.plateHold.time < 2) return;
+    if (this.online && near.vehicle.owned) { this.toast('Снятие своих номеров в онлайне пока не подключено'); this.plateHold = null; this.plateHoldDone = true; return; }
     const v = near.vehicle, t = { ...v.model.tuning, [near.side === 'front' ? 'plateFront' : 'plateBack']: false };
     if (!this.online && v.owned) {
       const number = v.model.tuning.plate ?? '', key = plateKey(number);
@@ -3464,6 +3465,18 @@ export class Game {
     (this.state.plateInventory ??= []).push({number,front:true,back:true});
     this.save(); this.toast(`Номер ${number} в инвентаре. Установите его возле машины`);
   }
+  /** Использовать предмет на ближайшей своей машине, не меняя другие автомобили. */
+  useLocalPlate(number: string) {
+    if (this.online) { this.toast('Установка номера в онлайне пока не подключена'); return; }
+    if (this.interior || this.inVeh || this.rideRemote) { this.toast('Выйдите и подойдите к своей стоящей машине'); return; }
+    const nearby = this.vehicles.filter(v => v.owned && v.model.group.visible &&
+      this.state.vehicles.some(o => o.uid === v.owned?.uid) &&
+      !['moto','scooter','heli','combine','quad'].includes(v.spec.body))
+      .map(v => ({v, d:Math.hypot(v.x-this.px,v.z-this.pz)}))
+      .filter(x => x.d <= 8).sort((a,b) => a.d-b.d)[0];
+    if (!nearby?.v.owned) { this.toast('Подойдите к своей стоящей машине'); return; }
+    this.installLocalPlate(number, nearby.v.owned.uid);
+  }
   /** Установка табличек из локального инвентаря только на свою стоящую машину. */
   installLocalPlate(number: string, uidv: string) {
     if (this.online) { this.toast('Установка из инвентаря пока доступна только в одиночной игре'); return; }
@@ -3475,7 +3488,7 @@ export class Game {
     const spec = VEHICLES[o.type];
     if (!spec || ['moto','scooter','heli','combine','quad'].includes(spec.body)) { this.toast('Для этого транспорта номера недоступны'); return; }
     const v = this.ownedVehicleNear(uidv);
-    if (!v || this.interior || this.inVeh || Math.abs(v.speed) > 0.5 || Math.hypot(v.x-this.px,v.z-this.pz) > 8) { this.toast('Выйдите и подойдите к своей стоящей машине'); return; }
+    if (!v || this.interior || this.inVeh || this.rideRemote || !v.model.group.visible || Math.abs(v.speed) > 0.5 || Math.hypot(v.x-this.px,v.z-this.pz) > 8) { this.toast('Выйдите и подойдите к своей стоящей машине'); return; }
     const key = plateKey(p.number);
     if (this.state.vehicles.some(x => x.uid !== uidv && plateKey(x.tuning?.plate ?? '') === key)) { this.toast('Этот номер уже указан у другой вашей машины'); return; }
     const old = o.tuning.plate ?? '', oldKey = plateKey(old);

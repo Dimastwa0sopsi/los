@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import type { Game } from '../game/game';
-import { ITEMS, VEHICLES, WEAPONS, AMMO_NAMES, TOPS, BOTTOMS, CLOTH_COLORS, DRESSES } from '../game/data';
+import { ITEMS, WEAPONS, AMMO_NAMES, TOPS, BOTTOMS, CLOTH_COLORS, DRESSES } from '../game/data';
 
 const COLS = 9;
+const PLATE_PREFIX = 'plate:';
 export function Slot({ id, n, sel, onClick, onDouble, small }: { id?: string; n?: number; sel?: boolean; onClick?: () => void; onDouble?: () => void; small?: boolean }) {
   const it = id ? ITEMS[id] : null;
+  const plate = id?.startsWith(PLATE_PREFIX) ? id.slice(PLATE_PREFIX.length) : null;
+  const name = plate ? `Номер ${plate}` : it?.name;
   return (
-    <button className={`mc-slot ${sel ? 'sel' : ''} ${small ? 'sm' : ''}`} onClick={onClick} onDoubleClick={onDouble} title={it?.name}>
-      {it && <span className="ic">{it.icon}</span>}
+    <button className={`mc-slot ${sel ? 'sel' : ''} ${small ? 'sm' : ''}`} onClick={onClick} onDoubleClick={onDouble} title={name} aria-label={name}>
+      {(it || plate) && <span className="ic">{plate ? '🏴‍☠️' : it?.icon}</span>}
       {it && (n ?? 1) > 1 && <em>{n}</em>}
     </button>
   );
@@ -31,10 +34,18 @@ export function InventoryGrid({ g }: { g: Game }) {
   const [selF, setSelF] = useState<string | null>(null);
   const [, f] = useState(0); const r = () => f((x) => x + 1);
   const s = g.getState(); const fridge = g.homeFridge();
-  const items = invEntries(s.inventory);
+  const items: [string, number][] = [...invEntries(s.inventory), ...(s.plateInventory ?? []).map((p): [string, number] => [PLATE_PREFIX + p.number, 1])];
+  const selectedPlate = sel?.startsWith(PLATE_PREFIX) ? (s.plateInventory ?? []).find(p => PLATE_PREFIX + p.number === sel) : undefined;
   const it = sel ? ITEMS[sel] : null; const itF = selF ? ITEMS[selF] : null;
   const stats = (id: string) => { const x = ITEMS[id]; return [x.food && `🍗 +${x.food}`, x.drink && `💧 ${x.drink > 0 ? '+' : ''}${x.drink}`, x.energy && `⚡ +${x.energy}`, x.health && `❤ ${x.health > 0 ? '+' : ''}${x.health}`, x.weapon && `урон ${WEAPONS[x.weapon].dmg} · магазин ${WEAPONS[x.weapon].mag}`, x.seed && 'посадить на грядку', x.sell && `продажа $${x.sell}`].filter(Boolean).join(' · '); };
-  const use = (id: string, fromF = false) => { g.useItem(id, fromF); r(); if (!(fromF ? g.homeFridge()?.[id] : g.getState().inventory[id])) fromF ? setSelF(null) : setSel(null); };
+  const use = (id: string, fromF = false) => {
+    if (!fromF && id.startsWith(PLATE_PREFIX)) {
+      const number = id.slice(PLATE_PREFIX.length); g.useLocalPlate(number); r();
+      if (!g.getState().plateInventory?.some(p => p.number === number)) setSel(null);
+      return;
+    }
+    g.useItem(id, fromF); r(); if (!(fromF ? g.homeFridge()?.[id] : g.getState().inventory[id])) fromF ? setSelF(null) : setSel(null);
+  };
   return (
     <div className="mc-inv">
       <div className="mc-title">Инвентарь <small>двойной клик — использовать</small></div>
@@ -49,13 +60,11 @@ export function InventoryGrid({ g }: { g: Game }) {
           <button className="ui-btn sm ghost" onClick={() => { g.dropItem(sel); r(); if (!g.getState().inventory[sel]) setSel(null); }}>Выбросить</button>
         </div>
       )}
-      {(s.plateInventory?.length ?? 0) > 0 && <><div className="mc-title">🚘 Номерные таблички <small>только для одиночной игры</small></div>
-        <p className="tb-note">Выйдите и подойдите к своей стоящей машине, затем выберите её для установки. Старые таблички вернутся в инвентарь.</p>
-        {(s.plateInventory ?? []).map((p,i) => <div className="mc-info" key={`${p.number}-${i}`}>
-          <span className="big">🚘</span><div className="grow"><b>{p.number}</b><small>передняя: {p.front ? 'есть' : 'нет'} · задняя: {p.back ? 'есть' : 'нет'}</small>
-            <div>{s.vehicles.filter(o => VEHICLES[o.type] && !['moto','scooter','heli','combine','quad'].includes(VEHICLES[o.type].body)).map(o => <button key={o.uid} className="ui-btn sm" disabled={g.online} onClick={() => { g.installLocalPlate(p.number,o.uid); r(); }}>Установить: {VEHICLES[o.type].name}</button>)}</div>
-          </div>
-        </div>)}</>}
+      {selectedPlate && sel && <div className="mc-info">
+        <span className="big">🏴‍☠️</span><div className="grow"><b>Номер {selectedPlate.number}</b>
+          <small>Передняя: {selectedPlate.front ? 'есть' : 'нет'} · задняя: {selectedPlate.back ? 'есть' : 'нет'} · {g.online ? 'онлайн пока недоступно' : 'подойдите к своей стоящей машине'}</small></div>
+        <button className="ui-btn sm main" disabled={g.online} onClick={() => use(sel)}>Использовать</button>
+      </div>}
       <div className="mc-title">👕 Одежда <small>переодевание где угодно</small></div>
       <Wardrobe g={g} />
       {fridge && <>
