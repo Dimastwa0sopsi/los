@@ -144,6 +144,13 @@ export class Vehicle {
   dispose() { this.model.dispose(); }
 }
 
+// Сильно повреждённый двигатель ограничивает скорость независимо от тюнинга.
+// Неломаемые промо-машины и вертолёты сохраняют свои особенности.
+export function damagedSpeedLimit(v: Pick<Vehicle, 'condition' | 'spec' | 'isHeli'>): number {
+  if (v.spec.unbreakable || v.isHeli || v.condition >= 0.45) return Infinity;
+  return (v.condition < 0.2 ? 80 : 120) / 3.6;
+}
+
 // ---------- физика игрока ----------
 export interface DriveResult { impact: number; nx: number; nz: number; flip?: boolean; stunt?: { kind: string; t: number; dist: number } }
 export function playerDrive(v: Vehicle, inp: DriveInput, dt: number, col: Collision, manual: boolean, waterAt: (x: number, z: number) => boolean): DriveResult {
@@ -156,6 +163,7 @@ export function playerDrive(v: Vehicle, inp: DriveInput, dt: number, col: Collis
   else if (v.condition < 0.5) maxSp *= 0.55 + 0.45 * (v.condition / 0.5); // сломанная машина едет, но медленно
   if (v.condition < 0.25) acc *= 0.6; // двигатель «троит»
   if (s.unbreakable) { maxSp = s.maxSpeed * (1 + tun.turbo * 0.08 + tun.engine * 0.05); acc = s.accel * (1 + tun.turbo * 0.25 + tun.engine * 0.15); v.condition = 1; }
+  maxSp = Math.min(maxSp, damagedSpeedLimit(v));
   const mw = v.model.missingWheels(); if (mw > 0) maxSp *= v.isMoto ? 0.1 : 0.3;
   // спущенные шины: машину ведёт в сторону, разгон и максималка падают
   const flats = v.model.flatTires();
@@ -383,7 +391,7 @@ export class AIDriver {
     const rx = (-dz / l) * o, rz = (dx / l) * o;
     return atB ? { x: B.x + rx, z: B.z + rz } : { x: A.x + rx, z: A.z + rz };
   }
-  step(v: Vehicle, dt: number, ctx: AICtx): { desired: number; target: number } {
+  step(v: Vehicle, dt: number, ctx: AICtx, speedLimit = Infinity): { desired: number; target: number } {
     const L = ctx.L;
     // паника затихает: уехали достаточно далеко от места стрельбы — снова обычная езда
     if (this.panicT > 0) {
@@ -480,7 +488,7 @@ export class AIDriver {
     let target = passHazard ? 0 : cruiseFor(kind) * this.speedMul * (this.speeding > 0 ? 1.35 : 1);
     if (this.mode === 'chase') target = v.spec.maxSpeed * 0.7;
     if (panic) target = Math.max(target, Math.min(this.panicSpeed, v.spec.maxSpeed));
-    target = Math.min(target, v.spec.maxSpeed);
+    target = Math.min(target, v.spec.maxSpeed, speedLimit);
     const distB = Math.hypot(B.x - v.x, B.z - v.z);
     if (this.k + 2 < this.route.length) {
       const C = L.nodes[this.route[this.k + 2]], Bn = L.nodes[b], An = L.nodes[a];

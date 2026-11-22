@@ -1221,3 +1221,27 @@ button.tb-card:hover { background: rgba(255,255,255,.09); } button.tb-card:activ
 .hx-map-results small, .hx-map-results > span { opacity: .7; font-size: 12px; padding: 4px; }
 
 .hx-voice { pointer-events: auto; cursor: pointer; color: #fff; }
+
+/* Компактнее только мобильное управление; область нажатия остаётся удобной. */
+.mui-btn { width: 54px; height: 54px; }
+.mui-btn.mid { width: 57px; height: 57px; }
+.mui-btn.mini { width: 39px; height: 39px; }
+.mui-btn.main { width: 79px; height: 79px; }
+.mui-btn.ctx-big { width: 80px; height: 80px; }
+.mui-btn.pedal { width: 80px; height: 95px; }
+.mui-btn.handbrake { width: 54px; height: 54px; border-radius: 18px; }
+.mui-btn.handbrake small { display: block; }
+.mui-pedals { gap: 7px; align-items: flex-end; }
+@media (orientation: portrait) {
+  .mui-btn.ctx-big { width: 62px; height: 62px; }
+  .mui-btn.pedal { width: 64px; height: 72px; }
+  .mui-btn.handbrake { width: 48px; height: 48px; }
+}
+@media (max-height: 430px) {
+  .mui-btn { width: 45px; height: 45px; }
+  .mui-btn.mid { width: 56px; height: 56px; }
+  .mui-btn.main { width: 64px; height: 64px; }
+  .mui-btn.ctx-big { width: 72px; height: 72px; }
+  .mui-btn.pedal { width: 57px; height: 61px; }
+  .mui-btn.handbrake { width: 46px; height: 46px; }
+}
