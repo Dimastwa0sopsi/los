@@ -160,7 +160,7 @@ interface Msg {
   money?: number; player?: ServerPlayer;
   players?: PlayersListEntry[] | Record<string, LegacyPlayer | PlayersListEntry>;
   x?: number; z?: number; rot?: number;
-  act?: string; reason?: string; accountState?: unknown; accountRevision?: number; accountSaveId?: string; saveId?: string; adminSession?: string; revision?: number; accounts?: number;
+  act?: string; reason?: string; accountState?: unknown; accountRevision?: number; accountSaveId?: string; saveId?: string; revision?: number; accounts?: number;
   /** 🎁 выдача предметов из панели Colab: режим, id предмета, количество */
   mode?: string; item?: string; qty?: number;
   /** авторизация онлайна: токен устройства и пароль-подсказка */
@@ -313,7 +313,6 @@ export class NetClient {
   /** login_success: сервер прислал деньги/координаты (first — первый вход) */
   onLogin: ((p: ServerPlayer, first: boolean, state?: unknown) => void) | null = null;
   onSaveError: ((text: string) => void) | null = null;
-  adminSession = '';
   private revision: number | null = null;
   private flight: { json: string; revision: number; id: string } | null = null;
   private pending: string | null = null;
@@ -390,7 +389,7 @@ export class NetClient {
       if (this.ws !== ws) return;
       window.clearTimeout(this.connectTimer);
       this.onVoiceDisconnect?.(); this.voiceSupported=false;
-      this.ws = null; this.id = null; this.authenticated = false; this.adminSession = ''; this.lastSaveMoney = NaN; this.auction = null; this.kioskOwners = null; this.kioskOwnersRequested = 0;
+      this.ws = null; this.id = null; this.authenticated = false; this.lastSaveMoney = NaN; this.auction = null; this.kioskOwners = null; this.kioskOwnersRequested = 0;
       if (this.dead || !this.want) { this.status = 'offline'; this.onChange?.(); return; }
       this.fail();
     };
@@ -410,7 +409,7 @@ export class NetClient {
   /** мягкий отказ: показываем причину, но не запрещаем повторную попытку входа */
   private softFail(text: string) {
     this.want = false; this.dead = false; this.status = 'offline';
-    const ws = this.ws; this.ws = null; this.id = null; this.authenticated = false; this.adminSession = ''; this.lastSaveMoney = NaN;
+    const ws = this.ws; this.ws = null; this.id = null; this.authenticated = false; this.lastSaveMoney = NaN;
     try { ws?.close(); } catch { /* */ }
     this.players.clear();
     this.kicked = text;
@@ -419,12 +418,12 @@ export class NetClient {
     this.onChange?.();
   }
   /** попытка снова войти после ошибки (кнопка «Повторить» в окне) */
-  retryLogin() { const ws = this.ws; this.ws = null; try { ws?.close(); } catch { /* */ } this.authenticated = false; this.adminSession = ''; this.dead = false; this.want = true; this.rejoin = 0; this.retry = 0; this.kicked = null; this.open(); }
+  retryLogin() { const ws = this.ws; this.ws = null; try { ws?.close(); } catch { /* */ } this.authenticated = false; this.dead = false; this.want = true; this.rejoin = 0; this.retry = 0; this.kicked = null; this.open(); }
   /** окончательно отключаемся: текстом бана или «сервер недоступен» */
   private die(text: string | null) {
     this.dead = true; this.want = false;
     window.clearTimeout(this.retryTimer); window.clearTimeout(this.connectTimer);
-    const ws = this.ws; this.ws = null; this.id = null; this.status = 'offline'; this.authenticated = false; this.adminSession = ''; this.lastSaveMoney = NaN;
+    const ws = this.ws; this.ws = null; this.id = null; this.status = 'offline'; this.authenticated = false; this.lastSaveMoney = NaN;
     try { ws?.close(); } catch { /* */ }
     this.players.clear();
     if (text) { this.kicked = text; this.sys('Вы отключены сервером'); this.onError?.(text); }
@@ -535,7 +534,6 @@ export class NetClient {
       else if (next !== expected) { this.conflict = true; this.onSaveError?.('Конфликт сохранения: аккаунт открыт в другой сессии'); }
     }
     this.revision = next;
-    this.adminSession = typeof m.adminSession === 'string' ? m.adminSession : '';
     const p = m.player ?? {};
     const id = num(p.id) ?? num(m.id);
     this.me = { ...p, id: id ?? this.id ?? undefined, name: String(p.name ?? p.nick ?? m.name ?? this.nick).slice(0, 24), gender: gOf(p.gender ?? m.gender, this.gender) };
@@ -782,7 +780,7 @@ export class NetClient {
   close() {
     this.want = false; this.dead = true;
     window.clearTimeout(this.retryTimer); window.clearTimeout(this.connectTimer);
-    const ws = this.ws; this.ws = null; this.id = null; this.status = 'offline'; this.authenticated = false; this.adminSession = ''; this.lastSaveMoney = NaN;
+    const ws = this.ws; this.ws = null; this.id = null; this.status = 'offline'; this.authenticated = false; this.lastSaveMoney = NaN;
     try { ws?.close(); } catch { /* */ }
     this.players.clear();
   }

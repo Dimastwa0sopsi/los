@@ -10,8 +10,6 @@ const Database = require('better-sqlite3');
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || crypto.randomBytes(9).toString('hex');
-// Пароль панели — дополнительный код, не замена проверке сессии аккаунта.
-const GAME_ADMIN_PASSWORD = process.env.GAME_ADMIN_PASSWORD || 'GAMEMODE';
 // Привязка ника к устройству. 0 (по умолчанию) — новый браузер просто забирает ник обратно,
 // иначе после чистки localStorage игрок навсегда терял вход. 1 — строго, как раньше.
 const STRICT_DEVICE = process.env.STRICT_DEVICE === '1';
@@ -220,7 +218,7 @@ const json = (res, code, obj) => {
   res.writeHead(code, {
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'content-type, x-admin-token, x-game-admin-session, ngrok-skip-browser-warning',
+    'Access-Control-Allow-Headers': 'content-type, x-admin-token, ngrok-skip-browser-warning',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     // ответы служебных ручек не кэшируем: диагностика должна быть свежей
     'Cache-Control': 'no-store',
@@ -1136,9 +1134,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   const token = url.searchParams.get('token') || req.headers['x-admin-token'];
-  const gameSession = String(req.headers['x-game-admin-session'] || '');
-  const gameAdmin = token === GAME_ADMIN_PASSWORD && !!gameSession && [...active.values()].some(a => a.row.name.toLowerCase() === 'kitty_kittys' && a.ws.readyState === WebSocket.OPEN && a.ws.adminSession === gameSession);
-  if (token !== ADMIN_TOKEN && !gameAdmin) { json(res, 403, { ok: false, error: 'Нет доступа: проверьте аккаунт и пароль' }); return; }
+  if (token !== ADMIN_TOKEN) { json(res, 403, { ok: false, error: 'Нет доступа: проверьте аккаунт и пароль' }); return; }
   if (req.method === 'GET' && url.pathname === '/admin/tunnel') {
     tunnelInfo().then((t) => json(res, 200, t)).catch(() => json(res, 200, { ok: true, url: '', ws: '', source: 'none' }));
     return;
@@ -1238,9 +1234,8 @@ wss.on('connection', (ws) => {
       }
       // деньги — только серверные: локальный сейв клиента в онлайн не переносится
       me = row; active.set(row.id, { ws, row }); ws.playerId = row.id;
-      if (normalizeLogin(row.name) === 'kitty_kittys') ws.adminSession = crypto.randomBytes(32).toString('hex');
       console.log(`[login] ${row.name} вошёл (онлайн: ${active.size})`);
-      send(ws, { type: 'login_success', accountState: account.state, accountRevision: account.revision, accountSaveId: account.saveId, adminSession: ws.adminSession || undefined, caps: { state: 1, peds: 1, adm: 1, relay: 1, accounts: 1, saveIds: 1, voice: 1 }, player: {
+      send(ws, { type: 'login_success', accountState: account.state, accountRevision: account.revision, accountSaveId: account.saveId, caps: { state: 1, peds: 1, adm: 1, relay: 1, accounts: 1, saveIds: 1, voice: 1 }, player: {
         id: row.id, name: row.name, gender: row.gender, money: row.money,
         x: row.pos_x, z: row.pos_z, rot: row.pos_rot, number: row.car_number, carNumber: row.car_number,
       } });

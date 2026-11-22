@@ -23,13 +23,13 @@ function client() {
 async function auth(name, mode, password, backup) { const c = client(); assert.equal((await c.next('hello')).accounts, 1); c.send({type:'login', name, mode, password, backup, gender:'f'}); return c; }
 (async () => {
   await start();
-  const gameAdminReq = async (session, password='GAMEMODE') => fetch(`http://127.0.0.1:${port}/admin/state`, {headers:{'x-admin-token':password, 'x-game-admin-session':session}});
-  assert.equal((await gameAdminReq('')).status, 403);
-  let owner = await auth('Kitty_Kittys', 'register', 'secure-admin-password'); let ownerLogin = await owner.next('login_success'); assert(ownerLogin.adminSession);
-  assert.equal((await gameAdminReq(ownerLogin.adminSession, 'wrong')).status, 403);
-  assert.equal((await gameAdminReq(ownerLogin.adminSession)).status, 200);
-  let otherOwner = await auth('kitty_kittys', 'login', 'secure-admin-password'); let owner2 = await otherOwner.next('login_success'); await owner.next('error');
-  assert.equal((await gameAdminReq(ownerLogin.adminSession)).status, 403); assert.equal((await gameAdminReq(owner2.adminSession)).status, 200); otherOwner.ws.close();
+  const adminReq = async token => fetch(`http://127.0.0.1:${port}/admin/state`, {headers:{'x-admin-token':token}});
+  let owner = await auth('Kitty_Kittys', 'register', 'secure-admin-password');
+  let ownerLogin = await owner.next('login_success'); assert(!ownerLogin.adminSession);
+  assert.equal((await adminReq('GAMEMODE')).status, 403);
+  assert.equal((await adminReq('test-admin-token')).status, 200);
+  let otherOwner = await auth('kitty_kittys', 'login', 'secure-admin-password');
+  let owner2 = await otherOwner.next('login_success'); assert(!owner2.adminSession); await owner.next('error'); otherOwner.ws.close();
   let legacy = client(); await legacy.next('hello'); legacy.send({ type:'login', name:'Tester' }); assert.equal((await legacy.next('error')).code, 'auth'); legacy.ws.close();
   let a = await auth('Tester', 'register', 'primary-password', 'backup-password'); let first = await a.next('login_success'); assert(!first.adminSession); assert.equal(first.accountState, null); assert.equal(first.accountRevision, 0);
   // Реальный WebSocket: публичный каталог показывает только активные лоты,

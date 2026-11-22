@@ -5,14 +5,13 @@ import { carValue } from '../game/state';
 import { loadPhotos, deletePhoto, QUEST_STEPS } from '../game/game';
 import { MapCanvas } from './Hud';
 import { InventoryGrid } from './InventoryGrid';
-import { AdminPanel } from './AdminPanel';
 import { SUPPORT_BOT } from '../game/support';
 import { type Settings, defaultSettings } from '../game/config';
 import { currentAccount, removeAccount, logout } from '../game/accounts';
 
 const $ = (n: number) => '$' + Math.round(n).toLocaleString('ru');
-type Scr = 'rules' | 'admin' | 'store' | 'tg' | 'gallery' | 'vzhuh' | 'food' | 'coffee' | 'pizza' | 'pharm' | 'limited' | 'quest' | 'home' | 'map' | 'taxi' | 'homes' | 'cars' | 'bazaar' | 'jobs' | 'biz' | 'bank' | 'inv' | 'players' | 'support' | 'promo' | 'settings' | 'profile' | 'estate' | 'all' | 'tasks' | 'ach' | 'danger';
-const TITLES: Record<Scr, string> = { rules: '📜 Правила игры', admin: '🛠 Админ-панель', store: 'LosSt — магазин приложений', tg: 'Телеграм', gallery: 'Галерея', vzhuh: 'Вжух Самокаты', food: 'Вкусно Доставка', coffee: 'Кофейня «Зерно»', pizza: 'Пиццерия «Сыр»', pharm: 'Аптека 24', limited: 'LIMITED Drop', quest: 'Сюжет', home: '', map: 'Карта и GPS', taxi: 'Такси', homes: 'Недвижимость', cars: 'Мой транспорт', bazaar: 'Автобазар', jobs: 'Работа', biz: 'Бизнес', bank: 'Банк', inv: 'Инвентарь', players: 'Игроки онлайн', support: 'Поддержка', promo: 'Промокод', settings: 'Настройки', profile: 'Профиль', estate: 'Имущество', all: 'Все сервисы', tasks: 'Задания дня', ach: 'Достижения', danger: '⚠️ Опасная зона' };
+type Scr = 'rules' | 'store' | 'tg' | 'gallery' | 'vzhuh' | 'food' | 'coffee' | 'pizza' | 'pharm' | 'limited' | 'quest' | 'home' | 'map' | 'taxi' | 'homes' | 'cars' | 'bazaar' | 'jobs' | 'biz' | 'bank' | 'inv' | 'players' | 'support' | 'promo' | 'settings' | 'profile' | 'estate' | 'all' | 'tasks' | 'ach' | 'danger';
+const TITLES: Record<Scr, string> = { rules: '📜 Правила игры', store: 'LosSt — магазин приложений', tg: 'Телеграм', gallery: 'Галерея', vzhuh: 'Вжух Самокаты', food: 'Вкусно Доставка', coffee: 'Кофейня «Зерно»', pizza: 'Пиццерия «Сыр»', pharm: 'Аптека 24', limited: 'LIMITED Drop', quest: 'Сюжет', home: '', map: 'Карта и GPS', taxi: 'Такси', homes: 'Недвижимость', cars: 'Мой транспорт', bazaar: 'Автобазар', jobs: 'Работа', biz: 'Бизнес', bank: 'Банк', inv: 'Инвентарь', players: 'Игроки онлайн', support: 'Поддержка', promo: 'Промокод', settings: 'Настройки', profile: 'Профиль', estate: 'Имущество', all: 'Все сервисы', tasks: 'Задания дня', ach: 'Достижения', danger: '⚠️ Опасная зона' };
 interface P { g: Game; go: (s: Scr) => void; close: () => void }
 
 export function Tablet({ g, close, initial }: { g: Game; close: () => void; initial?: string }) {
@@ -53,7 +52,6 @@ export function Tablet({ g, close, initial }: { g: Game; close: () => void; init
           {scr === 'support' && <Support g={g} go={go} close={close} />}
           {scr === 'promo' && <Promo g={g} go={go} close={close} />}
           {scr === 'rules' && <div className="tb-pad"><h3>Правила Лос-Города</h3><p>1. Ссылки и @ в чате запрещены. Рекомендуемое наказание — мут на 30 минут.</p><p>2. Не рекламируйте сторонние сайты и контакты на щитах и в СМИ.</p><p>3. Не спамьте и не мешайте другим игрокам.</p><p>4. Не используйте ошибки игры для накрутки и кражи прогресса.</p><p>5. Не выдавайте себя за администратора и не просите чужие пароли.</p><p>Мат в обычном чате разрешён, но уважайте других игроков. Наказание выбирает администратор.</p></div>}
-          {scr === 'admin' && g.online && !!g.net?.adminSession && <AdminPanel g={g} />}
           {scr === 'settings' && <SettingsApp g={g} close={close} />}
           {scr === 'profile' && <Profile g={g} go={go} close={close} />}
           {scr === 'estate' && <Estate g={g} go={go} close={close} />}
@@ -173,7 +171,6 @@ function Home({ g, go }: P) {
     },
     {
       name: 'Система', ico: '⚙️', items: [
-        ...(g.online && !!g.net?.adminSession ? [{ ico: '🛠️', label: 'Админ-панель', color: '#b45309', on: () => go('admin') } as Item] : []),
         { ico: '📜', label: 'Правила игры', color: '#0f766e', on: () => go('rules') },
         { ico: '⚙️', label: 'Настройки', color: '#64748b', on: () => go('settings') },
         { ico: '🧩', label: 'Все сервисы', color: '#8b5cf6', on: () => go('all') },
