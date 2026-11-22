@@ -17,10 +17,15 @@ const number=g.state.plateInventory[0].number; assert(plateKey(number)!==plateKe
 g.px=100;g.installLocalPlate(number,'mine');assert(g.state.plateInventory.length===1 && car.tuning.plate==='А111АА 77','требуется близость');
 g.px=10;v.speed=3;g.installLocalPlate(number,'mine');assert(g.state.plateInventory.length===1,'только стоящая машина');
 v.speed=0;g.online=true;g.installLocalPlate(number,'mine');assert(car.tuning.plate==='А111АА 77','нельзя установить онлайн');
-g.online=false;g.installLocalPlate(number,'mine');assert(car.tuning.plate===number && g.state.plateInventory.length===1 && g.state.plateInventory[0].number==='А111АА 77','старый комплект не потерян');
+g.online=false;g.useLocalPlate(number);assert(car.tuning.plate===number && g.state.plateInventory.length===1 && g.state.plateInventory[0].number==='А111АА 77','старый комплект не потерян');
 g.rideRemote=null;let down=true;g.input={down:()=>down};g.px=10;g.pz=10+v.spec.len/2+0.5;g.updatePlateHold(2.1);
 assert(car.tuning.plateFront===false && g.state.plateInventory.some((p:any)=>p.number===number && p.front && !p.back),'снятая передняя табличка в инвентаре');
-g.pz=10;g.installLocalPlate(number,'mine');assert(car.tuning.plateFront && car.tuning.plateBack && !g.state.plateInventory.some((p:any)=>p.number===number),'возврат одной стороны не копирует вторую');
+g.pz=10;g.useLocalPlate(number);assert(car.tuning.plateFront && car.tuning.plateBack && !g.state.plateInventory.some((p:any)=>p.number===number),'возврат одной стороны не копирует вторую');
+// Во время поездки и рядом с невидимой машиной предмет не расходуется.
+g.state.plateInventory.push({number:'А333АА 77',front:true,back:true});
+g.rideRemote={id:5,seat:1};g.useLocalPlate('А333АА 77');assert(g.state.plateInventory.some((p:any)=>p.number==='А333АА 77'),'пассажиру нельзя использовать номер');
+g.rideRemote=null;v.model.group.visible=false;g.useLocalPlate('А333АА 77');assert(g.state.plateInventory.some((p:any)=>p.number==='А333АА 77'),'невидимая машина не подходит');v.model.group.visible=true;
+g.online=true;g.px=10;g.pz=10+v.spec.len/2+0.5;g.plateHoldDone=false;g.updatePlateHold(2.1);assert(car.tuning.plateFront!==false,'онлайн снятие своего номера запрещено без серверного сохранения');g.online=false;g.pz=10;
 const other:any={...car,uid:'other',tuning:{...car.tuning,plate:'B222BB 77'}};g.state.vehicles.push(other);g.state.plateInventory.push({number:'В222ВВ 77',front:true,back:true});
 g.installLocalPlate('В222ВВ 77','mine');assert(car.tuning.plate===number,'запрет похожих латинских номеров');
 assert(plateKey('A123BC 77')===plateKey('А123ВС77'),'кириллица и латиница сравниваются одинаково');
