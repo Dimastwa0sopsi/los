@@ -853,7 +853,15 @@ export class VehicleModel {
     }
     this.part('fenderF');
     if (enduro) this.box(PAINT, 0, r + 0.34, zf + 0.06, 0.18, 0.04, 0.5, -0.12); // высокое крыло
-    else this.add(PAINT, T.torus, M(0, r, zf, Math.PI / 2, r + 0.05, r + 0.05, cruiser ? 0.5 : 0.4, 0, 0));
+    else {
+      // Короткая дуга над шиной вместо полного кольца вокруг колеса.
+      const radius = r + 0.045, halfArc = cruiser ? 1.05 : 0.85, segments = 9;
+      for (let i = 0; i < segments; i++) {
+        const a = -halfArc + (i + 0.5) * 2 * halfArc / segments;
+        this.box(PAINT, 0, r + Math.cos(a) * radius, zf + Math.sin(a) * radius,
+          cruiser ? 0.19 : 0.17, 0.025, radius * 2 * halfArc / segments + 0.01, a);
+      }
+    }
     this.part('fenderR');
     this.box(PAINT, 0, r + (enduro ? 0.4 : 0.3), zr + 0.05, enduro ? 0.2 : 0.16, 0.03, enduro ? 0.4 : 0.36, -0.3);
     // ---- тормоза, звезда, подножка ----
