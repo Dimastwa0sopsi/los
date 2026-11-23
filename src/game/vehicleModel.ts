@@ -278,7 +278,19 @@ export class VehicleModel {
       this.box(PAINT, -W / 2 + 0.04, beltY - 0.15, (-L / 2 + z0) / 2 - 0.05, 0.08, 0.3, z0 + L / 2 - 0.2);
     }
     if (s.body === 'van') {
-      this.box(PAINT, 0, (beltY + H) / 2, -L * 0.08, W, H - beltY, L * 0.84); // высокий короб
+      // Высокий кузов с проёмами: вместо сплошного блока стекла действительно
+      // открывают вид в салон. Задние стойки и крыша сохраняют форму фургона.
+      const roofZ0 = -L * 0.5, roofZ1 = L * 0.34, mid = (beltY + H) / 2;
+      this.box(PAINT, 0, H - 0.12, (roofZ0 + roofZ1) / 2, W, 0.24, roofZ1 - roofZ0);
+      this.box(PAINT, 0, mid, -L / 2 + 0.06, W, H - beltY, 0.12);
+      for (const side of [-1, 1]) {
+        const xx = side * (W / 2 - 0.07);
+        this.box(PAINT, xx, beltY + 0.15, -L * 0.08, 0.14, 0.3, L * 0.84);
+        for (const zz of [-L * 0.46, -L * 0.31, -L * 0.08, L * 0.12, L * 0.32])
+          this.box(PAINT, xx, mid, zz, 0.14, H - beltY, 0.11);
+        const frontLen = Math.hypot(H - beltY, L * 0.13);
+        this.box(PAINT, xx, mid, L * 0.405, 0.12, frontLen, 0.12, Math.atan2(-L * 0.13, H - beltY));
+      }
     }
     // колёсные арки (тёмные) + расширители арок и брызговики
     const axleZ = [L / 2 - L * 0.19, -L / 2 + L * 0.2];
@@ -560,6 +572,16 @@ export class VehicleModel {
       this.box('chrome', 0, beltY - 0.06, -L / 2 - 0.05, 0.5, 0.07, 0.03);
     }
     if (s.body === 'van') {
+      for (const side of [-1, 1]) {
+        const xx = side * (W / 2 + 0.035);
+        // Направляющая и контур сдвижной двери, подножка и бортовой молдинг.
+        this.box('c:#25292d', xx, clear + 0.34, -L * 0.12, 0.025, 0.08, L * 0.48);
+        this.box('c:#15191c', xx, beltY - 0.13, -L * 0.08, 0.025, 0.025, L * 0.43);
+        for (const zz of [-L * 0.30, L * 0.12]) this.box('c:#22262b', xx, beltY - 0.35, zz, 0.025, 0.65, 0.035);
+        this.box('chrome', xx, beltY - 0.18, L * 0.08, 0.035, 0.05, 0.18);
+        this.box('c:#20252a', side * (W / 2 + 0.10), clear + 0.02, -L * 0.12, 0.18, 0.07, L * 0.35);
+        if (s.service === 'ambulance') this.box('c:#dc2626', xx + side * 0.015, beltY - 0.25, -L * 0.08, 0.025, 0.18, L * 0.57);
+      }
       this.box('c:#d1d5db', 0, H + 0.06, L * 0.02, 0.7, 0.12, 0.7);          // вентиляция на крыше
       for (const sx of [1, -1]) this.box('chrome', sx * W * 0.26, beltY + 0.2, -L / 2 - 0.05, 0.06, 0.1, 0.03); // ручки задних дверей
       this.box('c:#111', 0, beltY - 0.02, -L / 2 - 0.03, W * 0.9, 0.03, 0.02);

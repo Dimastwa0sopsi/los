@@ -22,6 +22,15 @@ function capLogo(): THREE.Material {
   const tex = new THREE.CanvasTexture(canvas); tex.colorSpace = THREE.SRGBColorSpace;
   return losCapMat = new THREE.MeshLambertMaterial({ map: tex });
 }
+let lgLogoMaterial: THREE.Material | undefined;
+function lgShirtLogo(): THREE.Material {
+  if (lgLogoMaterial) return lgLogoMaterial;
+  const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 128;
+  const ctx = canvas.getContext('2d')!; ctx.fillStyle = '#101014'; ctx.fillRect(0, 0, 256, 128);
+  ctx.fillStyle = '#38bdf8'; ctx.font = 'bold 95px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('LG', 128, 68);
+  const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace;
+  return lgLogoMaterial = new THREE.MeshLambertMaterial({ map: texture });
+}
 const SPH = new THREE.SphereGeometry(1, 10, 8);
 function sp(parent: THREE.Object3D, color: string, rx: number, ry: number, rz: number, x = 0, y = 0, z = 0) {
   const m = new THREE.Mesh(SPH, color.startsWith('@') ? specialMat(color) : mat('c:' + color)); m.scale.set(rx, ry, rz); m.position.set(x, y, z); m.castShadow = true; parent.add(m); return m;
@@ -37,7 +46,9 @@ function stripeTex(colors: string[], vertical = false, stars = false) {
 export function specialMat(key: string): THREE.Material {
   let m = specialMats.get(key); if (m) return m;
   switch (key) {
-    case '@rainbow': m = new THREE.MeshLambertMaterial({ map: stripeTex(['#ff0040', '#ff8c00', '#ffe600', '#22e05a', '#00b4ff', '#8a2be2'], true), emissive: 0x222222 }); break;
+    case '@rainbow': m = new THREE.MeshLambertMaterial({ map: stripeTex(['#ff0040', '#ff8c00', '#ffe600', '#22e05a', '#00b4ff', '#8a2be2'], true), emissive: 0x555555, emissiveMap: stripeTex(['#ff0040', '#ff8c00', '#ffe600', '#22e05a', '#00b4ff', '#8a2be2'], true) }); break;
+    case '@lgshirt': m = new THREE.MeshLambertMaterial({ color: 0x101014 }); break;
+    case '@pinkslippers': m = new THREE.MeshLambertMaterial({ color: 0xf472b6 }); break;
     case '@fire': m = new THREE.MeshLambertMaterial({ map: stripeTex(['#ffe259', '#ffa751', '#ff512f', '#dd2476'], true), emissive: 0x551100 }); break;
     case '@galaxy': m = new THREE.MeshLambertMaterial({ map: stripeTex([], false, true), emissive: 0x1a0b40 }); break;
     case '@gold': m = new THREE.MeshStandardMaterial({ color: 0xffc83d, metalness: 1, roughness: 0.22 }); break;
@@ -113,7 +124,7 @@ export class Character {
     const sleeves = LONG_SLEEVE_TOPS.has(L.top);
     const bareTop = L.top === 'swim';
     const dress = DRESSES.has(L.top);
-    const shortsLike = L.bottom === 'shorts' || L.bottom === 'skirt' || L.bottom === 'swim' || dress;
+    const shortsLike = L.bottom === 'shorts' || L.bottom === 'sportshorts' || L.bottom === 'bermuda' || L.bottom === 'skirt' || L.bottom === 'swim' || dress;
     const skirtLen: Record<string, number> = { dress: 0.32, minidress: 0.2, sundress: 0.42, cocktail: 0.36, evening: 0.86 };
     const bareArms = bareTop || L.top === 'tank' || dress;
     this.visual.add(this.hips);
@@ -137,8 +148,28 @@ export class Character {
     if (dress && (L.top === 'sundress' || L.top === 'evening' || L.top === 'cocktail')) { bx(this.torso, skin, f ? 0.34 : 0.4, 0.07, 0.205, 0, 0.455, 0); for (const sx of [1, -1]) bx(this.torso, top, 0.03, 0.08, 0.21, sx * 0.1, 0.48, 0); } // открытые плечи и бретели
     if (L.top === 'evening') bx(this.torso, '#e5e7eb', 0.04, 0.04, 0.02, 0.06, 0.38, 0.12); // брошь
     if (f && !bareTop) bx(this.torso, tc, 0.28, 0.1, 0.06, 0, 0.36, 0.12);
+    if (L.top === 'tshirt' && L.topColor === '@lgshirt') {
+      const logo = new THREE.Mesh(FACE, lgShirtLogo());
+      logo.scale.set(0.2, 0.11, 1); logo.position.set(0, 0.36, f ? 0.155 : 0.1115); this.torso.add(logo);
+    }
+    if (L.wings) for (const side of [-1, 1]) {
+      // Отдельные перья закреплены на спине и двигаются вместе с торсом.
+      for (let i = 0; i < 5; i++) {
+        const feather = bx(this.torso, '#f5f8ff', 0.1, 0.34 + i * 0.035, 0.055,
+          side * (0.19 + i * 0.085), 0.30 + i * 0.022, -0.15);
+        feather.rotation.z = side * (0.38 + i * 0.11);
+      }
+    }
     if (L.top === 'suit') { bx(this.torso, '#f8fafc', 0.1, 0.3, 0.01, 0, 0.3, 0.111); bx(this.torso, '#7f1d1d', 0.04, 0.24, 0.012, 0, 0.3, 0.115); }
     if (L.top === 'hoodie') bx(this.torso, top, 0.3, 0.12, 0.12, 0, 0.5, -0.12);
+    if (L.top === 'striped_sweater') for (let i = 0; i < 3; i++) bx(this.torso, '#f1f5f9', 0.34, 0.027, 0.012, 0, 0.18 + i * 0.1, 0.116);
+    if (L.top === 'jersey') { bx(this.torso, '#f8fafc', 0.12, 0.07, 0.012, 0, 0.37, 0.116); bx(this.torso, '#f8fafc', 0.34, 0.025, 0.012, 0, 0.18, 0.116); }
+    if (L.top === 'utility_vest' || L.top === 'leather_jacket' || L.top === 'overshirt') {
+      bx(this.torso, '#1f2937', 0.018, 0.38, 0.015, 0, 0.26, 0.116);
+      for (const side of [-1, 1]) bx(this.torso, '#374151', 0.09, 0.09, 0.02, side * 0.1, 0.23, 0.12);
+    }
+    if (L.top === 'apron') { bx(this.torso, '#f8fafc', 0.26, 0.35, 0.025, 0, 0.21, 0.12); bx(this.torso, '#94a3b8', 0.16, 0.065, 0.02, 0, 0.12, 0.14); }
+
     // шея и голова
     bx(this.torso, skin, 0.1, 0.08, 0.1, 0, 0.51, 0);
     this.torso.add(this.head); this.head.position.set(0, 0.55, 0);
@@ -197,9 +228,12 @@ export class Character {
         bx(hp, dress || L.bottom === 'skirt' ? skin : bot, 0.14, 0.2, 0.15, 0, -0.1, 0);
         bx(hp, skin, 0.12, 0.26, 0.13, 0, -0.32, 0);
       } else bx(hp, bot, 0.14, 0.46, 0.15, 0, -0.22, 0);
+      if (L.bottom === 'patched_jeans') bx(hp, '#94a3b8', 0.09, 0.11, 0.012, 0, -0.23, 0.08);
+      if (L.bottom === 'workpants') bx(hp, '#57534e', 0.06, 0.13, 0.03, sg * 0.075, -0.18, 0);
       hp.add(kn); kn.position.set(0, -0.44, 0);
       bx(kn, shortsLike ? skin : bot, 0.12, 0.42, 0.13, 0, -0.2, 0);
-      bx(kn, L.shoes, 0.13, 0.08, 0.26, 0, -0.43, 0.05);
+      bx(kn, L.shoes, L.shoes === '@pinkslippers' ? 0.16 : 0.13, 0.08, 0.26, 0, -0.43, 0.05);
+      if (L.shoes === '@pinkslippers') bx(kn, '#fbcfe8', 0.14, 0.04, 0.12, 0, -0.38, 0.105);
     }
     for (const g of [this.hips, this.torso, this.head, this.shL, this.shR, this.elL, this.elR, this.hipL, this.hipR, this.knL, this.knR]) mergeChildren(g, [this.carryBox]);
     if (this.item !== 'none') this.setItem(this.item);
@@ -234,6 +268,15 @@ export class Character {
     }
     // аксессуары
     switch (this.look.acc) {
+      case 'cat_ears': {
+        bx(h, '#1f2937', 0.27, 0.025, 0.07, 0, 0.31, 0);
+        for (const side of [-1, 1]) {
+          bx(h, '#20232c', 0.09, 0.115, 0.045, side * 0.095, 0.37, 0);
+          bx(h, '#f9a8d4', 0.052, 0.07, 0.012, side * 0.095, 0.38, 0.026);
+          sp(h, '@gold', 0.018, 0.018, 0.018, side * 0.12, 0.28, 0.03);
+        }
+        break;
+      }
       case 'crown': bx(h, '@gold', 0.24, 0.07, 0.25, 0, 0.33, 0); for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI * 2; bx(h, '@gold', 0.04, 0.08, 0.04, Math.sin(a) * 0.11, 0.39, Math.cos(a) * 0.11); } bx(h, '#dc2626', 0.035, 0.035, 0.02, 0, 0.33, 0.13); break;
       case 'halo': { const m = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.015, 6, 20), new THREE.MeshBasicMaterial({ color: 0xfff1a8 })); m.rotation.x = Math.PI / 2; m.position.y = 0.45; h.add(m); break; }
       case 'los_cap': bx(h, '#111827', 0.255, 0.08, 0.265, 0, 0.3, 0); bx(h, '#111827', 0.22, 0.02, 0.13, 0, 0.27, 0.17); { const logo = new THREE.Mesh(FACE, capLogo()); logo.scale.set(0.19, 0.046, 1); logo.position.set(0, 0.3, 0.133); h.add(logo); } break;
@@ -264,6 +307,11 @@ export class Character {
   }
   /** t — время в секундах, k — фаза ходьбы, lean — наклон */
   pose(p: Pose, t: number, phase = 0, lean = 0, move = 0) {
+    if (this.look.hairColor === '@rainbow') {
+      const rainbow = specialMats.get('@rainbow') as THREE.MeshLambertMaterial | undefined;
+      if (rainbow?.map) rainbow.map.offset.y = (performance.now() / 5000) % 1;
+      if (rainbow?.emissiveMap) rainbow.emissiveMap.offset.y = (performance.now() / 5000) % 1;
+    }
     const s = Math.sin(phase);
     this.visual.rotation.set(0, 0, 0); this.visual.position.set(0, 0, 0);
     this.hips.position.set(0, 0.92, 0); this.hips.rotation.set(0, 0, 0);

@@ -29,7 +29,7 @@ export type PropType = 'tree' | 'pine' | 'bush' | 'lamp' | 'bench' | 'hydrant' |
   'toilet' | 'shower' | 'palm' | 'volleyball' | 'crop' | 'bridge' | 'bridge_rail' | 'pillar' | 'silo' | 'well' | 'trailer' | 'flag' |
   'walllamp' | 'guntruck' | 'pool' | 'greenhouse' | 'path' | 'poolstep' |
   // пляж и деревня
-  'pave' | 'dune' | 'post' | 'ball' | 'shell' | 'cabin' | 'jetty' |
+  'pave' | 'dune' | 'dirtbump' | 'post' | 'ball' | 'shell' | 'cabin' | 'jetty' |
   // городские услуги: мойка, шиномонтаж, паркомат, автомат, ломбард, доставка, садок, штрафстоянка
   'washbay' | 'tirestack' | 'parkmeter' | 'slot' | 'pawnshop' | 'foodbox' | 'fishkeeper' | 'impound' | 'partsshop' | 'evcharger' |
   // настоящий пляж: лодки, буйки, спасательный круг, гирлянды флажков, дюнная трава, лежак
@@ -1487,9 +1487,15 @@ export function generateLayout(): WorldLayout {
     const middleNorth = roadSeg(northWest, [[780, -350]], 'village', 8).at(-1)!;
     const northEast = roadSeg(middleNorth, [[880, -350]], 'village', 8).at(-1)!;
     // Сомкнуть оба конца улиц Сосновки и довести дорогу до Егоровки.
-    addEdge(sosnovkaStreetEnd, sosnovkaLaneEnd, 'village', 8);
-    const link = roadSeg(sosnovkaLaneEnd, [[610, -262], [610, -290]], 'village', 8).at(-1)!;
+    // Повороты по прямым осям: учитываем последующий перенос Сосновки на 40 м.
+    const corner = roadSeg(sosnovkaStreetEnd, [[560, -300]], 'village', 8).at(-1)!;
+    addEdge(corner, sosnovkaLaneEnd, 'village', 8);
+    const link = roadSeg(sosnovkaLaneEnd, [[610, -302], [610, -290]], 'village', 8).at(-1)!;
     addEdge(link, entry, 'village', 8);
+    // Сквозная прямая между Сосновкой и северной улицей Егоровки.
+    // Узел x=600 переедет вместе с Сосновкой; остальные уже в новых координатах.
+    const straight = roadSeg(sosnovkaStreetEnd, [[600, -300], [610, -340], [680, -340]], 'village', 8).at(-1)!;
+    addEdge(straight, northWest, 'village', 8);
     addEdge(northEast, east, 'village', 8);
     villages.push({ name, sx: 680, sz: -290, ex: 880, ez: -290, signX: 726, signZ: -242, cx: 780, cz: -320 });
     addProp({ t: 'vsign', x: 726, z: -242, r: 0, c: name }, { w: 0.4, d: 0.4, h: 2.4 });
@@ -2021,6 +2027,16 @@ export function generateLayout(): WorldLayout {
     edges.forEach((e, i) => { Object.assign(roadSegments[i], { ax: nodes[e.a].x, az: nodes[e.a].z, bx: nodes[e.b].x, bz: nodes[e.b].z }); });
     // На новом месте не оставляем старые лесные деревья внутри домов и бань.
     for (const b of buildings) if (b.village === 'Сосновка') clearVegetation(b.x, b.z, b.w + 5, b.d + 5);
+    // Ранние посадки были рассчитаны до переноса села: очищаем новую дорогу
+    // вместе с коллайдерами, не трогая постройки и имущество.
+    const connection = roadSegments.filter(s => s.kind === 'village' &&
+      Math.min(s.ax, s.bx) >= 540 && Math.max(s.ax, s.bx) <= 680 &&
+      Math.min(s.az, s.bz) >= -350 && Math.max(s.az, s.bz) <= -290);
+    for (const p of [...props]) if (['tree', 'pine', 'bush'].includes(p.t) &&
+      connection.some(s => segDist(p.x, p.z, s.ax, s.az, s.bx, s.bz).d < s.w / 2 + 2)) {
+      clearVegetation(p.x, p.z, 0.01, 0.01);
+    }
+
   }
 
   // Дополнительные леса отдельным генератором: он не меняет расположение
@@ -2039,6 +2055,40 @@ export function generateLayout(): WorldLayout {
     }
   }
 
+
+  // Невысокие проезжаемые кочки на сельских грунтовках. Высота коллизии
+  // совпадает с видимым холмиком и ниже допустимой ступеньки персонажа/колёс.
+  for (const road of roadSegments) {
+    if (road.kind !== 'dirt') continue;
+    const dx = road.bx - road.ax, dz = road.bz - road.az, length = Math.hypot(dx, dz);
+    const count = Math.floor(length / 24);
+    for (let i = 0; i < count; i++) {
+      const t = (i + 0.5) / count, x = road.ax + dx * t, z = road.az + dz * t;
+      if (!villages.some(v => Math.hypot(x - v.cx, z - v.cz) < 330)) continue;
+      if (isJunction(x, z) || solidNear(x, z, 2)) continue;
+      if (roadSegments.some(other => other !== road && other.kind !== 'dirt' && segDist(x, z, other.ax, other.az, other.bx, other.bz).d < other.w / 2 + 4)) continue;
+      if (props.some(p => p.t === 'dirtbump' && Math.hypot(p.x - x, p.z - z) < 8)) continue;
+      addProp({ t: 'dirtbump', x, z, w: 2.2, d: 2.2, h: 0.12 }, { w: 1.5, d: 1.5, h: 0.12 });
+    }
+  }
+
+  // Посадки вокруг полей, не внутри грядок и проездов комбайнов.
+  {
+    const fieldTrees = new RNG(WORLD_SEED + 76219);
+    const zones = [{ x: 1350, z: 1020, r: 85 }, { x: 1730, z: 1040, r: 65 },
+      { x: 1470, z: 1340, r: 65 }, { x: 300, z: 1770, r: 70 }, { x: 1220, z: 1730, r: 65 }];
+    const crops = props.filter(p => p.t === 'crop');
+    for (const zone of zones) for (let n = 0; n < 90; n++) {
+      const angle = fieldTrees.next() * Math.PI * 2, distance = Math.sqrt(fieldTrees.next()) * zone.r;
+      const x = zone.x + Math.cos(angle) * distance, z = zone.z + Math.sin(angle) * distance;
+      if (nearRoad(x, z, 10) || solidNear(x, z, 4)) continue;
+      if (inRect(x, z, farm, 12) || farm.aiFields.some(f => inRect(x, z, f, 12))) continue;
+      if (crops.some(p => Math.abs(x - p.x) < (p.w ?? 1) / 2 + 8 && Math.abs(z - p.z) < (p.d ?? 1) / 2 + 8)) continue;
+      if (buildings.some(b => !b.removed && Math.abs(x - b.x) < b.w / 2 + 12 && Math.abs(z - b.z) < b.d / 2 + 12)) continue;
+      if (garages.some(g => Math.abs(x - g.x) < g.w / 2 + 8 && Math.abs(z - g.z) < g.d / 2 + 8)) continue;
+      addProp({ t: fieldTrees.chance(0.35) ? 'pine' : 'tree', x, z, h: fieldTrees.range(0.9, 1.4), v: 76219 }, { w: 0.6, d: 0.6, h: 4 });
+    }
+  }
 
   // Добавляем в самом конце, чтобы числовые ID старых зданий в сохранениях не изменились.
   addBuilding({ kind: 'gas', name: 'АЗС · Набережная', x: -63, z: 520, w: 14, d: 9, h: 4,

@@ -872,12 +872,27 @@ function buildBuilding(b: Batcher, bd: Building) {
   }
   if (bd.kind === 'hospital') b.add('sign:✚|#dc2626', T.plane, M(fx + ox * 0.08, h - 2, fz + oz * 0.08, a, 2.4, 2.4, 1));
   if (bd.kind === 'fire') b.add('c:#b91c1c', T.box, M(fx + ox * 0.04 + Math.cos(a) * 5, 1.9, fz + oz * 0.04 - Math.sin(a) * 5, a, 4, 3.8, 0.1));
+  // Вымышленные бумажные объявления и граффити только на окраинных фасадах.
+  const outskirts = x < 150 || z < 150 || x > 930 || z > 930;
+  if (outskirts && (bd.kind === 'apartment' || bd.kind === 'house' || bd.kind === 'vhouse') && bd.id % 5 === 0) {
+    const messages = ['ПРОПАЛ КОТ · 555-01-01 · ИГРА', 'ИЩУ ВЕЛОСИПЕД · 555-02-02 · ИГРА', 'ЛОС ГОРОД · НАША УЛИЦА', 'ЗДЕСЬ БЫЛ ЛОСЬ'];
+    const graffiti = bd.id % 2 === 0;
+    const side = bd.id % 4 === 0 ? -1 : 1;
+    const offset = side * Math.min(3.1, (Math.abs(oz) > 0.5 ? w : d) / 2 - 1);
+    const px = fx + Math.cos(a) * offset + ox * 0.08, pz = fz - Math.sin(a) * offset + oz * 0.08;
+    const text = messages[(bd.id / 5 | 0) % messages.length];
+    b.add(`sign:${text}|${graffiti ? '#334155' : '#57534e'}`, T.plane, M(px, 1.85, pz, a, graffiti ? 2.5 : 1.6, graffiti ? 0.55 : 0.45, 1));
+  }
+
 }
 
 // ---------- реквизит ----------
 function buildProp(b: Batcher, p: Prop, lift = 0) {
   const { x, z } = p; const r = p.r ?? 0; const s = p.h ?? 1;
   switch (p.t) {
+    case 'dirtbump':
+      b.add('c:#796b4a', T.sphere, M(x, 0.018, z, r, (p.w ?? 2.2) / 2, p.h ?? 0.12, (p.d ?? 2.2) / 2));
+      break;
     case 'tree':
       if (s <= 0.9) { // уличное дерево — облегчённое
         b.add('c:#5b3a1e', T.box, M(x, 1.1 * s, z, r, 0.26, 2.2 * s, 0.26));

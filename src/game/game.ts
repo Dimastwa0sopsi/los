@@ -1,3 +1,4 @@
+import { canUseWingJump, equipLimited, slipperSpeedMultiplier } from './limitedLook';
 import { NearbyVoice } from './voice';
 import { canDrive, issueDocument, type DocumentKind } from './documents';
 import { generateSpeedCameras, cameraDetects, cameraFine, type SpeedCamera } from './speedCameras';
@@ -127,6 +128,7 @@ export class Game {
   input!: Input; sound = new Sound(); peds!: PedSystem;
   state!: GameState; player!: Character;
   vehGroup = new THREE.Group(); vehicles: Vehicle[] = [];
+  private airJumps = 0;
   px = 0; py = 0; pz = 0; pa = 0; pvy = 0; pvx = 0; pvz = 0; walkPhase = 0;
   /** визуальное погружение в воду: модель уходит под воду, физика остаётся на дне */
   dip = 0;
@@ -1072,7 +1074,8 @@ export class Game {
     const wading = !inWater && depth > 0.08;       // по колено идём по дну
     const cb = this.combat;
     const fighting = cb.busy || cb.blocking || cb.aiming;
-    const sp = (this.crouch ? 1.5 : run && !fighting ? 6 : 2.6) * (inWater ? (run ? 0.55 : 0.85) : wading ? 0.82 : 1) * (this.carrying ? 0.8 : 1) * (cb.knockT > 0 ? 0 : cb.atk || cb.stagger > 0 ? 0.25 : cb.blocking ? 0.5 : cb.aiming ? 0.7 : 1);
+    const shootingBonus = slipperSpeedMultiplier(this.state.look, cb.gunOut, cb.aiming, cb.lastShotT, performance.now());
+    const sp = shootingBonus * (this.crouch ? 1.5 : run && !fighting ? 6 : 2.6) * (inWater ? (run ? 0.55 : 0.85) : wading ? 0.82 : 1) * (this.carrying ? 0.8 : 1) * (cb.knockT > 0 ? 0 : cb.atk || cb.stagger > 0 ? 0.25 : cb.blocking ? 0.5 : cb.aiming ? 0.7 : 1);
     // укрытие: спина прижата к стене, A/D — вдоль стены, W — выйти вперёд
     if (this.coverOn && (this.panel || this.carrying || inWater || cb.knockT > 0 || this.crouch)) this.exitCover();
     const cover = this.coverOn ? this.findWall() : null;
@@ -1117,7 +1120,8 @@ export class Game {
     // прыжок и гравитация
     const ground = this.activeCol.groundAt(this.px, this.pz, this.py, 0.45, 0.25);
     const onGround = this.py <= ground + 0.05;
-    if (onGround && (I.pressed(K.jump) || I.vPressed('jump'))) {
+    const jumpPressed = I.pressed(K.jump) || I.vPressed('jump');
+    if (onGround && jumpPressed) {
       if (this.coverOn) {
         // отскок из укрытия: прыжок с шагом от стены (Пробел)
         const out = this.wall ? { x: this.wall.nx, z: this.wall.nz } : { x: Math.sin(this.pa), z: Math.cos(this.pa) };
@@ -1128,9 +1132,11 @@ export class Game {
         this.pvy = 5.2; this.wallJumpT = 0.45;
       } else if (this.crouch) this.crouch = false;
       else this.pvy = 5.2;
+    } else if (jumpPressed && canUseWingJump(this.state.look, onGround, inWater, this.airJumps)) {
+      this.airJumps++; this.pvy = 5.2;
     }
     this.pvy -= 15 * dt; this.py += this.pvy * dt;
-    if (this.py <= ground) { this.py = ground; this.pvy = 0; }
+    if (this.py <= ground) { this.py = ground; this.pvy = 0; this.airJumps = 0; }
     if (inWater) {
       const pool = !this.interior ? this.poolAt(this.px, this.pz) : null;
       // держимся у поверхности; зажатый присед (C / кнопка) уводит ко дну
@@ -4432,8 +4438,8 @@ export class Game {
   }
   applyLimited(id: string) {
     const d = LIMITED.find((x) => x.id === id); if (!d) return;
-    const L = { ...this.state.look };
-    if (d.kind === 'hair') L.hairColor = d.value; else if (d.kind === 'top') L.topColor = d.value; else if (d.kind === 'bottom') L.bottomColor = d.value; else L.acc = L.acc === d.value ? undefined : d.value;
+    if (!(this.state.limited ?? []).includes(id)) return;
+    const L = equipLimited(this.state.look, d);
     this.state.look = L; this.player.setLook(L); this.netN = 0; this.save();
   }
   // ================= ТЕЛЕГРАМ =================
@@ -4987,7 +4993,7 @@ export class Game {
       if (v?.owned?.locked && !this.passenger) st.lk = 1;
       if (v && v.spec.service === 'taxi' && !this.passenger) st.tx = 1;
       if (this.netN % 8 === 1) {
-        st.l = [L.gender, L.skin, L.hair, L.hairColor, L.top, L.topColor, L.bottom, L.bottomColor, L.shoes, L.eyes ?? '', String(L.height ?? ''), String(L.build ?? ''), L.beard ?? '', L.lips ?? '', L.acc ?? '', L.mask ? '1' : ''] as unknown as RemoteState['l'];
+        st.l = [L.gender, L.skin, L.hair, L.hairColor, L.top, L.topColor, L.bottom, L.bottomColor, L.shoes, L.eyes ?? '', String(L.height ?? ''), String(L.build ?? ''), L.beard ?? '', L.lips ?? '', L.acc ?? '', L.mask ? '1' : '', L.wings ? '1' : ''] as unknown as RemoteState['l'];
         st.n = this.state.nick ?? '';
         st.pr = this.state.properties.flatMap((id) => {
           const entry: [string, number] = [id, this.isLocked(id) ? 1 : 0];
@@ -5071,7 +5077,7 @@ export class Game {
         for (const l of st?.ls ?? []) { const sl = this.L.bazaarSlots[l.slot]; if (!sl || !VEHICLES[l.type]) { R.listings.push(new Vehicle('lada', 'remote')); continue; } const lv = new Vehicle(l.type, 'remote', l.color); lv.place(sl.x, sl.z, sl.a, 0.15); this.addVehicle(lv); R.listings.push(lv); }
       }
       if (st?.l) { const k = st.l.join('|'); if (k !== R.lookKey) { R.lookKey = k; const a = st.l as unknown as string[]; const [gender, skin, hair, hairColor, top, topColor, bottom, bottomColor, shoes] = a; const num = (x?: string) => (x && isFinite(+x) && +x > 0.5 && +x < 1.5 ? +x : undefined);
-        R.char.setLook({ gender: gender === 'f' ? 'f' : 'm', skin, hair, hairColor, top, topColor, bottom, bottomColor, shoes, eyes: a[9] || undefined, height: num(a[10]), build: num(a[11]), beard: a[12] || undefined, lips: a[13] || undefined, acc: a[14] || undefined, mask: a[15] === '1' }); R.weapon = -1; } }
+        R.char.setLook({ gender: gender === 'f' ? 'f' : 'm', skin, hair, hairColor, top, topColor, bottom, bottomColor, shoes, eyes: a[9] || undefined, height: num(a[10]), build: num(a[11]), beard: a[12] || undefined, lips: a[13] || undefined, acc: a[14] || undefined, mask: a[15] === '1', wings: a[16] === '1' }); R.weapon = -1; } }
       // интерполяция
       const k = Math.min(1, dt * 9);
       const jump = Math.hypot(tx - R.x, tz - R.z) > 40;

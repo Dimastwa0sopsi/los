@@ -49,8 +49,26 @@ try {
     const a = L.nodes[e.a], b = L.nodes[e.b];
     return (a.x === ax && a.z === az && b.x === bx && b.z === bz) || (b.x === ax && b.z === az && a.x === bx && a.z === bz);
   });
-  if (!edgeAt(540, -340, 560, -302)) throw new Error('концы улиц Сосновки не соединены');
+  if (!edgeAt(540, -340, 560, -340) || !edgeAt(560, -340, 560, -302) || !edgeAt(560, -302, 610, -302)) throw new Error('нет прямых отрезков дороги Сосновка — Егоровка');
   if (!edgeAt(610, -290, 660, -290)) throw new Error('нет дороги Сосновка — Егоровка');
+  if (!edgeAt(540, -340, 600, -340) || !edgeAt(600, -340, 610, -340) || !edgeAt(610, -340, 680, -340)) throw new Error('нет прямой дороги в Егоровку');
+  for (let x = 542; x <= 678; x += 2) {
+    if (L.colliders.some(c => c.y1 > 0.5 && c.tag !== 'curb' && x > c.x0 - 2 && x < c.x1 + 2 && -340 > c.z0 - 2 && -340 < c.z1 + 2)) throw new Error('препятствие на прямой дороге в Егоровку');
+  }
+  const fieldTrees = L.props.filter(p => p.v === 76219 && (p.t === 'tree' || p.t === 'pine'));
+  if (fieldTrees.length < 100) throw new Error('у полей мало новых деревьев');
+  for (const tree of fieldTrees) for (const field of [L.farm, ...L.farm.aiFields]) {
+    if (tree.x > field.x0 && tree.x < field.x1 && tree.z > field.z0 && tree.z < field.z1) throw new Error('дерево в поле комбайна');
+  }
+  const bumps = L.props.filter(p => p.t === 'dirtbump');
+  if (!bumps.length || bumps.some(p => (p.h ?? 0) > 0.2)) throw new Error('кочки отсутствуют или слишком высокие');
+  for (const p of bumps) if (!L.colliders.some(c => !c.tag && Math.abs((c.x0+c.x1)/2-p.x)<0.001 && Math.abs((c.z0+c.z1)/2-p.z)<0.001 && c.y1 === p.h)) throw new Error('у кочки нет соответствующей коллизии');
+  const corridor = L.roadSegments.filter(s => s.kind === 'village' && Math.min(s.ax, s.bx) >= 540 && Math.max(s.ax, s.bx) <= 680 && Math.min(s.az, s.bz) >= -350 && Math.max(s.az, s.bz) <= -290);
+  for (const p of L.props.filter(p => ['tree', 'pine', 'bush'].includes(p.t))) for (const s of corridor) {
+    const dx = s.bx - s.ax, dz = s.bz - s.az;
+    const t = Math.max(0, Math.min(1, ((p.x - s.ax) * dx + (p.z - s.az) * dz) / (dx * dx + dz * dz)));
+    if (Math.hypot(p.x - s.ax - t * dx, p.z - s.az - t * dz) < s.w / 2 + 2) throw new Error('растение на дороге Сосновка — Егоровка');
+  }
   if (edgeAt(780, -350, 780, -290)) throw new Error('посередине Егоровки осталась дорога');
   if (!L.buildings.some(b => b.kind === 'vshop' && b.village === 'Ольховка' && b.w >= 20)) throw new Error('нет большого сельмага Ольховки');
   if (!L.props.some(p => p.t === 'fountain' && p.x > 680 && p.x < 880 && p.z < -290 && p.z > -350)) throw new Error('нет фонтана Егоровки');
