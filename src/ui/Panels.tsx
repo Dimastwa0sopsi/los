@@ -4,7 +4,7 @@ import { Modal } from './MenuScreens';
 import { Tablet } from './Tablet';
 import { InventoryGrid } from './InventoryGrid';
 import { PcPanel, OfficeHr, Livestock } from './Work';
-import { BAR_DRINKS, DRESSES, ITEMS, VEHICLES, KIOSK_TYPES, PAINT_COLORS, NEON_COLORS, LIGHT_COLORS, HAIR_STYLES, HAIR_COLORS, TOPS, BOTTOMS, CLOTH_COLORS, SKINS, EYE_COLORS, BROWS, NOSES, LIP_SHAPES, LIP_COLORS, type Tuning, type Look, TUNE_PRICES, TUNE_CATALOG, TUNE_CATS, HYDRO_PRICE, type TuneCat } from '../game/data';
+import { BAR_DRINKS, DRESSES, ITEMS, VEHICLES, VEHICLE_BODY_NAMES, KIOSK_TYPES, PAINT_COLORS, NEON_COLORS, LIGHT_COLORS, HAIR_STYLES, HAIR_COLORS, TOPS, BOTTOMS, CLOTH_COLORS, SKINS, EYE_COLORS, BROWS, NOSES, LIP_SHAPES, LIP_COLORS, type Tuning, type Look, TUNE_PRICES, TUNE_CATALOG, TUNE_CATS, HYDRO_PRICE, type TuneCat } from '../game/data';
 import { CarPreview } from './CarPreview';
 import { LookPreview } from './LookPreview';
 import { repairCost, sellPrice, demand, carValue, type MarketOffer } from '../game/state';
@@ -296,7 +296,7 @@ function Dealer({ g, close, scooter }: { g: Game; close: () => void; scooter?: b
   return (<Modal title={scooter ? '🛴 Электросамокаты «Вжух Store»' : '🚗 Автосалон'} onClose={close} wide>
     <p className="lg-money-line">Ваши деньги: <b>{$(g.getState().money)}</b></p>
     <div className="lg-list">{list.map((v) => <div className="lg-row wrap" key={v.id}>
-      <div className="flex-1 min-w-[150px]"><b>{v.name}</b><small>{v.autopilot ? '🤖 автопилот · ' : ''}{v.ev ? '⚡ электро · ' : ''}до {Math.round(v.maxSpeed * 3.6)} км/ч</small></div>
+      <div className="flex-1 min-w-[150px]"><b>{v.name}</b><small>{VEHICLE_BODY_NAMES[v.body]}</small><small>{v.autopilot ? '🤖 автопилот · ' : ''}{v.ev ? '⚡ электро · ' : ''}до {Math.round(v.maxSpeed * 3.6)} км/ч</small></div>
       <div className="flex gap-1">{v.colors.map((c) => <button key={c} className={`lg-swatch ${(color[v.id] ?? v.colors[0]) === c ? 'on' : ''}`} style={{ background: c }} onClick={() => setColor({ ...color, [v.id]: c })} />)}</div>
       <button className="lg-btn sm lg-btn-main" onClick={() => g.buyVehicle(v.id, color[v.id] ?? v.colors[0])}>{$(v.price)}</button></div>)}</div>
   </Modal>);
@@ -394,7 +394,7 @@ function Market({ g, close, sellUid }: { g: Game; close: () => void; sellUid?: s
     <div className="lg-list">{offers.map((o) => { const val = carValue(o.type, o.year, o.mileage, o.condition); const d = dealOf(o); const open = talk === o.id; return (
       <div className="lg-col-row" key={o.id}>
         <div className="lg-row wrap">
-          <span className="lg-swatch" style={{ background: o.color }} /><div className="flex-1 min-w-[160px]"><b>{VEHICLES[o.type].name}</b><small>{o.year} г. · {o.mileage.toLocaleString('ru')} км · состояние {Math.round(o.condition * 100)}% · продавец {o.seller}</small><small>Оценка: {$(val)} · спрос ×{demand(o.type, per).toFixed(2)}</small></div>
+          <span className="lg-swatch" style={{ background: o.color }} /><div className="flex-1 min-w-[160px]"><b>{VEHICLES[o.type].name}</b><small>{VEHICLE_BODY_NAMES[VEHICLES[o.type].body]}</small><small>{o.year} г. · {o.mileage.toLocaleString('ru')} км · состояние {Math.round(o.condition * 100)}% · продавец {o.seller}</small><small>Оценка: {$(val)} · спрос ×{demand(o.type, per).toFixed(2)}</small></div>
           <div className="flex gap-1">
             <button className="lg-btn sm" onClick={() => (open ? setTalk(null) : talkTo(o))}>{open ? '✕' : '💬'}</button>
             <button className="lg-btn sm lg-btn-main" onClick={() => buy(o)}>{d.price < o.price && d.tries > 0 ? <>{<s>{$(o.price)}</s>} <b>→ ${d.price.toLocaleString('ru')}</b></> : $(d.price)}</button>

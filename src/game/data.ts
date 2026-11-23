@@ -143,6 +143,13 @@ export const EMOTES: { id: string; name: string; icon: string; dance?: boolean }
 export const SCOOTER_RATE = 9; // в минуту
 export const HYDRO_PRICE = 48000;  // комплект гидравлической подвески в автомагазине
 export type BodyKind = 'sedan' | 'hatch' | 'suv' | 'pickup' | 'van' | 'truck' | 'semi' | 'bus' | 'sport' | 'moto' | 'quad' | 'heli' | 'combine' | 'scooter';
+/** Человекочитаемый класс кузова для каталога и авторынка. */
+export const VEHICLE_BODY_NAMES: Record<BodyKind, string> = {
+  sedan: 'Легковушка · седан', hatch: 'Легковушка · хэтчбек', suv: 'Внедорожник',
+  pickup: 'Пикап', van: 'Микроавтобус', truck: 'Грузовик', semi: 'Фура',
+  bus: 'Автобус', sport: 'Спорткар', moto: 'Мотоцикл', quad: 'Квадроцикл',
+  heli: 'Вертолёт', combine: 'Комбайн', scooter: 'Самокат',
+};
 export interface VSpec {
   id: string; name: string; body: BodyKind; len: number; wid: number; hei: number;
   maxSpeed: number; accel: number; price: number; autopilot?: boolean; old?: boolean; ev?: boolean;
