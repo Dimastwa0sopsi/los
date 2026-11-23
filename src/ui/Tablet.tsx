@@ -1,6 +1,7 @@
+import { limitedWorn } from '../game/limitedLook';
 import { useEffect, useRef, useState } from 'react';
 import type { Game } from '../game/game';
-import { VEHICLES, KIOSK_TYPES, ITEMS, AMMO_NAMES, LIMITED, limitedAvailable, limitedLeft, SCOOTER_RATE } from '../game/data';
+import { VEHICLES, KIOSK_TYPES, ITEMS, AMMO_NAMES, LIMITED, limitedAvailable, SCOOTER_RATE } from '../game/data';
 import { carValue } from '../game/state';
 import { loadPhotos, deletePhoto, QUEST_STEPS } from '../game/game';
 import { MapCanvas } from './Hud';
@@ -541,7 +542,7 @@ const APPS = [
   { id: 'coffee', short: 'Зерно', name: 'Кофейня «Зерно»', icon: '☕', color: '#78350f', desc: 'Кофе, чай и выпечка навынос', size: '12 МБ' },
   { id: 'pizza', short: 'Сыр', name: 'Пиццерия «Сыр»', icon: '🍕', color: '#dc2626', desc: 'Горячая пицца и напитки', size: '18 МБ' },
   { id: 'pharm', short: 'Аптека', name: 'Аптека 24', icon: '💊', color: '#10b981', desc: 'Аптечки, лекарства и витамины', size: '15 МБ' },
-  { id: 'limited', short: 'LIMITED', name: 'LIMITED Drop', icon: '💎', color: '#a855f7', desc: 'Лимитированные вещи: радужные волосы, корона, золото', size: '40 МБ' },
+  { id: 'limited', short: 'LIMITED', name: 'LIMITED Drop', icon: '💎', color: '#a855f7', desc: 'Ушки, крылья ангела, футболка LG и другие вещи', size: '40 МБ' },
 ];
 const MENUS: Record<string, { name: string; items: string[] }> = {
   food: { name: 'Вкусно Доставка', items: ['burger', 'shawarma', 'hotdog', 'sushi', 'pelmeni', 'pizza', 'donut', 'cola', 'lemonade', 'icecream', 'water'] },
@@ -668,14 +669,19 @@ function Delivery({ g, app }: { g: Game; app: string }) {
 }
 function Limited({ g }: P) {
   const s = g.getState(); const own = s.limited ?? [];
-  const h = 3 - ((Date.now() / 3600000) % 3);
+  const entries = LIMITED.map((d, i) => ({ d, i })).filter(({ d }) => d.id !== 'los_gorod_cap' || own.includes(d.id));
   return (
-    <div className="tb-list">
-      <div className="store-hero lim"><b>💎 LIMITED Drop</b><span>Окно обновится через {Math.floor(h)} ч {Math.floor((h % 1) * 60)} мин · тираж ограничен</span></div>
-      {LIMITED.map((d, i) => { const has = own.includes(d.id); const av = limitedAvailable(i); const worn = d.kind === 'acc' ? s.look.acc === d.value : d.kind === 'hair' ? s.look.hairColor === d.value : d.kind === 'top' ? s.look.topColor === d.value : s.look.bottomColor === d.value; return (
-        <div className={`tb-card ${!av && !has ? 'dim' : ''}`} key={d.id}><span className="emo">{d.icon}</span><div className="grow"><b>{d.name}</b><small>{has ? (worn ? 'надето' : 'в коллекции') : av ? `осталось ${limitedLeft(d, i)} шт.` : 'нет в продаже в этом окне'}</small></div>
-          {has ? <button className="ui-btn sm" onClick={() => g.applyLimited(d.id)}>{d.kind === 'acc' && worn ? 'Снять' : 'Надеть'}</button> : <button className="ui-btn sm main" disabled={!av} onClick={() => g.buyLimited(d.id)}>{$(d.price)}</button>}</div>); })}
-      <p className="tb-note">Купленные вещи навсегда в коллекции; снять волосы/одежду можно в парикмахерской и магазине одежды.</p>
+    <div className="tb-list limited-store">
+      <div className="store-hero lim"><b>💎 LIMITED Drop</b><span>Особые вещи для твоего персонажа</span></div>
+      <p className="tb-note">Новая коллекция — вверху. Другие дропы меняются каждые три часа.</p>
+      {entries.map(({ d, i }) => { const has = own.includes(d.id); const av = limitedAvailable(i); const worn = limitedWorn(s.look, d); return (
+        <div className={`tb-card limited-card ${!av && !has ? 'dim' : ''}`} key={d.id}>
+          <span className="limited-icon">{d.icon}</span>
+          <div className="grow"><b>{d.name}</b>{d.desc && <small>{d.desc}</small>}
+            <small className="limited-status">{has ? (worn ? 'Надето' : 'В коллекции') : av ? 'Доступно сейчас' : 'В этом окне недоступно'}</small></div>
+          {has ? <button className="ui-btn sm" onClick={() => g.applyLimited(d.id)}>{['acc', 'wings', 'shoes'].includes(d.kind) && worn ? 'Снять' : 'Надеть'}</button> : <button className="ui-btn sm main" disabled={!av} onClick={() => g.buyLimited(d.id)}>{$(d.price)}</button>}
+        </div>); })}
+      <p className="tb-note">Вещи сохраняются в коллекции. Волосы и одежду можно сменить в редакторе внешности.</p>
     </div>
   );
 }

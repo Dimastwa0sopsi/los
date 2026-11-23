@@ -364,7 +364,7 @@ export function randomPlate(): string {
 // Внешность
 export interface Look {
   gender: 'm' | 'f'; skin: string; hair: string; hairColor: string; top: string; topColor: string; bottom: string; bottomColor: string; shoes: string;
-  eyes?: string; height?: number; build?: number; beard?: string; lips?: string; acc?: string; mask?: boolean;
+  eyes?: string; height?: number; build?: number; beard?: string; lips?: string; acc?: string; wings?: boolean; mask?: boolean;
   /** отдельные черты лица: форма брови, нос, губы и их цвет */
   brows?: string; browColor?: string; nose?: string; lipColor?: string;
   /** форма лица, форма глаз, ресницы и особые приметы (веснушки, шрам, родинка...) */
@@ -413,9 +413,13 @@ export const HAIR_STYLES: { id: string; name: string; price: number }[] = [
   { id: 'verylong', name: 'Очень длинные', price: 90 }, { id: 'rocker', name: 'Рокер (до плеч)', price: 70 }, { id: 'manbun', name: 'Мэн-бан', price: 55 }, { id: 'mullet', name: 'Маллет', price: 50 }, { id: 'dreads', name: 'Дреды', price: 110 },
 ];
 /** лимитированные предметы: доступны только в своё «окно» (меняется каждые 3 часа реального времени), ограниченный тираж */
-export interface LimitedDef { id: string; name: string; icon: string; kind: 'hair' | 'top' | 'bottom' | 'acc'; value: string; price: number; stock: number }
+export interface LimitedDef { id: string; name: string; icon: string; kind: 'hair' | 'top' | 'bottom' | 'acc' | 'wings' | 'shoes'; value: string; price: number; stock: number; desc?: string }
 export const LIMITED: LimitedDef[] = [
-  { id: 'lh_rainbow', name: 'Радужные волосы', icon: '🌈', kind: 'hair', value: '@rainbow', price: 25000, stock: 500 },
+  { id: 'la_cat_ears', name: 'Кошачьи ушки', icon: '🐱', kind: 'acc', value: 'cat_ears', price: 25000, stock: 500, desc: 'Ободок с кошачьими ушками и мини-колокольчиками' },
+  { id: 'lt_lg', name: 'Футболка LG', icon: '👕', kind: 'top', value: '@lgshirt', price: 50000, stock: 500, desc: 'Чёрная футболка с голубым логотипом LG' },
+  { id: 'lh_rainbow', name: 'Разноцветные волосы', icon: '🌈', kind: 'hair', value: '@rainbow', price: 100000, stock: 500, desc: 'Радужные волосы светятся в темноте' },
+  { id: 'la_angel_wings', name: 'Крылья ангела', icon: '🪽', kind: 'wings', value: 'angel', price: 200000, stock: 500, desc: 'Два дополнительных прыжка в воздухе' },
+  { id: 'ls_pink_slippers', name: 'Розовые тапочки', icon: '🩷', kind: 'shoes', value: '@pinkslippers', price: 10000, stock: 500, desc: 'Уютные тапочки: +10% скорости при стрельбе' },
   { id: 'lh_gold', name: 'Золотые волосы', icon: '✨', kind: 'hair', value: '@gold', price: 40000, stock: 300 },
   { id: 'lh_neon', name: 'Неоновые волосы', icon: '💡', kind: 'hair', value: '@neon', price: 30000, stock: 400 },
   { id: 'lh_fire', name: 'Огненные волосы', icon: '🔥', kind: 'hair', value: '@fire', price: 35000, stock: 350 },
@@ -430,7 +434,7 @@ export const LIMITED: LimitedDef[] = [
   { id: 'la_phones', name: 'Неон-наушники', icon: '🎧', kind: 'acc', value: 'phones', price: 20000, stock: 600 },
 ];
 export function limitedWindow() { return Math.floor(Date.now() / (3 * 3600 * 1000)); }
-export function limitedAvailable(i: number) { return LIMITED[i]?.id !== 'los_gorod_cap' && (limitedWindow() + i) % 3 !== 0; }
+export function limitedAvailable(i: number) { const d = LIMITED[i]; return !!d && d.id !== 'los_gorod_cap' && (!!d.desc || (limitedWindow() + i) % 3 !== 0); }
 export function limitedLeft(d: LimitedDef, i: number) { const t = (Date.now() / (3 * 3600 * 1000)) % 1; return Math.max(1, Math.round(d.stock * (1 - t * 0.85) - ((i * 37) % 23))); }
 export const DRESSES = new Set(['dress', 'minidress', 'sundress', 'cocktail', 'evening', 'wedding', 'sequin']);
 export const HAIR_COLORS = ['#1a1a1a', '#4a2f1b', '#8b5a2b', '#d9b26a', '#b5462b', '#9e9e9e', '#3b82f6', '#ec4899'];
@@ -443,17 +447,22 @@ export const TOPS: { id: string; name: string; price: number }[] = [
   { id: 'vest', name: 'Жилет', price: 95 }, { id: 'tracksuit', name: 'Спортивка', price: 145 }, { id: 'denim', name: 'Джинсовка', price: 175 },
   { id: 'raincoat', name: 'Плащ', price: 260 }, { id: 'puffer', name: 'Пуховик', price: 380 }, { id: 'hawaiian', name: 'Гавайка', price: 90 },
   { id: 'tuxedo', name: 'Смокинг', price: 780 }, { id: 'wedding', name: 'Свадебное платье', price: 1400 }, { id: 'sequin', name: 'Платье с пайетками', price: 950 },
+  { id: 'striped_sweater', name: 'Полосатый свитер', price: 125 }, { id: 'jersey', name: 'Спортивная футболка', price: 85 },
+  { id: 'utility_vest', name: 'Рабочий жилет', price: 145 }, { id: 'apron', name: 'Фартук', price: 75 },
+  { id: 'leather_jacket', name: 'Кожаная куртка', price: 310 }, { id: 'overshirt', name: 'Рубашка поверх футболки', price: 180 },
 ];
 export const BOTTOMS: { id: string; name: string; price: number }[] = [
   { id: 'jeans', name: 'Джинсы', price: 60 }, { id: 'trousers', name: 'Брюки', price: 90 }, { id: 'shorts', name: 'Шорты', price: 30 }, { id: 'skirt', name: 'Юбка', price: 50 },
   { id: 'cargo', name: 'Карго', price: 95 }, { id: 'joggers', name: 'Джоггеры', price: 70 }, { id: 'chinos', name: 'Чиносы', price: 110 },
   { id: 'pleated', name: 'Юбка в складку', price: 85 }, { id: 'maxi', name: 'Макси-юбка', price: 130 }, { id: 'leggings', name: 'Легинсы', price: 45 },
   { id: 'bermuda', name: 'Бермуды', price: 40 }, { id: 'sweatpants', name: 'Спортивные штаны', price: 65 },
+  { id: 'workpants', name: 'Рабочие брюки', price: 110 }, { id: 'patched_jeans', name: 'Джинсы с заплатками', price: 120 },
+  { id: 'sportshorts', name: 'Спортивные шорты', price: 55 },
 ];
 export const CLOTH_COLORS = ['#ffffff', '#111827', '#1d4ed8', '#dc2626', '#16a34a', '#f59e0b', '#7c3aed', '#db2777', '#6b7280', '#92400e', '#0e7490', '#f5f5dc',
   '#0f172a', '#334155', '#a16207', '#15803d', '#0891b2', '#be123c', '#7c2d12', '#eab308', '#c084fc', '#f472b6', '#22d3ee', '#4ade80'];
 /** вещи с длинным рукавом (использует модель персонажа) */
-export const LONG_SLEEVE_TOPS = new Set(['hoodie', 'shirt', 'suit', 'polo', 'bomber', 'coat', 'jacket', 'turtleneck', 'cardigan', 'tracksuit', 'denim', 'raincoat', 'puffer', 'tuxedo']);
+export const LONG_SLEEVE_TOPS = new Set(['hoodie', 'shirt', 'suit', 'polo', 'bomber', 'coat', 'jacket', 'turtleneck', 'cardigan', 'tracksuit', 'denim', 'raincoat', 'puffer', 'tuxedo', 'striped_sweater', 'leather_jacket', 'overshirt']);
 export const defaultLook = (g: 'm' | 'f'): Look => g === 'm'
   ? { gender: 'm', skin: SKINS[0], hair: 'short', hairColor: HAIR_COLORS[1], top: 'tshirt', topColor: '#1d4ed8', bottom: 'jeans', bottomColor: '#1e3a5f', shoes: '#222222', face: 'oval', eyeShape: 'almond', lashes: 'none', marks: 'none', cheeks: 'flat' }
   : { gender: 'f', skin: SKINS[0], hair: 'long', hairColor: HAIR_COLORS[3], top: 'tshirt', topColor: '#db2777', bottom: 'jeans', bottomColor: '#1e3a5f', shoes: '#ffffff', face: 'oval', eyeShape: 'almond', lashes: 'soft', marks: 'none', cheeks: 'soft' };

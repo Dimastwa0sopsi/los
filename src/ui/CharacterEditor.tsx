@@ -1,3 +1,4 @@
+import { equipLimited, limitedWorn } from '../game/limitedLook';
 import { useEffect, useRef, useState } from 'react';
 import type { Game } from '../game/game';
 import { LIMITED, DRESSES, type Look, SKINS, HAIR_STYLES, HAIR_COLORS, TOPS, BOTTOMS, CLOTH_COLORS, EYE_COLORS, BROWS, NOSES, LIP_SHAPES, LIP_COLORS, defaultLook, FACE_SHAPES, EYE_SHAPES, LASH_STYLES, FACE_MARKS, CHEEKS, BEARDS } from '../game/data';
@@ -74,8 +75,8 @@ export function CharacterEditor({ g, fresh }: { g: Game; fresh: boolean }) {
           {tab === 'limited' && <>
             <h4>Лимитированные вещи</h4>
             {!owned.length && <p className="tb-note">Пока пусто. Лимитки продаются в приложении «LIMITED Drop» (планшет → LosSt).</p>}
-            <div className="chips">{owned.map((d) => { const on = d.kind === 'hair' ? l.hairColor === d.value : d.kind === 'top' ? l.topColor === d.value : d.kind === 'bottom' ? l.bottomColor === d.value : l.acc === d.value; return (
-              <button key={d.id} className={`ui-chip ${on ? 'on' : ''}`} onClick={() => set(d.kind === 'hair' ? { hairColor: d.value } : d.kind === 'top' ? { topColor: d.value } : d.kind === 'bottom' ? { bottomColor: d.value } : { acc: on ? undefined : d.value })}>{d.icon} {d.name}</button>); })}</div>
+            <div className="chips">{owned.map((d) => { const on = limitedWorn(l, d); return (
+              <button key={d.id} className={`ui-chip ${on ? 'on' : ''}`} onClick={() => set(equipLimited(l, d))}>{d.icon} {d.name}</button>); })}</div>
           </>}
           {tab === 'clothes' && <>
             <h4>Верх</h4><Chips list={tops} value={l.top} set={(id) => set({ top: id })} /><Colors list={CLOTH_COLORS} value={l.topColor} set={(c) => set({ topColor: c })} />

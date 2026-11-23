@@ -1,3 +1,4 @@
+import { TestDrive } from './TestDrive';
 import { useEffect, useState } from 'react';
 import type { Game, Panel } from '../game/game';
 import { Modal } from './MenuScreens';
@@ -293,13 +294,15 @@ function Promo({ g, close }: { g: Game; close: () => void }) {
 function Dealer({ g, close, scooter }: { g: Game; close: () => void; scooter?: boolean }) {
   const list = Object.values(VEHICLES).filter((v) => v.forSale === (scooter ? 'scooter' : 'dealer')).sort((a, b) => a.price - b.price);
   const [color, setColor] = useState<Record<string, string>>({});
-  return (<Modal title={scooter ? '🛴 Электросамокаты «Вжух Store»' : '🚗 Автосалон'} onClose={close} wide>
+  const [testing, setTesting] = useState<{ type: string; color: string } | null>(null);
+  return (<><Modal title={scooter ? '🛴 Электросамокаты «Вжух Store»' : '🚗 Автосалон'} onClose={close} wide>
     <p className="lg-money-line">Ваши деньги: <b>{$(g.getState().money)}</b></p>
     <div className="lg-list">{list.map((v) => <div className="lg-row wrap" key={v.id}>
       <div className="flex-1 min-w-[150px]"><b>{v.name}</b><small>{VEHICLE_BODY_NAMES[v.body]}</small><small>{v.autopilot ? '🤖 автопилот · ' : ''}{v.ev ? '⚡ электро · ' : ''}до {Math.round(v.maxSpeed * 3.6)} км/ч</small></div>
       <div className="flex gap-1">{v.colors.map((c) => <button key={c} className={`lg-swatch ${(color[v.id] ?? v.colors[0]) === c ? 'on' : ''}`} style={{ background: c }} onClick={() => setColor({ ...color, [v.id]: c })} />)}</div>
+      {!scooter && <button className="lg-btn sm" onClick={() => setTesting({ type: v.id, color: color[v.id] ?? v.colors[0] })}>Тест-драйв</button>}
       <button className="lg-btn sm lg-btn-main" onClick={() => g.buyVehicle(v.id, color[v.id] ?? v.colors[0])}>{$(v.price)}</button></div>)}</div>
-  </Modal>);
+  </Modal>{testing && <TestDrive g={g} type={testing.type} color={testing.color} close={() => setTesting(null)} />}</>);
 }
 
 /** реплики продавцов авторынка — 50 фраз по пяти темам */
