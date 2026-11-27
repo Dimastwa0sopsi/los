@@ -34,6 +34,10 @@ import { hamsterSpot, makeHamster } from './hamster';
 import { nextImmersion } from './vehicleSinking';
 import { carRadioVolume, radioGain, soundCloudUrl, type RadioPlace } from './radioSpatial';
 import { RemoteRadios } from './remoteRadio';
+import {speakerById, speakerVolume} from './speakers';
+import {hasSubwooferTrunk} from './data';
+import { stepTrunkMotion, TRUNK_OPEN_SECONDS } from './trunkAnimation';
+import {disposeHomeSpeaker, makeHomeSpeaker} from './speakerModel';
 import { setSoundCloudMobile } from './soundCloudWidget';
 import { allMaterials, disposeTextures, mat, GFX, getTex } from './textures';
 import { T, M } from './geom';
@@ -156,6 +160,7 @@ export class Game {
   private socialSent: { to: number; until: number } | null = null;
   private plateHold: { vehicle: Vehicle; side: 'front' | 'back'; time: number } | null = null;
   private plateHoldDone = false;
+  private testTrunks = new Map<Vehicle, { elapsed: number; opening: boolean }>();
   seatbelt = false; private beltHold = 0; private beltTriggered = false; private beltInputGeneration = 0;
   speedCameras: SpeedCamera[] = []; private cameraSeen = new Set<string>();
   furnitureSeat: { seat: InteriorSeat; fromX: number; fromZ: number } | null = null;
@@ -263,7 +268,7 @@ export class Game {
   weather = new Weather();
   /** радио в машине (T) */
   radio = new Radio();
-  private radioSource: {kind:'vehicle'; vehicle:Vehicle} | {kind:'computer'; place: Extract<RadioPlace,{kind:'computer'}>} | null = null;
+  private radioSource: {kind:'vehicle'; vehicle:Vehicle} | {kind:'computer'; place: Extract<RadioPlace,{kind:'computer'}>; homeId:string|null} | null = null;
   private remoteRadios = new RemoteRadios(() => this.toast('📻 Рядом играет радио. Если звука нет, нажмите ▶ в плеере SoundCloud'));
   private radioNetTimer = 0;
   /** дрифт-ассист для телефона: одна кнопка держит ручник и обостряет руль */
@@ -651,6 +656,7 @@ export class Game {
     const it = buildInterior(kind, { seed: b.id, owned, name: b.name });
     this.setInterior(it, kind);
     this.state.location = { b: b.id };
+    this.syncHomeSpeakerVisual();
     if (!silent) this.sound.door();
     this.lastBuilding = b;
   }
@@ -666,6 +672,7 @@ export class Game {
     const kind: InteriorKind = b.cls === 'lux' ? 'apt_lux' : b.cls === 'mid' ? 'apt_mid' : 'apt_eco';
     this.setInterior(buildInterior(kind, { seed: b.id * 10 + unit }), kind);
     this.state.location = { b: b.id, unit };
+    this.syncHomeSpeakerVisual();
     if (!silent) { this.sound.door(); this.save(); }
   }
   enterMallShop(b: Building, kind: InteriorKind, idx: number, silent = false) {
@@ -688,7 +695,7 @@ export class Game {
       const hk: InteriorKind = b.kind === 'house' ? 'house_city' : 'house_village';
       const it = buildInterior(hk, { seed: b.id });
       this.setInterior(it, hk, it.doorSpots['hatch']);
-      this.state.location = { b: b.id }; this.sound.door(); return;
+      this.state.location = { b: b.id }; this.syncHomeSpeakerVisual(); this.sound.door(); return;
     }
     if (loc.sub !== undefined && b.kind === 'mall') { // из магазина — в зал торгового центра
       const it = buildInterior('mall', { seed: b.id });
@@ -750,17 +757,18 @@ export class Game {
     radio.getPosition(position=>{
       if(this.net!==net || this.radioSource!==source || this.radio.station!==station || !radio.playing)return;
       const place=source.kind==='vehicle'?{kind:'vehicle',x:source.vehicle.x,z:source.vehicle.z}:source.place;
-      const outside=source.kind==='vehicle'?carRadioVolume(radio.volume,!!source.vehicle.owned?.tuning.subwoofer):radio.volume;
-      const inside=source.kind==='vehicle'?carRadioVolume(radio.insideVolume,!!source.vehicle.owned?.tuning.subwoofer):radio.insideVolume;
+      const speaker=source.kind==='computer' && source.homeId ? this.state.homeSpeakers?.[source.homeId] : undefined;
+      const outside=source.kind==='vehicle'?carRadioVolume(radio.volume,!!source.vehicle.owned?.tuning.subwoofer):speakerVolume(radio.volume,speaker);
+      const inside=source.kind==='vehicle'?carRadioVolume(radio.insideVolume,!!source.vehicle.owned?.tuning.subwoofer):speakerVolume(radio.insideVolume,speaker);
       net.sendRadio({...place,url:station.url,position,outside,inside,playing:true});
     });
   }
   openComputerRadio() {
     const id=this.state.location?.b, building=id===undefined ? undefined : this.L.buildings[id];
     if (!this.interior || !building) { this.toast('📻 Откройте домашний компьютер'); return; }
-    if (this.radioSource?.kind !== 'computer' || this.radioSource.place.buildingId !== id) {
+    if (this.radioSource?.kind !== 'computer' || this.radioSource.place.buildingId !== id || this.radioSource.homeId !== this.homeId()) {
       this.radio.stop();
-      this.radioSource={kind:'computer',place:{kind:'computer',x:this.px,z:this.pz,exteriorX:building.door.x,exteriorZ:building.door.z,buildingId:building.id}};
+      this.radioSource={kind:'computer',homeId:this.homeId(),place:{kind:'computer',x:this.px,z:this.pz,exteriorX:building.door.x,exteriorZ:building.door.z,buildingId:building.id}};
     }
     this.openPanel({type:'radio'});
   }
@@ -815,14 +823,20 @@ export class Game {
   private updateWorldSystems(dt: number) {
     const inside = !!this.interior;
     this.hamster?.animate(performance.now() / 1000);
+    for (const [v, animation] of this.testTrunks) {
+      if (!this.vehicles.includes(v)) { this.testTrunks.delete(v); continue; }
+      animation.elapsed = stepTrunkMotion('hinged', animation.elapsed, animation.opening, dt);
+      v.model.setExperimentalTrunkElapsed(animation.elapsed);
+    }
     if (this.radioSource) {
       const source=this.radioSource;
       if (source.kind === 'vehicle' && !this.vehicles.includes(source.vehicle)) { this.radio.stop(); this.radioSource=null; }
       else {
         const place: RadioPlace=source.kind==='vehicle' ? {kind:'vehicle',x:source.vehicle.x,z:source.vehicle.z,vehicleId:String(source.vehicle.id)} : source.place;
         const listener={x:this.px,z:this.pz,buildingId:this.interior ? this.state.location?.b ?? null : null,vehicleId:this.inVeh ? String(this.inVeh.id) : null};
-        const outside=source.kind==='vehicle'?carRadioVolume(this.radio.volume,!!source.vehicle.owned?.tuning.subwoofer):this.radio.volume;
-        const insideVolume=source.kind==='vehicle'?carRadioVolume(this.radio.insideVolume,!!source.vehicle.owned?.tuning.subwoofer):this.radio.insideVolume;
+        const speaker=source.kind==='computer' && source.homeId ? this.state.homeSpeakers?.[source.homeId] : undefined;
+        const outside=source.kind==='vehicle'?carRadioVolume(this.radio.volume,!!source.vehicle.owned?.tuning.subwoofer):speakerVolume(this.radio.volume,speaker);
+        const insideVolume=source.kind==='vehicle'?carRadioVolume(this.radio.insideVolume,!!source.vehicle.owned?.tuning.subwoofer):speakerVolume(this.radio.insideVolume,speaker);
         this.radio.setOutputVolume(radioGain(place,listener,outside,insideVolume));
       }
     }
@@ -2787,6 +2801,7 @@ export class Game {
     if (!src || !src[id]) return;
     const it = ITEMS[id];
     if (id === 'mask' && !fromFridge) { this.toggleMask(); return; }
+    if (!fromFridge && speakerById(id)) { this.installHomeSpeaker(id); return; }
     if (it.weapon) { this.setWeapon(it.weapon); this.closePanel(); return; }
     // канистра и запчасти: ставим у своей машины, предмет тратится только при успехе
     if (it.fuel || it.part) {
@@ -2812,6 +2827,30 @@ export class Game {
     if (b.kind === 'apartment' && loc.unit !== undefined) return `${b.id}:${loc.unit}`;
     if ((b.kind === 'house' || b.kind === 'vhouse') && this.state.properties.includes(`${b.id}:0`)) return `${b.id}:0`;
     return null;
+  }
+  homeSpeaker():string|null { const h=this.homeId(); return h && this.state.properties.includes(h) ? this.state.homeSpeakers?.[h] ?? null : null; }
+  private syncHomeSpeakerVisual() {
+    const interior=this.interior; if(!interior)return;
+    const old=interior.group.getObjectByName('installed-home-speaker');
+    if(old)disposeHomeSpeaker(old);
+    const speaker=speakerById(this.homeSpeaker());
+    const desk=interior.acts.find(a=>a.action==='homepc'); if(!speaker||!desk)return;
+    interior.group.add(makeHomeSpeaker(speaker,desk));
+  }
+  installHomeSpeaker(id:string):boolean {
+    const speaker=speakerById(id), h=this.homeId(), inv=this.state.inventory;
+    if (!this.interior?.acts.some(a=>a.action==='homepc') || !h || !this.state.properties.includes(h)) { this.toast('Колонку можно установить только у компьютера в своём доме или квартире'); return false; }
+    if (!speaker || !(inv[id]>0)) { this.toast('Сначала купите колонку'); return false; }
+    const installed=this.state.homeSpeakers?.[h];
+    if (installed===id) { this.toast('Эта колонка уже установлена'); return false; }
+    inv[id]--; if(!inv[id])delete inv[id];
+    if (speakerById(installed)) inv[installed!]=(inv[installed!]??0)+1;
+    (this.state.homeSpeakers??={})[h]=id;this.syncHomeSpeakerVisual();this.save();this.toast(`🔊 Установлена колонка ${speaker.name}`);return true;
+  }
+  removeHomeSpeaker():boolean {
+    const h=this.homeId(); if(!this.interior?.acts.some(a=>a.action==='homepc') || !h || !this.state.properties.includes(h))return false;
+    const id=this.state.homeSpeakers?.[h]; if(!speakerById(id))return false;
+    delete this.state.homeSpeakers![h];this.state.inventory[id!]=(this.state.inventory[id!]??0)+1;this.syncHomeSpeakerVisual();this.save();this.toast('🔊 Колонка убрана в инвентарь');return true;
   }
   homeFridge(): Record<string, number> | null { const h = this.homeId(); if (!h) return null; return (this.state.fridges[h] ??= {}); }
   toFridge(id: string) { const f = this.homeFridge(); const inv = this.state.inventory; if (!f || !inv[id]) return; if (!ITEMS[id].fridge) { this.toast('Это нельзя положить в холодильник'); return; } inv[id]--; if (!inv[id]) delete inv[id]; f[id] = (f[id] ?? 0) + 1; }
@@ -3459,6 +3498,7 @@ export class Game {
     const v = this.vehicles.find((x) => x.owned?.uid === uidv);
     const o = this.state.vehicles.find((x) => x.uid === uidv);
     if (!o || !v) { this.toast('Машина недоступна — сначала вызовите её'); return false; }
+    if (t.subwoofer && !o.tuning.subwoofer && !hasSubwooferTrunk(v.spec.body)) { this.toast('Сабвуфер ставится в багажник машины'); return false; }
     const next = { ...t, plate: o.tuning.plate, turbo: Math.max(o.tuning.turbo, t.turbo), engine: Math.max(o.tuning.engine, t.engine) };
     const cost = this.tuningCost(o.tuning, next);
     if (cost > 0 && !this.pay(cost)) return false;
@@ -3984,6 +4024,22 @@ export class Game {
       for (const o of [-2.3, 0, 2.3]) this.plantMesh(g, bed.x + (alongZ ? 0 : o), 0.37, bed.z + (alongZ ? o : 0), pl[key].crop, pr);
     }
   }
+  /** Visual-only test. Does not move or store any items or synchronize online. */
+  testTrunkCommand() {
+    if (this.inVeh || this.interior) { this.toast('Выйдите из машины и подойдите к её задней части'); return; }
+    const v = this.vehicles.filter(car => car.owned && this.state.vehicles.some(o => o.uid === car.owned?.uid) && car.model.group.visible && Math.abs(car.speed) < 0.3)
+      .map(car => { const f = car.forward(); return { car, distance: Math.hypot(this.px - (car.x - f.x * car.spec.len / 2), this.pz - (car.z - f.z * car.spec.len / 2)) }; })
+      .filter(x => x.distance < 2.5).sort((a,b) => a.distance - b.distance)[0]?.car;
+    if (!v) { this.toast('Подойдите сзади к своей неподвижной машине'); return; }
+    if (!v.model.setExperimentalTrunkAnimation(true)) { this.toast('Тест крышки пока доступен только для седанов и спорткаров'); return; }
+    if (!v.model.body.getObjectByName('experimental-trunk-pivot')) { this.toast('Крышка отсутствует — сначала отремонтируйте машину'); return; }
+    const previous = this.testTrunks.get(v);
+    const animation = previous ?? { elapsed: 0, opening: false };
+    animation.opening = !animation.opening;
+    animation.elapsed = Math.min(animation.elapsed, TRUNK_OPEN_SECONDS.hinged);
+    this.testTrunks.set(v, animation);
+    this.toast(animation.opening ? 'Тест: крышка открывается. Хранение вещей ещё не работает' : 'Тест: крышка закрывается');
+  }
   // ================= ЧАТ И КОМАНДЫ =================
   chatLog(): ChatMsg[] { return this.net?.chat ?? this.localChat; }
   private pushLocal(m: Omit<ChatMsg, 't'>) { const arr = this.net?.chat ?? this.localChat; arr.push({ ...m, t: Date.now() }); if (arr.length > 80) arr.shift(); }
@@ -4338,6 +4394,9 @@ export class Game {
     const price = Math.round(this.unitPrice(b, u) * 0.6);
     if (this.interior && this.state.location?.b === bi) { this.forceOutside(); this.state.location = null; }
     this.state.properties = props.filter((p) => p !== id);
+    const installedSpeaker=this.state.homeSpeakers?.[id];
+    if (speakerById(installedSpeaker)) this.state.inventory[installedSpeaker!]=(this.state.inventory[installedSpeaker!]??0)+1;
+    if (this.state.homeSpeakers) delete this.state.homeSpeakers[id];
     if (this.state.locks) delete this.state.locks[id];
     if (this.state.spawnHome === id) this.state.spawnHome = undefined;
     for (const k of Object.keys(this.state.plants ?? {})) if (k.startsWith(bi + ':')) delete this.state.plants![k];

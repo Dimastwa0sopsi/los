@@ -1,8 +1,9 @@
 // Модели транспорта: детальные, с отрываемыми деталями и тюнингом
 import * as THREE from 'three';
 import { T, M, Batcher } from './geom';
-import { VEHICLES, type VSpec, type Tuning, defaultTuning } from './data';
+import { VEHICLES, type VSpec, type Tuning, defaultTuning, hasSubwooferTrunk } from './data';
 import { mat } from './textures';
+import { trunkMotionPose } from './trunkAnimation';
 
 interface Item { mat: string; tpl: THREE.BufferGeometry; m: THREE.Matrix4 }
 export interface Part { name: string; items: Item[]; detachable: boolean; attached: boolean; center: THREE.Vector3 }
@@ -128,6 +129,11 @@ export class VehicleModel {
   spec: VSpec; color: string; tuning: Tuning;
   private cur!: Part;
   private steerHandle: THREE.Object3D | null = null;
+  private subwooferModel: THREE.Group | null = null;
+  /** Experimental: opt-in until interaction, storage and networking are ready. */
+  private trunkAnimationEnabled = false;
+  private trunkElapsed = 0;
+  private trunkPivot: THREE.Group | null = null;
   lightsOn = false;
   /** горят ли стоп-сигналы */
   braking = false;
@@ -147,6 +153,7 @@ export class VehicleModel {
     this.passenger = { x: -0.36, y: 0.55, z: -1, pose: 'passenger', scale: 0.92 };
     this.construct();
     this.rebuild();
+    this.syncSubwooferModel();
     if (this.spec.body !== 'heli' && this.spec.body !== 'scooter') {
       const blob = new THREE.Mesh(T.plane, mat('blob'));
       blob.rotation.x = -Math.PI / 2; blob.scale.set(this.spec.wid + 0.7, this.spec.len + 0.6, 1); blob.position.y = 0.04; blob.renderOrder = 1;
@@ -1026,11 +1033,41 @@ export class VehicleModel {
     if (k === 'TRIM') return 'c:#222';
     return k;
   }
+  /** Enable only for the separately modelled sedan/sport lid. A solid chassis
+   * remains underneath: a real cargo opening still needs body reconstruction. */
+  setExperimentalTrunkAnimation(enabled: boolean): boolean {
+    const supported = this.spec.body === 'sedan' || this.spec.body === 'sport';
+    const next = enabled && supported;
+    if (next !== this.trunkAnimationEnabled) { this.trunkAnimationEnabled = next; this.rebuild(); }
+    return next;
+  }
+  setExperimentalTrunkElapsed(seconds: number) {
+    this.trunkElapsed = Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
+    if (this.trunkPivot) this.trunkPivot.rotation.x = trunkMotionPose('hinged', this.trunkElapsed).lidAngle;
+  }
+  private clearTrunkPivot() {
+    if (!this.trunkPivot) return;
+    this.trunkPivot.traverse(o => { const mesh = o as THREE.Mesh; if (mesh.isMesh) mesh.geometry.dispose(); });
+    this.trunkPivot.removeFromParent(); this.trunkPivot = null;
+  }
   rebuild() {
     for (const m of this.meshes) { this.body.remove(m); m.geometry.dispose(); }
     this.meshes = [];
+    this.clearTrunkPivot();
     const b = new Batcher();
-    for (const p of this.parts) if (p.attached) for (const it of p.items) b.add(this.resolveMat(it.mat), it.tpl, it.m);
+    for (const p of this.parts) if (p.attached) {
+      if (this.trunkAnimationEnabled && p.name === 'trunk' && p.items.length) {
+        const e = p.items[0].m.elements;
+        const pivot = new THREE.Vector3(e[12], e[13], e[14] + Math.abs(e[10]) / 2);
+        const offset = new THREE.Matrix4().makeTranslation(-pivot.x, -pivot.y, -pivot.z);
+        const lidBatch = new Batcher();
+        for (const it of p.items) lidBatch.add(this.resolveMat(it.mat), it.tpl, offset.clone().multiply(it.m));
+        const group = new THREE.Group(); group.name = 'experimental-trunk-pivot'; group.position.copy(pivot);
+        for (const mesh of lidBatch.build({ cast: true })) group.add(mesh);
+        this.body.add(group); this.trunkPivot = group;
+        this.setExperimentalTrunkElapsed(this.trunkElapsed);
+      } else for (const it of p.items) b.add(this.resolveMat(it.mat), it.tpl, it.m);
+    }
     const ms = b.build({ cast: true });
     for (const m of ms) { this.body.add(m); this.meshes.push(m); }
     this.sirenMeshes = ms.filter((m) => m.userData.matKey === 'glow:#ef4444' || m.userData.matKey === 'glow:#3b82f6');
@@ -1105,6 +1142,16 @@ export class VehicleModel {
       if (mat && mat.color && (mat as unknown as { isMeshBasicMaterial?: boolean }).isMeshBasicMaterial) mat.color.copy(col);
     }
   }
+  private syncSubwooferModel() {
+    if(this.subwooferModel){this.subwooferModel.traverse(o=>{const m=o as THREE.Mesh;if(m.isMesh)m.geometry.dispose();});this.subwooferModel.removeFromParent();this.subwooferModel=null;}
+    if(!this.tuning.subwoofer || !hasSubwooferTrunk(this.spec.body))return;
+    const s=this.spec, box=new THREE.Group();box.name='trunk-subwoofer';
+    const width=Math.min(.65,s.wid*.4), depth=Math.min(.38,s.len*.085), height=.28;
+    const casing=new THREE.Mesh(new THREE.BoxGeometry(width,height,depth),mat('c:#24262b'));casing.position.y=height/2;box.add(casing);
+    const cone=new THREE.Mesh(new THREE.CylinderGeometry(width*.22,width*.22,.016,20),mat('c:#6b7280'));
+    cone.position.set(0,height+.009,0);box.add(cone);
+    box.position.set(0,Math.max(.32,s.hei*.25),-s.len*.37);this.body.add(box);this.subwooferModel=box;
+  }
   applyTuning(t: Tuning) {
     const rimsChanged = t.rims !== this.tuning.rims;
     const spoilerChanged = t.spoiler !== this.tuning.spoiler || t.chrome !== this.tuning.chrome;
@@ -1118,6 +1165,7 @@ export class VehicleModel {
     }
     this.addNeon(this.spec.wid, this.spec.len);
     this.rebuild();
+    this.syncSubwooferModel();
     this.updatePlate();
   }
   detachables() { return this.parts.filter((p) => p.detachable && p.attached); }
@@ -1195,5 +1243,5 @@ export class VehicleModel {
     for (const w of this.frontWheels) w.rotation.y = -steer * 0.5;
     if (this.steerHandle) this.steerHandle.rotation.z = -steer;
   }
-  dispose() { for (const m of this.meshes) m.geometry.dispose(); for (const p of [this.plate, this.frontPlate]) if (p) { p.geometry.dispose(); (p.material as THREE.Material).dispose(); } this.plateTexture?.dispose(); this.group.parent?.remove(this.group); }
+  dispose() { this.clearTrunkPivot(); for (const m of this.meshes) m.geometry.dispose(); if(this.subwooferModel){this.subwooferModel.traverse(o=>{const m=o as THREE.Mesh;if(m.isMesh)m.geometry.dispose();});this.subwooferModel.removeFromParent();this.subwooferModel=null;} for (const p of [this.plate, this.frontPlate]) if (p) { p.geometry.dispose(); (p.material as THREE.Material).dispose(); } this.plateTexture?.dispose(); this.group.parent?.remove(this.group); }
 }

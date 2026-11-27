@@ -352,6 +352,21 @@ button.tb-card:hover { background: rgba(255,255,255,.09); } button.tb-card:activ
 .pc-side { display: flex; flex-direction: column; gap: 10px; } .pc-side > div { background: rgba(255,255,255,.05); border-radius: 12px; padding: 10px; } .pc-side small { display: block; color: var(--mut); font-size: 11px; } .pc-side .price { color: var(--mint); font-size: 22px; }
 .pc-prog { display: block; height: 6px; background: rgba(255,255,255,.1); border-radius: 99px; margin: 6px 0; overflow: hidden; } .pc-prog em { display: block; height: 100%; background: var(--acc); }
 .pc-log { display: flex; flex-direction: column; gap: 3px; font-size: 12px; } .pc-log .ok { color: #86efac; } .pc-log .bad { color: #fca5a5; }
+.lsos { position: relative; min-height: min(510px, 70vh); display: flex; flex-direction: column; background: radial-gradient(ellipse at 65% 45%, #50a6dd 0%, #164c8e 38%, #112e5c 72%, #101f45 100%); }
+.lsos .pc-desk { flex: 1; align-content: start; grid-template-columns: repeat(auto-fill, minmax(95px, 110px)); }
+.lsos .pc-desk button { background: transparent; border: 1px solid transparent; border-radius: 5px; padding: 9px 4px; text-shadow: 0 1px 3px #111; }
+.lsos .pc-desk button:hover { background: #ffffff24; border-color: #ffffff55; }
+.lsos .pc-work { flex: 1; }
+.lsos-taskbar { display: flex; align-items: center; gap: 4px; padding: 5px 9px; background: #101f32e8; border-top: 1px solid #ffffff40; }
+.lsos-taskbar button { min-width: 38px; height: 36px; border: 0; border-radius: 5px; background: transparent; font-size: 19px; }
+.lsos-taskbar button:hover, .lsos-taskbar button.on { background: #ffffff28; }
+.lsos-taskbar span { color: #b6cee5; font-size: 12px; }.lsos-taskbar time { margin-left: auto; font-size: 12px; }
+.lsos-start { position: absolute; z-index: 2; left: 6px; bottom: 51px; width: min(300px, 88%); display: grid; gap: 3px; padding: 14px; border: 1px solid #ffffff50; border-radius: 10px; background: #15283ef2; box-shadow: 0 12px 30px #0008; }
+.lsos-start b { padding: 4px 8px 10px; }.lsos-start button { text-align: left; padding: 9px; border: 0; border-radius: 6px; background: transparent; color: white; }.lsos-start button:hover { background: #ffffff20; }
+.lsos-speakers { flex: 1; margin: 12px; padding: 12px; min-height: 0; background: #14263deb; border: 1px solid #b7d7ff66; border-radius: 10px; }
+.lsos-window-title { display: flex; justify-content: space-between; }.lsos-window-title button { border: 0; background: transparent; color: white; }
+.lsos-speakers p { font-size: 12px; margin: 8px 0; }.lsos-speaker-list { max-height: 260px; overflow: auto; }.lsos-speaker { display: flex; align-items: center; gap: 8px; padding: 6px; border-bottom: 1px solid #ffffff1a; }.lsos-speaker > div { flex: 1; min-width: 0; }.lsos-speaker small { display: block; font-size: 11px; color: #b6cce0; }
+@media (max-width: 550px) { .lsos-speaker { flex-wrap: wrap; }.lsos-speaker > div { min-width: 55%; } }
 /* ---------- камера ---------- */
 .camui { position: absolute; inset: 0; z-index: 25; pointer-events: none; }
 .cam-frame i { position: absolute; width: 40px; height: 40px; border: 3px solid rgba(255,255,255,.8); }

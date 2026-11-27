@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { Game } from '../game/game';
 import { Modal } from './MenuScreens';
+import { SPEAKERS, speakerById } from '../game/speakers';
 
 type Task = { kind: 'sum'; title: string; nums: number[]; answer: string } | { kind: 'code'; title: string; code: string; answer: string } | { kind: 'mail'; title: string; subject: string; options: string[]; answer: string };
 const SUBJ: [string, string][] = [['Счёт №4471 за аренду офиса', 'Счета'], ['Вы выиграли миллион! Перейдите по ссылке', 'Спам'], ['Отчёт за квартал: продажи выросли', 'Отчёты'], ['Клиент просит перезвонить по договору', 'Клиенты'],
@@ -17,7 +18,11 @@ export function PcPanel({ g, mode, close }: { g: Game; mode: 'office' | 'home'; 
   const [task, setTask] = useState<Task>(makeTask);
   const [val, setVal] = useState('');
   const [log, setLog] = useState<{ ok: boolean; pay: number }[]>([]);
-  const [app, setApp] = useState<'work' | 'desk'>(mode === 'office' ? 'work' : 'desk');
+  const [app, setApp] = useState<'work' | 'desk' | 'speakers'>(mode === 'office' ? 'work' : 'desk');
+  const [start,setStart]=useState(false);
+  const [,refresh]=useState(0);
+  const open=(next:'work'|'desk'|'speakers')=>{setApp(next);setStart(false);};
+  const music=()=>{close();g.openComputerRadio();};
   const earned = log.reduce((a, l) => a + l.pay, 0);
   const submit = (ans: string) => {
     const ok = ans.trim().toUpperCase() === task.answer.toUpperCase();
@@ -27,17 +32,30 @@ export function PcPanel({ g, mode, close }: { g: Game; mode: 'office' | 'home'; 
   const done = g.getState().officeDone ?? 0;
   return (
     <Modal title={mode === 'office' ? '💻 Рабочий ПК · «ЛосТех»' : '🖥️ Домашний компьютер'} onClose={close} wide>
-      <div className="pc">
-        <div className="pc-bar"><span>🪟 LosOS</span><button className={app === 'work' ? 'on' : ''} onClick={() => setApp('work')}>{mode === 'office' ? 'Задачи CRM' : 'Фриланс'}</button>{mode === 'home' && <button className={app === 'desk' ? 'on' : ''} onClick={() => setApp('desk')}>Рабочий стол</button>}<span className="pc-clock">{new Date().toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}</span></div>
+      <div className={`pc ${mode === 'home' ? 'lsos' : ''}`}>
+        {mode === 'office' && <div className="pc-bar"><span>🪟 LSos</span><button className="on" onClick={() => setApp('work')}>Задачи CRM</button><span className="pc-clock">{new Date().toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}</span></div>}
         {app === 'desk' && (
           <div className="pc-desk">
             <button onClick={() => setApp('work')}><span>💼</span>Фриланс-биржа<small>$18 за задачу</small></button>
-            <button onClick={() => { close(); g.openComputerRadio(); }}><span>📻</span>Радио<small>музыка из компьютера</small></button>
+            <button onClick={music}><span>🎵</span>Музыка<small>SoundCloud</small></button>
+            <button onClick={() => open('speakers')}><span>🔊</span>Колонки<small>магазин и установка</small></button>
             <button onClick={() => { close(); g.openPanel({ type: 'phone', tab: 'store' }); }}><span>🛍️</span>LosSt<small>приложения</small></button>
             <button onClick={() => { close(); g.openPanel({ type: 'phone', tab: 'gallery' }); }}><span>🖼️</span>Галерея<small>ваши фото</small></button>
             <button onClick={() => { close(); g.openPanel({ type: 'phone', tab: 'support' }); }}><span>🛟</span>Поддержка<small>жалобы</small></button>
           </div>
         )}
+        {app === 'speakers' && mode === 'home' && <div className="lsos-speakers">
+          <div className="lsos-window-title"><b>🔊 Колонки</b><button onClick={() => open('desk')} aria-label="Закрыть окно">✕</button></div>
+          <p>Установлена: <b>{speakerById(g.homeSpeaker())?.name ?? 'нет'}</b> · Выберите колонку для своего дома или квартиры.</p>
+          <div className="lsos-speaker-list">{SPEAKERS.map(s=>{
+            const count=g.getState().inventory[s.id]??0, installed=g.homeSpeaker()===s.id;
+            return <div className="lsos-speaker" key={s.id}><span>🔊</span><div><b>{s.name}</b><small>{s.placement==='desktop'?'Настольная · без усилителя':'Напольная · усилитель в комплекте'} · фактическая громкость до {Math.round(s.power*100)}% · ${s.price.toLocaleString('ru-RU')} · в инвентаре {count}</small></div>
+              <button className="ui-btn sm" onClick={()=>{g.buy(s.id);g.save();refresh(x=>x+1);}}>Купить</button>
+              <button className="ui-btn sm main" disabled={!count||installed} onClick={()=>{g.installHomeSpeaker(s.id);refresh(x=>x+1);}}>{installed?'Установлена':'Установить'}</button></div>;
+          })}</div>
+          <button className="ui-btn sm" disabled={!g.homeSpeaker()} onClick={()=>{g.removeHomeSpeaker();refresh(x=>x+1);}}>Снять колонку</button>
+          <p className="rd-foot">Модели отличаются громкостью. SoundCloud не позволяет игре менять тембр встроенного плеера.</p>
+        </div>}
         {app === 'work' && (
           <div className="pc-work">
             <div className="pc-task">
@@ -56,6 +74,10 @@ export function PcPanel({ g, mode, close }: { g: Game; mode: 'office' | 'home'; 
             </div>
           </div>
         )}
+        {mode === 'home' && <>
+          {start && <div className="lsos-start"><b>LSos · Пуск</b><button onClick={() => open('desk')}>🖥️ Рабочий стол</button><button onClick={() => open('work')}>💼 Фриланс</button><button onClick={music}>🎵 Музыка</button><button onClick={() => open('speakers')}>🔊 Колонки</button><button onClick={close}>⏻ Выйти из компьютера</button></div>}
+          <div className="lsos-taskbar"><button className={start?'on':''} onClick={()=>setStart(!start)} aria-label="Пуск">🪟</button><button onClick={()=>open('desk')} title="Рабочий стол">🖥️</button><button onClick={()=>open('work')} title="Фриланс">💼</button><button onClick={music} title="Музыка">🎵</button><button onClick={()=>open('speakers')} title="Колонки">🔊</button><span>LSos</span><time>{new Date().toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})}</time></div>
+        </>}
       </div>
     </Modal>
   );
