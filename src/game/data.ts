@@ -1,6 +1,8 @@
 // Справочники: предметы, транспорт, магазины, одежда, тюнинг
+import {SPEAKERS} from './speakers';
 export interface ItemDef { id: string; name: string; icon: string; price: number; food?: number; drink?: number; energy?: number; health?: number; smoke?: boolean; weapon?: string; ammo?: number; ammoType?: string; seed?: string; drug?: boolean; sell?: number; fridge?: boolean; fuel?: number; part?: 'wheel' | 'glass' | 'body' }
 export const ITEMS: Record<string, ItemDef> = {
+  ...Object.fromEntries(SPEAKERS.map(s=>[s.id,{id:s.id,name:s.name,icon:'🔊',price:s.price}])),
   water: { id: 'water', name: 'Вода 0.5л', icon: '💧', price: 2, drink: 35, fridge: true },
   cola: { id: 'cola', name: 'Кола', icon: '🥤', price: 3, drink: 30, energy: 5, fridge: true },
   juice: { id: 'juice', name: 'Сок', icon: '🧃', price: 4, drink: 35, food: 5, fridge: true },
@@ -95,7 +97,7 @@ export const ITEMS: Record<string, ItemDef> = {
 export type ShopKind = 'shop24' | 'supermarket' | 'cafe' | 'pharmacy' | 'gunshop' | 'vshop' | 'gas' | 'mallfood' | 'fishshop';
 export const SHOP_ITEMS: Record<ShopKind, string[]> = {
   shop24: ['mask', 'water', 'cola', 'kvass', 'lemonade', 'coffee', 'bread', 'sandwich', 'hotdog', 'chips', 'chocolate', 'donut', 'gum', 'energy', 'cigarettes'],
-  supermarket: ['mask', 'seed_tomato', 'seed_cucumber', 'seed_strawberry', 'water', 'cola', 'juice', 'smoothie', 'milk', 'bread', 'sausage', 'salo', 'cheese', 'eggs', 'pelmeni', 'pizza', 'apple', 'banana', 'grapes', 'watermelon', 'corn', 'honey', 'chocolate', 'icecream', 'chips', 'cigarettes'],
+  supermarket: [...SPEAKERS.map(s=>s.id), 'mask', 'seed_tomato', 'seed_cucumber', 'seed_strawberry', 'water', 'cola', 'juice', 'smoothie', 'milk', 'bread', 'sausage', 'salo', 'cheese', 'eggs', 'pelmeni', 'pizza', 'apple', 'banana', 'grapes', 'watermelon', 'corn', 'honey', 'chocolate', 'icecream', 'chips', 'cigarettes'],
   cafe: ['coffee', 'tea', 'burger', 'hotdog', 'pizza', 'soup', 'borscht', 'croissant', 'donut', 'cake', 'juice', 'lemonade'],
   pharmacy: ['medkit', 'pills', 'vitamins', 'bandage', 'antiseptic', 'sunscreen', 'water'],
   gunshop: ['knife', 'machete', 'seed_durman', 'pistol', 'revolver', 'smg', 'shotgun', 'rifle', 'sniper', 'ammo', 'ammo_m', 'shells', 'ammo_r'],
@@ -258,6 +260,8 @@ const SCOOTERS: SRow[] = [
 for (const [id, name, kmh, accel, price, r, deck, seat, dual, susp, colors] of SCOOTERS) VEHICLES[id] = { id, name, body: 'scooter', len: deck + 0.25, wid: 0.55, hei: 1.15, maxSpeed: kmh / 3.6, accel, price, ev: true, colors: colors ?? ['#1f2937', '#e5e7eb', '#16a34a', '#2563eb'], forSale: 'scooter', sc: { r, deck, seat, dual, susp } };
 export const TRAFFIC_TYPES = ['volga', 'lada', 'pchelka', 'kolibri', 'taiga', 'bizon', 'gazelka', 'volta', 'drakon', 'fenghuang', 'taxi', 'titan', 'bus', 'strizh', 'police', 'semi', ...MORE.map((r) => r[0]).filter((id) => VEHICLES[id].price < 150000), 'dalnoboy', 'severyanin', 'titanxl', 'refr'];
 export const TRAFFIC_WEIGHTS = [5, 5, 5, 4, 3, 3, 2, 2, 2, 2, 3, 2, 2, 2, 0.6, 1, ...MORE.filter((r) => VEHICLES[r[0]].price < 150000).map(() => 0.9), 0.5, 0.5, 0.5, 0.5];
+
+export function hasSubwooferTrunk(body:BodyKind):boolean { return ['sedan','hatch','suv','pickup','sport','van'].includes(body); }
 
 export interface Tuning {
   paint?: string; tint: number; turbo: number; engine: number; rims: number; spoiler: boolean;

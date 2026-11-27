@@ -7,5 +7,6 @@ const car={x:7,z:9,owned:{tuning:{subwoofer:false}}};const station={url:'https:/
 g.net=net;g.online=true;g.radioSource={kind:'vehicle',vehicle:car};g.radio={station,playing:true,volume:1,insideVolume:.5,getPosition:(cb:(n:number)=>void)=>cb(1000)};
 g.syncRadio();assert.equal(sent[0].outside,.7);assert.equal(sent[0].inside,.35);
 car.owned.tuning.subwoofer=true;g.syncRadio();assert.equal(sent[1].outside,1);assert.equal(sent[1].inside,.5);
-g.radioSource={kind:'computer',place:{kind:'computer',x:1,z:2,buildingId:7,exteriorX:9,exteriorZ:9}};g.syncRadio();assert.equal(sent[2].outside,1);assert.equal(sent[2].inside,.5);
-console.log('✓ сабвуфер: 70%/100% на сетевом источнике, ПК не ограничен');
+g.state={homeSpeakers:{'7:0':'speaker_10'}};g.radioSource={kind:'computer',homeId:'7:0',place:{kind:'computer',x:1,z:2,buildingId:7,exteriorX:9,exteriorZ:9}};g.syncRadio();assert.equal(sent[2].outside,1);assert.equal(sent[2].inside,.5);
+g.state.homeSpeakers['7:0']='speaker_1';g.syncRadio();assert.equal(sent[3].outside,.7);assert.equal(sent[3].inside,.35);
+console.log('✓ сетевой источник: громкость сабвуфера и установленных колонок');

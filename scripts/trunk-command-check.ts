@@ -1,0 +1,12 @@
+import './domstub';
+import { strict as assert } from 'node:assert';
+import { Game } from '../src/game/game';
+let enabled = false; let text = '';
+const car: any = {x:0,z:0,speed:0,owned:{uid:'own'},spec:{len:4},forward:()=>({x:0,z:1}),model:{group:{visible:true},setExperimentalTrunkAnimation:()=>{enabled=true;return true;},body:{getObjectByName:()=>enabled?{}:null}}};
+const game: any = {inVeh:null,interior:null,px:0,pz:-2,vehicles:[car],state:{vehicles:[{uid:'own'}]},testTrunks:new Map(),toast:(s:string)=>text=s};
+Game.prototype.testTrunkCommand.call(game);
+assert(enabled); assert.equal(game.testTrunks.get(car).opening,true); assert(text.includes('Хранение'));
+Game.prototype.testTrunkCommand.call(game); assert.equal(game.testTrunks.get(car).opening,false);
+game.pz = 10; Game.prototype.testTrunkCommand.call(game); assert(text.includes('Подойдите'));
+game.pz = -2; game.state.vehicles = []; Game.prototype.testTrunkCommand.call(game); assert(text.includes('Подойдите'));
+console.log('✓ визуальный тест: только своя стоящая машина рядом, повтор закрывает, предметы не переносятся');

@@ -11,6 +11,8 @@ export interface OwnedVehicle {
   dirt?: number;
   /** куплен и установлен комплект гидравлической подвески */
   hydro?: boolean;
+  /** Будущее хранилище багажника; перенос предметов пока не подключён в игре. */
+  trunk?: Record<string,number>;
 }
 /** услуги города: залоги в ломбарде, садок, платная парковка, штрафстоянка */
 export interface PawnTicket { id: string; item: string; n: number; pay: number; buy: number; t: number }
@@ -26,6 +28,8 @@ export interface GameState {
   version: number; money: number; health: number; food: number; water: number; energy: number;
   look: Look; inventory: Record<string, number>; ammo: number;
   properties: string[]; fridges: Record<string, Record<string, number>>; garages: number[];
+  /** Installed computer speaker per owned dwelling. */
+  homeSpeakers?: Record<string,string>;
   vehicles: OwnedVehicle[]; kiosks: KioskOwn[]; promoUsed: boolean;
   wanted: number; pos: { x: number; z: number; a: number }; location: Location | null; gameTime: number; playTime: number;
   cameraFines?: CameraFine[];

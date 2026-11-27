@@ -9,6 +9,7 @@ import { BAR_DRINKS, DRESSES, ITEMS, VEHICLES, VEHICLE_BODY_NAMES, KIOSK_TYPES, 
 import { CarPreview } from './CarPreview';
 import { LookPreview } from './LookPreview';
 import { repairCost, sellPrice, demand, carValue, type MarketOffer } from '../game/state';
+import { hasSubwooferTrunk } from '../game/data';
 import { HelpPanel } from './Help';
 import { AdsPanel } from './AdsPanel';
 import { AuctionPanel } from './AuctionPanel';
@@ -435,7 +436,7 @@ function TuningPanel({ g, uid, close }: { g: Game; uid: string; close: () => voi
   const Opt = ({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) => <button className={`lg-chip ${on ? 'on' : ''}`} onClick={onClick}>{children}</button>;
   const seenPatches = new Set<string>();
   const items = TUNE_CATALOG.filter(it => {
-    if (it.cat !== cat || Object.keys(it.patch).length === 0 || it.patch.kit) return false;
+    if (it.cat !== cat || Object.keys(it.patch).length === 0 || it.patch.kit || (it.id === 'subwoofer' && !hasSubwooferTrunk(VEHICLES[o.type].body))) return false;
     const key = JSON.stringify(it.patch); if (seenPatches.has(key)) return false; seenPatches.add(key); return true;
   });
   const unavailable = !v;

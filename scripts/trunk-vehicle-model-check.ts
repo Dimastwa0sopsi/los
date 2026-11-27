@@ -1,0 +1,32 @@
+import './domstub';
+import { strict as assert } from 'node:assert';
+import * as THREE from 'three';
+import { VehicleModel } from '../src/game/vehicleModel';
+import { VEHICLES, defaultTuning } from '../src/game/data';
+import { TRUNK_OPEN_SECONDS } from '../src/game/trunkAnimation';
+for (const spec of Object.values(VEHICLES).filter(s => s.body === 'sedan' || s.body === 'sport')) {
+  const model = new VehicleModel(spec.id);
+  assert(!model.body.getObjectByName('experimental-trunk-pivot'));
+  assert(model.setExperimentalTrunkAnimation(true));
+  const pivot = model.body.getObjectByName('experimental-trunk-pivot')!;
+  assert(pivot, spec.id);
+  const localRear = new THREE.Vector3(0, 0, -0.2);
+  pivot.updateMatrixWorld(true); const closed = pivot.localToWorld(localRear.clone());
+  model.setExperimentalTrunkElapsed(TRUNK_OPEN_SECONDS.hinged);
+  pivot.updateMatrixWorld(true); const opened = pivot.localToWorld(localRear.clone());
+  assert(opened.y > closed.y, `${spec.id}: rear edge must lift`);
+  model.setLights(true);
+  const rebuilt = model.body.getObjectByName('experimental-trunk-pivot')!;
+  assert(rebuilt && rebuilt !== pivot); assert(rebuilt.rotation.x > 1);
+  model.applyTuning({ ...defaultTuning(), paint: '#123456' });
+  assert(model.body.getObjectByName('experimental-trunk-pivot'));
+  const detached = model.detach('trunk'); assert(detached);
+  assert(!model.body.getObjectByName('experimental-trunk-pivot'));
+  detached.mesh.traverse(o => { if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).geometry.dispose(); });
+  model.repairParts(); assert(model.body.getObjectByName('experimental-trunk-pivot'));
+  model.setExperimentalTrunkAnimation(false); assert(!model.body.getObjectByName('experimental-trunk-pivot'));
+  model.dispose();
+}
+const moto = Object.values(VEHICLES).find(s => s.body === 'moto')!;
+const bike = new VehicleModel(moto.id); assert.equal(bike.setExperimentalTrunkAnimation(true), false); bike.dispose();
+console.log('✓ экспериментальная штатная крышка седана/спорткара: подъём, перестройка, ремонт, мотоциклы');
