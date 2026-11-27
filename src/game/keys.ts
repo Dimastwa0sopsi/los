@@ -62,7 +62,7 @@ export const BINDINGS: Binding[] = [
   // ---- UI ----
   { ctx: 'ui', code: K.phone, action: 'phone', what: 'телефон: карта, работа, объявления, банк' },
   { ctx: 'ui', code: K.chat, action: 'chat', what: 'чат и команды · /help — список команд' },
-  { ctx: 'ui', code: K.music, action: 'music', what: 'музыка и радио — где угодно' },
+  { ctx: 'ui', code: K.music, action: 'music', what: 'радио в машине' },
   { ctx: 'ui', code: K.help, action: 'help', what: 'эта справка в любой момент' },
   { ctx: 'ui', code: K.pause, action: 'pause', what: 'пауза и настройки' },
   { ctx: 'ui', code: K.map, action: 'map', what: 'карта города' },

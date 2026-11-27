@@ -30,6 +30,9 @@ import { AdsSystem, AD_TAGS, type AdTag } from './ads';
 import { checkText, checkChat } from './moderation';
 import { eyeSees, recognitionEye, POLICE_EYE, PED_EYE, type Eye } from './police';
 import { Radio } from './radio';
+import { hamsterSpot, makeHamster } from './hamster';
+import { nextImmersion } from './vehicleSinking';
+import { radioGain, type RadioPlace } from './radioSpatial';
 import { allMaterials, disposeTextures, mat, GFX, getTex } from './textures';
 import { T, M } from './geom';
 import { LIMITED, limitedAvailable, CROPS, EMOTES, SCOOTER_RATE, HYDRO_PRICE, WEAPONS, WEAPON_ORDER, AMMO_NAMES, ITEMS, VEHICLES, TRAFFIC_TYPES, TRAFFIC_WEIGHTS, KIOSK_TYPES, KIOSK_PERIOD, KIOSK_MAX_PERIODS, SHOP_ITEMS, randomPlate, plateKey, type ShopKind, type Look, type Tuning, defaultTuning, TUNE_PRICES, TUNE_CATALOG, HAIR_STYLES, TOPS, BOTTOMS, BAR_DRINKS } from './data';
@@ -258,6 +261,7 @@ export class Game {
   weather = new Weather();
   /** радио в машине (T) */
   radio = new Radio();
+  private radioSource: {kind:'vehicle'; vehicle:Vehicle} | {kind:'computer'; place: Extract<RadioPlace,{kind:'computer'}>} | null = null;
   /** дрифт-ассист для телефона: одна кнопка держит ручник и обостряет руль */
   driftAssist = false;
   /** подсказка про гидравлику показана только один раз за сессию */
@@ -309,6 +313,7 @@ export class Game {
   private gainAmt = 0; private gainT = 0; private lastMoney = -1;
   private trafficGoal = 20; private resizeObs: (() => void) | null = null;
   private tmpV = new THREE.Vector3();
+  private hamster: ReturnType<typeof makeHamster> | null = null;
   constructor(private container: HTMLElement, settings: Settings, cb: GameCallbacks) {
     this.cb = cb; this.settings = { ...settings }; this.mobile = resolveMobile(settings);
   }
@@ -346,6 +351,13 @@ export class Game {
     this.ads.onExpire = () => this.toast('⏳ Аренда щита закончилась — место снова свободно');
     if (this.disposed) return;
     this.scene.add(this.W.root);
+    const hamsterLocation = hamsterSpot(this.L, this.col);
+    if (hamsterLocation) {
+      this.hamster = makeHamster();
+      this.hamster.group.position.set(hamsterLocation.x, 0, hamsterLocation.z);
+      this.hamster.group.rotation.y = Math.random() * Math.PI * 2;
+      this.W.root.add(this.hamster.group);
+    }
     P(0.95, 'Жители и транспорт');
     this.setupScene();
     // состояние
@@ -699,10 +711,10 @@ export class Game {
       if (!this.panel && this.inVeh) { this.toast('🕺 Танцевать можно пешком — выйдите из машины'); return; }
     }
     // F больше не открывает анимации: эмоции живут в телефоне и по /
-    // U — музыка: радио играет и в машине, и пешком
+    // U — управление радиоприёмником машины; домашний ПК открывается отдельно.
     if (code === K.music && !this.camMode) {
       if (this.panel?.type === 'radio') { this.closePanel(); return; }
-      if (!this.panel) { this.openPanel({ type: 'radio' }); return; }
+      if (!this.panel) { this.openVehicleRadio(); return; }
     }
     if (code === K.online && !this.input.keys.has(K.cover)) { if (!this.panel || this.panel.type === 'phone' || this.panel.type === 'onlineJoin') { if (this.panel?.type === 'onlineJoin') this.closePanel(); else this.toggleOnline(); } return; }
     if (code === K.pause && this.camMode && !this.panel) { this.stopCamera(); return; }
@@ -717,6 +729,21 @@ export class Game {
     else if (code === K.promo) this.togglePanel({ type: 'promo' });
   }
   togglePanel(p: Panel) { if (this.panel && this.panel.type === p.type) this.closePanel(); else this.openPanel(p); }
+  openVehicleRadio() {
+    const v=this.inVeh;
+    if (!v) { this.toast('📻 Радио доступно в машине или на домашнем компьютере'); return; }
+    if (this.radioSource?.kind !== 'vehicle' || this.radioSource.vehicle !== v) { this.radio.stop(); this.radioSource={kind:'vehicle',vehicle:v}; }
+    this.openPanel({type:'radio'});
+  }
+  openComputerRadio() {
+    const id=this.state.location?.b, building=id===undefined ? undefined : this.L.buildings[id];
+    if (!this.interior || !building) { this.toast('📻 Откройте домашний компьютер'); return; }
+    if (this.radioSource?.kind !== 'computer' || this.radioSource.place.buildingId !== id) {
+      this.radio.stop();
+      this.radioSource={kind:'computer',place:{kind:'computer',x:this.px,z:this.pz,exteriorX:building.door.x,exteriorZ:building.door.z,buildingId:building.id}};
+    }
+    this.openPanel({type:'radio'});
+  }
   openPanel(p: Panel) { if (this.economyLabPaused) return; this.beltHold = 0; this.beltTriggered = false; this.panel = p; this.input?.releaseAll(); if (this.input) this.input.enabled = false; this.input?.unlock(); this.cb.onPanel(p); this.sound.click(); }
   closePanel() {
     this.panel = null; this.lookOrbit = 0; if (this.input) { this.input.enabled = true; this.input.releaseAll(); } this.cb.onPanel(null);
@@ -767,6 +794,16 @@ export class Game {
   }
   private updateWorldSystems(dt: number) {
     const inside = !!this.interior;
+    this.hamster?.animate(performance.now() / 1000);
+    if (this.radioSource) {
+      const source=this.radioSource;
+      if (source.kind === 'vehicle' && !this.vehicles.includes(source.vehicle)) { this.radio.stop(); this.radioSource=null; }
+      else {
+        const place: RadioPlace=source.kind==='vehicle' ? {kind:'vehicle',x:source.vehicle.x,z:source.vehicle.z,vehicleId:String(source.vehicle.id)} : source.place;
+        const listener={x:this.px,z:this.pz,buildingId:this.interior ? this.state.location?.b ?? null : null,vehicleId:this.inVeh ? String(this.inVeh.id) : null};
+        this.radio.setOutputVolume(radioGain(place,listener,this.radio.volume,this.radio.insideVolume));
+      }
+    }
     this.rides?.update(dt);
     this.ads?.update();
     if (this.rideOn) this.updateRide(dt);
@@ -779,6 +816,7 @@ export class Game {
     }
     // ИИ транспорт
     this.updateTraffic(dt);
+    if (!inside) this.updateVehicleSinking(dt);
     this.updatePolice(dt);
     this.updateSpeedCameras();
     this.updateTaxi(dt);
@@ -1598,6 +1636,20 @@ export class Game {
   setAutopilot(on: boolean) { this.autopilot = on; if (!on && this.inVeh && (this.inVeh.role === 'owned' || this.inVeh.role === 'traffic')) this.inVeh.ai = null; }
   private aiCtx(): AICtx { return { L: this.L, vehicles: this.vehicles, player: { x: this.px, z: this.pz, inVehicle: this.inVeh }, lightState: (n, ew) => this.lightState(n, ew), rand: () => this.rng.next(), col: this.col }; }
   // ================= ТРАФИК =================
+  private updateVehicleSinking(dt: number) {
+    for (const v of this.vehicles) {
+      // Remote vehicles follow their owner's network state, not local physics.
+      if (v.isHeli || v.role === 'remote' || v.role === 'npcpuppet' || v.role === 'deco') continue;
+      const depth = this.waterDepthAt(v.x, v.z);
+      v.immersion = nextImmersion(v.immersion, depth, dt);
+      if (depth <= 0.55) continue;
+      v.y = this.waterSurfaceAt(v.x, v.z) - v.immersion;
+      v.speed *= Math.exp(-dt * (v.immersion > 0.5 ? 3 : 0.7));
+      if (v.immersion > 1.1) v.speed = 0;
+      if (v === this.inVeh) { this.py = v.y; if (this.autopilot) this.setAutopilot(false); }
+      v.sync();
+    }
+  }
   private updateTraffic(dt: number) {
     const ctx = this.aiCtx();
     let count = 0;
