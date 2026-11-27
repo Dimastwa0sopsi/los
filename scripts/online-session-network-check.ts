@@ -1,0 +1,57 @@
+import {strict as assert} from 'node:assert';
+import {mkdtempSync,cpSync,writeFileSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {spawn} from 'node:child_process';
+import {NetClient} from '../src/game/net';
+const WS=require('ws');
+(globalThis as any).WebSocket=WS;
+(globalThis as any).window=globalThis;
+async function main(){
+ const dir=mkdtempSync(join(tmpdir(),'los-online-only-'));cpSync(join(process.cwd(),'server'),dir,{recursive:true});writeFileSync(join(dir,'package.json'),'{"type":"commonjs"}');
+ const port=23000+Math.floor(Math.random()*20000);
+ const proc=spawn(process.execPath,[join(dir,'server.js')],{env:{...process.env,PORT:String(port),DB_FILE:join(dir,'test.db'),ADMIN_TOKEN:'test-token'}});
+ let net:NetClient|undefined, other:NetClient|undefined;
+ try {
+  await new Promise<void>((resolve,reject)=>{let text='';const timer=setTimeout(()=>reject(Error('server startup timeout '+text)),10000);proc.stdout.on('data',d=>{text+=d;if(text.includes('Los-Gorod server on')){clearTimeout(timer);resolve();}});proc.stderr.on('data',d=>text+=d);proc.once('exit',code=>{clearTimeout(timer);reject(Error('server exited '+code+': '+text));});});
+  net=new NetClient('OnlineOnlyTest','m',`ws://127.0.0.1:${port}`,{mode:'register',password:'example-password-123'});
+  let opens=0;let loginResolve:(first:boolean)=>void=()=>{};
+  net.onChange=()=>{if(net!.ready && !net!.sessionReady)opens++;};
+  net.onLogin=(_p,first)=>loginResolve(first);
+  const login=()=>new Promise<boolean>((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('login timeout')),10000);loginResolve=(first)=>{clearTimeout(timer);resolve(first);};});
+  const firstWorld=new Promise<any>((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('hamster snapshot timeout')),10000);net!.onHamsterWorld=w=>{clearTimeout(timer);resolve(w);};});
+  let logged=login();net.connect();assert.equal(await logged,true);assert(net.sessionReady);assert(opens>=1,'период до подтверждения логина не замечен');
+  const initial=await firstWorld;assert.equal(initial.event,null);
+  other=new NetClient('HamsterClient','f',`ws://127.0.0.1:${port}`,{mode:'register',password:'example-password-456'});
+  const otherWorld=new Promise<any>((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('second hamster snapshot timeout')),10000);other!.onHamsterWorld=w=>{clearTimeout(timer);resolve(w);};});
+  other.connect();assert.equal((await otherWorld).event,null);
+  const eventFor=(client:NetClient)=>new Promise<any>((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('hamster event timeout')),10000);client.onHamsterWorld=w=>{clearTimeout(timer);resolve(w);};});
+  const firstEvent=eventFor(net),secondEvent=eventFor(other);
+  net.sendMove(initial.x,initial.z,0);net.petHamster();
+  const [ev1,ev2]=await Promise.all([firstEvent,secondEvent]);assert.deepEqual(ev1,ev2);assert.equal(ev1.event.petter,net.id);
+  const waitOther=(predicate:()=>boolean)=>new Promise<void>((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('remote state timeout')),10000);const check=()=>{if(predicate()){clearTimeout(timer);other!.onChange=null;resolve();}};other!.onChange=check;check();});
+  await waitOther(()=>other!.players.has(net!.id!));
+  const receivedTrunk=new Promise<void>((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('remote trunk timeout')),10000);const sock=(other as any).ws;const handler=(data:any)=>{const m=JSON.parse(String(data));if(m.type==='chat' && typeof m.text==='string' && m.text.startsWith('§LG{')){clearTimeout(timer);sock.off('message',handler);resolve();}};sock.on('message',handler);});
+  const tr:[string,string,string,number,number,number,number,number,string]=['car1','lada','#aabbcc',initial.x,0,initial.z,0,.5,''];
+  const pv:[string,string,string,number,number,number,number,string]=['car1','lada','#aabbcc',initial.x,0,initial.z,0,''];
+  const pp:[string,string,0|1,0|1]=['car1','А123ВС 77',1,0];
+  net.sendState({x:initial.x,y:0,z:initial.z,a:0,s:0,v:'',c:'',seat:0,tr:[tr],th:'car1',pv:[pv],pp:[pp]});await receivedTrunk;
+  assert.deepEqual(other.players.get(net.id!)!.st!.tr,[tr]);assert.deepEqual(other.players.get(net.id!)!.st!.pv,[pv]);assert.deepEqual(other.players.get(net.id!)!.st!.pp,[pp]);assert.equal(other.players.get(net.id!)!.st!.th,'car1');
+  const socket=(net as any).ws;
+  const ack=new Promise<void>((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('save timeout')),5000);socket.addEventListener('message',(e:any)=>{const m=JSON.parse(e.data);if(m.type==='account_saved'){clearTimeout(timer);assert(m.ok);resolve();}},{once:false});});
+  net.saveAccount({money:24500,inventory:{water:2}});await ack;assert(net.accountSaved);
+  const rejoinedWorld=eventFor(net);logged=login();const closed=new Promise<void>(resolve=>socket.once('close',()=>resolve()));socket.terminate();await closed;assert(!net.sessionReady);
+  assert.equal(await logged,false);assert(net.sessionReady);assert(opens>=2,'после переподключения готовность не должна наступать до авторизации');assert(net.accountSaved);
+  assert.deepEqual((await rejoinedWorld).event,ev1.event);
+  const otherId=other.id!;assert(net.players.has(otherId));
+  const left=new Promise<void>((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('player leave timeout')),3000);net!.onChange=()=>{if(!net!.players.has(otherId)){clearTimeout(timer);net!.onChange=null;resolve();}};});
+  other.close();await left;
+  assert(!net.players.has(otherId),'полный список должен сразу удалить вышедшего игрока без дополнительных перемещений');
+  other=new NetClient('HamsterClient','f',`ws://127.0.0.1:${port}`,{mode:'login',password:'example-password-456'});
+  const rejoined=new Promise<void>((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('second client rejoin timeout')),10000);other!.onLogin=()=>{clearTimeout(timer);resolve();};});other.connect();await rejoined;
+  await new Promise<void>((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('rejoined player timeout')),3000);net!.onChange=()=>{if(net!.players.has(otherId)){clearTimeout(timer);net!.onChange=null;resolve();}};if(net!.players.has(otherId)){clearTimeout(timer);net!.onChange=null;resolve();}});
+  assert.equal(net.players.get(otherId)!.st,null,'старые визуальные снимки не должны переживать повторный вход');
+  console.log('✓ реальный сервер: два клиента, хомяк и багажник, переподключение, выход и возврат без старых снимков');
+ } finally {net?.close();other?.close();proc.kill();await new Promise<void>(resolve=>proc.once('exit',()=>resolve()));rmSync(dir,{recursive:true,force:true});}
+}
+main().catch(e=>{console.error(e);process.exitCode=1;});

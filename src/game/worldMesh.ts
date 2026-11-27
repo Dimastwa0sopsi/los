@@ -7,6 +7,7 @@ import type { WorldLayout, Building, Prop } from './worldgen';
 import { Batcher, T, M, stripQuad } from './geom';
 import { FACADE_TILE, mat, getTex, GFX } from './textures';
 import { KIOSK_TYPES } from './data';
+import { streetMeme } from './memePictures';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 const tick = () => new Promise<void>((r) => setTimeout(r, 0));
@@ -515,6 +516,12 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
     if (L.buildings[i].removed) continue;
     if (L.buildings[i].kind === 'auction') { buildBuilding(auctionBatcher, L.buildings[i]); continue; }
     if (L.buildings[i].kind === 'parkade') buildParkade(B(L.buildings[i].x, L.buildings[i].z), L.buildings[i]); else buildBuilding(B(L.buildings[i].x, L.buildings[i].z), L.buildings[i]);
+    const poster=streetMeme(L.buildings[i]);
+    if (poster) {
+      const batch=B(L.buildings[i].x,L.buildings[i].z), nx=Math.sin(poster.a), nz=Math.cos(poster.a);
+      batch.add('c:#27272a',T.plane,M(poster.x,2.05,poster.z,poster.a,0.92,0.92,1));
+      batch.add('meme:'+poster.index,T.plane,M(poster.x+nx*0.01,2.05,poster.z+nz*0.01,poster.a,0.82,0.82,1));
+    }
     if (i % BUILD_STEP === 0) { progress(0.3 + (i / L.buildings.length) * 0.22, `Здания ${i}/${L.buildings.length}`); await tick(); }
   }
   const auctionGroup = new THREE.Group();

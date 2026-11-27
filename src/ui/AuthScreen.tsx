@@ -6,7 +6,7 @@
 import { useState } from 'react';
 import menuBg from '../assets/menu.jpg';
 import { type JoinLaunch } from './OnlineJoin';
-import { activateAccountSave, currentAccount, updateAccount } from '../game/accounts';
+import { currentAccount, updateAccount } from '../game/accounts';
 import { APP_BUILD, APP_VERSION, versionShort } from '../version';
 
 const NICK_KEY = 'losgorod_nick';
@@ -34,7 +34,6 @@ export function AuthScreen({ onLaunch }: { onLaunch: (l: JoinLaunch) => void }) 
     let gender: 'm' | 'f' = 'm';
     try { gender = (localStorage.getItem(GENDER_KEY) === 'f' ? 'f' : 'm'); } catch { /* */ }
     if (acc) {
-      activateAccountSave(acc.login);                       // прогресс аккаунта — в свой слот
       gender = acc.gender;
       updateAccount(acc.login, { gender });
     }

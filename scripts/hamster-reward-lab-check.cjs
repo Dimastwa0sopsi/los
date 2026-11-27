@@ -30,7 +30,26 @@ if(!isMainThread){
    db.close();db=new Database(file);accounts=createAccountStore(db);lab=createHamsterRewardLab(db,accounts);
    r=lab.claim('alice',2,'hamster-second-00000000',10000+COOLDOWN_MS);assert(r.ok);assert.equal(r.state.money,2500);
    assert.equal(JSON.parse(db.prepare('SELECT state_json FROM accounts WHERE login_key=?').get('alice').state_json).money,2500);
-   console.log('✓ онлайн-лаборатория: $1000, лимит 2 часа на аккаунт, повтор запроса, рестарт и гонка');
+   const stale=lab.claim('alice',1,`hamster-request-0000000${winner}`,10000+COOLDOWN_MS+1);
+   assert.deepEqual(stale,{ok:false,error:'receipt_stale',committed:true,revision:2});
+   let recovered=lab.recover('alice',1,`hamster-request-0000000${winner}`);
+   assert.equal(recovered.outcome,'committed');assert.equal(recovered.committedRevision,2);assert.equal(recovered.revision,3);assert.equal(recovered.state.money,2500);
+   assert.equal(lab.recover('alice',2,`hamster-request-0000000${winner}`).error,'request_reused');
+   const cancelledId='hamster-late-request-001';
+   recovered=lab.recover('alice',3,cancelledId);assert.equal(recovered.outcome,'cancelled');assert.equal(recovered.state.money,2500);
+   assert.equal(lab.claim('alice',3,cancelledId,10000+2*COOLDOWN_MS).error,'cancelled');
+   assert.equal(lab.claim('alice',4,cancelledId,10000+2*COOLDOWN_MS).error,'request_reused');
+   assert.equal((await accounts.login('alice','password-for-testing')).state.money,2500,'повтор старой квитанции не откатывает баланс');
+   db.close();db=new Database(file);accounts=createAccountStore(db);lab=createHamsterRewardLab(db,accounts);
+   assert.equal(lab.recover('alice',3,cancelledId).outcome,'cancelled');assert.equal(lab.claim('alice',3,cancelledId,10000+2*COOLDOWN_MS).error,'cancelled');
+   // Failure after updating the account rolls the entire transaction back.
+   db.exec("CREATE TRIGGER reject_hamster_receipt BEFORE INSERT ON hamster_receipts_lab BEGIN SELECT RAISE(ABORT, 'receipt failure'); END");
+   assert.throws(()=>lab.claim('bob',2,'hamster-failing-000000',10001+COOLDOWN_MS),/receipt failure/);
+   assert.equal((await accounts.login('bob','password-for-testing')).state.money,1500);
+   assert.equal(db.prepare('SELECT next_at FROM hamster_cooldowns_lab WHERE login_key=?').get('bob').next_at,10001+COOLDOWN_MS);
+   db.exec('DROP TRIGGER reject_hamster_receipt');
+   assert(lab.claim('bob',2,'hamster-failing-000000',10001+COOLDOWN_MS).ok);
+   console.log('✓ онлайн-лаборатория: $1000, лимит 2 часа, гонка, рестарт, устаревшая квитанция и откат при ошибке');
   }finally{if(db)db.close();fs.rmSync(dir,{recursive:true,force:true});}
  })().catch(e=>{console.error(e);process.exitCode=1;});
 }

@@ -355,6 +355,7 @@ export interface AICtx {
   L: WorldLayout; vehicles: Vehicle[]; player: { x: number; z: number; inVehicle: Vehicle | null };
   lightState: (node: number, axisEW: boolean) => 'green' | 'yellow' | 'red' | 'flash';
   rand: () => number; col?: Collision;
+  pedestrians?: readonly {x:number;z:number}[];
 }
 const laneOff = (kind: string) => (kind === 'highway' ? 4 : kind === 'city' || kind === 'avenue' ? 3 : kind === 'village' ? 2.1 : kind === 'industrial' ? 2.5 : 1.6);
 const cruiseFor = (kind: string) => (kind === 'highway' ? 22 : kind === 'avenue' ? 15 : kind === 'city' ? 13 : kind === 'village' ? 11 : kind === 'industrial' ? 8 : 8);
@@ -462,35 +463,50 @@ export class AIDriver {
     // Обгон только на широкой прямой и при свободной встречной полосе.
     const ux = (B.x - A2.x) / sl, uz = (B.z - A2.z) / sl;
     this.passingT = Math.max(0, this.passingT - dt);
-    if (!this.passingT && this.mode === 'wander' && (kind === 'city' || kind === 'avenue' || kind === 'highway') && remain > 38) {
+    if (!this.passingT && this.passingOffset > -0.1 && (this.mode === 'wander' || this.mode === 'route') && (kind === 'city' || kind === 'avenue' || kind === 'highway') && remain > 38) {
       const ahead = ctx.vehicles.some(o => {
         if (o === v || !o.model.group.visible) return false;
         const dx = o.x - v.x, dz = o.z - v.z, f = dx * ux + dz * uz, side = dx * -uz + dz * ux;
-        return f > 8 && f < 24 && Math.abs(side) < 2 && o.speed < v.speed - 1 && Math.cos(angleDiff(o.heading, v.heading)) > 0.7;
+        const parked = Math.abs(o.speed) < 0.5;
+        return f > 5 && f < 24 && Math.abs(side) < (v.spec.wid + o.spec.wid) / 2 && (parked || (o.speed < v.speed - 1 && Math.cos(angleDiff(o.heading, v.heading)) > 0.7));
       });
       const clear = !ctx.vehicles.some(o => {
         if (o === v || !o.model.group.visible) return false;
         const dx = o.x - v.x, dz = o.z - v.z, f = dx * ux + dz * uz, side = dx * -uz + dz * ux;
         return f > -18 && f < 65 && side < -1 && side > -8;
       });
-      const clearWall = !ctx.col || !ctx.col.solidAt(v.x + uz * 4, 1, v.z - ux * 4);
-      if (ahead && clear && clearWall) this.passingT = 4;
+      const people = [...(ctx.pedestrians ?? []), ...(!ctx.player.inVehicle ? [ctx.player] : [])];
+      const clearPeople = !people.some(p => {
+        const dx = p.x - v.x, dz = p.z - v.z, f = dx * ux + dz * uz, side = dx * -uz + dz * ux;
+        return f > -8 && f < 45 && side < -1 && side > -8;
+      });
+      const clearWall = !ctx.col || [0, 8, 16, 24].every(d => !ctx.col!.solidAt(v.x + ux * d + uz * 4, 1, v.z + uz * d - ux * 4));
+      if (ahead && clear && clearPeople && clearWall) this.passingT = 4;
     }
     // Если встречная машина появилась уже во время манёвра, тормозим;
     // смещение сохраняется, пока возвращение не станет безопасным.
-    const passHazard = (this.passingT > 0 || this.passingOffset < -0.5) && ctx.vehicles.some(o => {
+    const passing = this.passingT > 0 || this.passingOffset < -0.5;
+    const passHazard = passing && (ctx.vehicles.some(o => {
       if (o === v || !o.model.group.visible) return false;
       const dx = o.x - v.x, dz = o.z - v.z, f = dx * ux + dz * uz, side = dx * -uz + dz * ux;
       return f > 0 && f < 35 && side < -1 && side > -8 && Math.cos(angleDiff(o.heading, v.heading)) < -0.3;
+    }) || [...(ctx.pedestrians ?? []), ...(!ctx.player.inVehicle ? [ctx.player] : [])].some(p => {
+      const dx=p.x-v.x, dz=p.z-v.z, f=dx*ux+dz*uz, side=dx*-uz+dz*ux;
+      return f > 0 && f < 25 && side < -1 && side > -8;
+    }));
+    const returnBlocked = this.passingOffset < -0.5 && ctx.vehicles.some(o => {
+      if (o === v || !o.model.group.visible) return false;
+      const dx=o.x-v.x, dz=o.z-v.z, f=dx*ux+dz*uz, side=dx*-uz+dz*ux;
+      return f > -(v.spec.len+o.spec.len)/2-3 && f < (v.spec.len+o.spec.len)/2+3 && side > 1 && side < 8;
     });
-    const wantOffset = this.passingT > 0 ? -4.5 : 0;
+    const wantOffset = this.passingT > 0 || returnBlocked ? -4.5 : 0;
     this.passingOffset += clamp(wantOffset - this.passingOffset, -dt * 1.8, dt * 1.8);
     tx += -uz * this.passingOffset; tz += ux * this.passingOffset;
     const desired = Math.atan2(tx - v.x, tz - v.z);
     // скорость
     let target = passHazard ? 0 : cruiseFor(kind) * this.speedMul * (this.speeding > 0 ? 1.35 : 1);
-    if (this.mode === 'chase') target = v.spec.maxSpeed * 0.7;
-    if (panic) target = Math.max(target, Math.min(this.panicSpeed, v.spec.maxSpeed));
+    if (this.mode === 'chase' && !passHazard) target = v.spec.maxSpeed * 0.7;
+    if (panic && !passHazard) target = Math.max(target, Math.min(this.panicSpeed, v.spec.maxSpeed));
     target = Math.min(target, v.spec.maxSpeed, speedLimit);
     const distB = Math.hypot(B.x - v.x, B.z - v.z);
     if (this.k + 2 < this.route.length) {
@@ -562,6 +578,9 @@ export class AIDriver {
         check(o.x, o.z, longRadius, sideRadius, o.speed * (ofx * fx + ofz * fz));
       }
       if (!ctx.player.inVehicle) check(ctx.player.x, ctx.player.z, 0.5, 0.5);
+      for (const p of ctx.pedestrians ?? []) {
+        if (Math.abs(p.x-v.x)+Math.abs(p.z-v.z) < 80) check(p.x, p.z, 0.5, 0.5);
+      }
     }
     if (v.shock > 0) { v.shock -= dt; target = 0; }
     const diff = angleDiff(v.heading, desired);

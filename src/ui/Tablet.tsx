@@ -9,6 +9,7 @@ import { InventoryGrid } from './InventoryGrid';
 import { SUPPORT_BOT } from '../game/support';
 import { type Settings, defaultSettings } from '../game/config';
 import { currentAccount, removeAccount, logout } from '../game/accounts';
+import {wipeOfflineSaves} from '../game/offlineSaveCleanup';
 import { MicrophonePermission } from './MicrophonePermission';
 
 const $ = (n: number) => '$' + Math.round(n).toLocaleString('ru');
@@ -175,8 +176,7 @@ function Home({ g, go }: P) {
         { ico: '📜', label: 'Правила игры', color: '#0f766e', on: () => go('rules') },
         { ico: '⚙️', label: 'Настройки', color: '#64748b', on: () => go('settings') },
         { ico: '🧩', label: 'Все сервисы', color: '#8b5cf6', on: () => go('all') },
-        // опасная зона видна только в офлайн-игре: онлайн-прогресс трогать нельзя
-        ...(g.online ? [] : [{ ico: '☠️', label: 'Опасно', color: '#7f1d1d', on: () => go('danger') } as Item]),
+        { ico: '☠️', label: 'Опасно', color: '#7f1d1d', on: () => go('danger') },
       ],
     },
   ];
@@ -755,7 +755,7 @@ function AllServices({ g, go }: P) {
     { ico: '🪪', label: 'Профиль', color: '#0f766e', on: () => go('profile') },
   ];
   if (g.online) items.push({ ico: '👥', label: 'Игроки', color: '#06b6d4', on: () => go('players') });
-  else items.push({ ico: '☠️', label: 'Опасно', color: '#7f1d1d', on: () => go('danger') });
+  items.push({ ico: '☠️', label: 'Опасно', color: '#7f1d1d', on: () => go('danger') });
   items.push({ ico: '💬', label: 'Чат', color: '#334155', on: () => { g.closePanel(); g.chatFocus?.(); } });
   return (
     <div className="tb-app-screen">
@@ -769,20 +769,20 @@ function AllServices({ g, go }: P) {
 /** ⚠️ «Опасно» — приложение только для офлайн-игры: полный сброс прогресса или удаление аккаунта */
 function Danger({ g }: P) {
   const [arm, setArm] = useState<'reset' | 'account' | null>(null);
-  /** стирает все локальные сейвы соло-игры; онлайн-слоты (losgorod_save_online…) не трогаем */
-  const wipeOfflineSaves = () => {
+  const [cleanupStatus, setCleanupStatus] = useState('');
+  const clearOffline = () => {
     try {
-      const drop: string[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k && k.startsWith('losgorod_save') && !k.startsWith('losgorod_save_online')) drop.push(k);
-      }
-      drop.forEach((k) => localStorage.removeItem(k));
-    } catch { /* приватный режим */ }
+      const r=wipeOfflineSaves(localStorage);
+      setCleanupStatus(r.ok ? `Одиночные сохранения на этом устройстве удалены: ${r.removed}. Онлайн-аккаунт не затронут.` : `Не удалось удалить все сохранения (удалено: ${r.removed}). Проверьте настройки браузера.`);
+    } catch { setCleanupStatus('Хранилище браузера недоступно.'); }
+    setArm(null);
   };
   if (g.online) return (
     <div className="tb-pad">
-      <div className="tb-card big dim">☠️ <div><b>Только офлайн</b><small>Это приложение доступно в одиночной игре. Онлайн-прогресс хранится на сервере и здесь не меняется.</small></div></div>
+      <div className="tb-card big dim">☠️ <div><b>Удаление одиночного прогресса</b><small>Удаляются только одиночные сохранения на этом устройстве. Онлайн-аккаунт и его прогресс не меняются. Восстановить удалённые данные нельзя.</small></div></div>
+      {arm !== 'reset' ? <button className="ui-btn danger" onClick={() => setArm('reset')}>Удалить одиночные сохранения…</button>
+        : <div className="btns"><button className="ui-btn danger" onClick={clearOffline}>Да, удалить навсегда</button><button className="ui-btn ghost" onClick={() => setArm(null)}>Отмена</button></div>}
+      {cleanupStatus && <p className="tb-note" role="status">{cleanupStatus}</p>}
     </div>
   );
   const acc = currentAccount();
@@ -794,14 +794,14 @@ function Danger({ g }: P) {
         <div className="row">💾 <div className="grow"><b>Сбросить весь офлайн-прогресс</b><small>деньги, дома, машины, бизнес и инвентарь — игра начнётся заново</small></div></div>
         {arm !== 'reset'
           ? <button className="ui-btn danger" onClick={() => setArm('reset')}>Сбросить сохранения…</button>
-          : <div className="btns"><button className="ui-btn danger" onClick={() => { wipeOfflineSaves(); window.location.reload(); }}>Да, начать с нуля</button><button className="ui-btn ghost" onClick={() => setArm(null)}>Отмена</button></div>}
+          : <div className="btns"><button className="ui-btn danger" onClick={() => { const r=wipeOfflineSaves(localStorage); if(r.ok) window.location.reload(); else setCleanupStatus('Не удалось удалить все сохранения.'); }}>Да, начать с нуля</button><button className="ui-btn ghost" onClick={() => setArm(null)}>Отмена</button></div>}
       </div>
 
       <div className="tb-card col">
         <div className="row">🗑️ <div className="grow"><b>Удалить свой аккаунт</b><small>{acc ? `логин «${acc.login}» будет стёрт с этого устройства вместе со всем прогрессом` : 'локальный аккаунт не найден — прогресс и так гостевой'}</small></div></div>
         {arm !== 'account'
           ? <button className="ui-btn danger" disabled={!acc} onClick={() => setArm('account')}>Удалить аккаунт…</button>
-          : <div className="btns"><button className="ui-btn danger" onClick={() => { const a = currentAccount(); if (a) removeAccount(a.login); logout(); wipeOfflineSaves(); window.location.reload(); }}>Да, удалить навсегда</button><button className="ui-btn ghost" onClick={() => setArm(null)}>Отмена</button></div>}
+          : <div className="btns"><button className="ui-btn danger" onClick={() => { const a = currentAccount(); if (a) removeAccount(a.login); logout(); const r=wipeOfflineSaves(localStorage); if(r.ok) window.location.reload(); else setCleanupStatus('Не удалось удалить все сохранения.'); }}>Да, удалить навсегда</button><button className="ui-btn ghost" onClick={() => setArm(null)}>Отмена</button></div>}
       </div>
 
       <p className="tb-note">После подтверждения страница перезагрузится и начнётся новая игра. Онлайн-прогресс (серверный) останется нетронутым.</p>

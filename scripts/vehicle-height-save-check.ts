@@ -1,0 +1,16 @@
+import './domstub';
+import {strict as assert} from 'node:assert';
+import {Game} from '../src/game/game';
+import {newState} from '../src/game/state';
+import {defaultTuning} from '../src/game/data';
+import {Vehicle} from '../src/game/vehicles';
+const store=new Map<string,string>();(globalThis as any).localStorage={setItem:(k:string,v:string)=>store.set(k,v),getItem:(k:string)=>store.get(k)??null};
+const state=newState('m',{x:0,z:0,a:0});state.nick='HeightTest';
+state.vehicles=[{uid:'one',type:'lada',color:'#aabbcc',tuning:defaultTuning(),condition:1,mileage:0,year:2020,fuel:100,pos:{x:50,z:70,a:1,y:8.25},missing:[],paid:0}];
+let saved:any;const g=Object.create(Game.prototype) as any;
+Object.assign(g,{state,online:true,onlineRequired:true,economyLabPaused:false,interior:null,vehicles:[],col:{groundAt:()=>.2},L:{dealerLot:{x:0,z:0}},playerWorldPos:()=>({x:0,z:0,a:0}),addVehicle:(v:Vehicle)=>g.vehicles.push(v),net:{saveAccount:(s:any)=>saved=JSON.parse(JSON.stringify(s))}});
+g.spawnOwnedVehicles();assert.equal(g.vehicles[0].y,8.25);g.vehicles[0].y=9.75;g.save();assert.equal(saved.vehicles[0].pos.y,9.75);
+g.vehicles.forEach((v:Vehicle)=>v.dispose());g.vehicles=[];g.spawnOwnedVehicles();assert.equal(g.vehicles[0].y,9.75,'перезапуск восстанавливает высоту с моста');
+g.vehicles.forEach((v:Vehicle)=>v.dispose());g.vehicles=[];delete state.vehicles[0].pos!.y;g.spawnOwnedVehicles();assert.equal(g.vehicles[0].y,.2,'старый снимок использует опору рядом с землёй');
+g.vehicles.forEach((v:Vehicle)=>v.dispose());g.vehicles=[];state.vehicles[0].pos!.y=Infinity;g.spawnOwnedVehicles();assert.equal(g.vehicles[0].y,.2,'невалидная высота не портит модель');
+g.vehicles.forEach((v:Vehicle)=>v.dispose());console.log('✓ высота своей машины: сохранение, восстановление и совместимость со старыми снимками');

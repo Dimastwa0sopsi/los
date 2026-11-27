@@ -16,6 +16,8 @@ import { AuctionPanel } from './AuctionPanel';
 import { CASINO_ITEMS, ROULETTE_MIN, ROULETTE_MAX, type RouletteBet } from '../game/roulette';
 import { validVehicleSideText } from '../game/vehicleSideText';
 import { TRUNK_CAPACITY, trunkCount } from '../game/trunk';
+import { dealerVehicles, dealerCategories, filterDealerVehicles, type DealerCategory } from '../game/dealerFilter';
+import { DOCUMENT_PRICES } from '../game/documents';
 
 const $ = (n: number) => '$' + Math.round(n).toLocaleString('ru');
 
@@ -129,10 +131,10 @@ export function GamePanel({ g, panel, close }: { g: Game; panel: Panel; close: (
         { id: 'weapon' as const, name: 'Лицензия на оружие', description: 'Для покупки огнестрельного оружия' },
       ];
       return <Modal title="🏛️ Мэрия · документы" onClose={close}>
-        <p>Получение документов бесплатное. Для лицензий сначала оформите паспорт.</p>
+        <p>Для лицензий сначала оформите паспорт. Ваши деньги: <b>{$(s.money)}</b></p>
         <div className="lg-list mt-3">{entries.map(d => <div className="lg-row" key={d.id}>
           <div className="flex-1"><b>{d.name}</b><small>{d.description}</small></div>
-          {docs[d.id] ? <span>Получен</span> : <button className="lg-btn sm lg-btn-main" disabled={d.id !== 'passport' && !docs.passport} onClick={wrap(() => g.issueCityDocument(d.id))}>Получить</button>}
+          {docs[d.id] ? <span>Получен</span> : <button className="lg-btn sm lg-btn-main" disabled={d.id !== 'passport' && !docs.passport} onClick={wrap(() => g.issueCityDocument(d.id))}>Оформить · {$(DOCUMENT_PRICES[d.id])}</button>}
         </div>)}</div>
       </Modal>;
     }
@@ -330,16 +332,32 @@ function Promo({ g, close }: { g: Game; close: () => void }) {
 }
 
 function Dealer({ g, close, scooter }: { g: Game; close: () => void; scooter?: boolean }) {
-  const list = Object.values(VEHICLES).filter((v) => v.forSale === (scooter ? 'scooter' : 'dealer')).sort((a, b) => a.price - b.price);
+  const stock = dealerVehicles(!!scooter);
+  const [query, setQuery] = useState('');
+  const [category, setCategory] = useState<DealerCategory>('all');
+  const [budget, setBudget] = useState('');
+  const list = filterDealerVehicles(stock, {query, category, budget});
   const [color, setColor] = useState<Record<string, string>>({});
   const [testing, setTesting] = useState<{ type: string; color: string } | null>(null);
   return (<><Modal title={scooter ? '🛴 Электросамокаты «Вжух Store»' : '🚗 Автосалон'} onClose={close} wide>
     <p className="lg-money-line">Ваши деньги: <b>{$(g.getState().money)}</b></p>
+    <div className="dealer-filters">
+      <label>Название<input className="lg-input" value={query} maxLength={80} placeholder="Поиск автомобиля" onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.stopPropagation()} /></label>
+      <label>Категория<select className="lg-input" value={category} onChange={e=>setCategory(e.target.value as DealerCategory)} onKeyDown={e=>e.stopPropagation()}>
+        <option value="all">Все категории</option>{dealerCategories(stock).map(body=><option key={body} value={body}>{VEHICLE_BODY_NAMES[body]}</option>)}
+      </select></label>
+      <label>Бюджет до $<input className="lg-input" value={budget} inputMode="numeric" maxLength={15} placeholder="Любой" onChange={e=>setBudget(e.target.value.replace(/\D/g,''))} onKeyDown={e=>e.stopPropagation()} /></label>
+      <button className="lg-btn sm" onClick={()=>setBudget(String(Math.max(0,Math.floor(g.getState().money))))}>По моим деньгам</button>
+      <button className="lg-btn sm" onClick={()=>{setQuery('');setCategory('all');setBudget('');}}>Сбросить</button>
+    </div>
+    <p className="dealer-result" aria-live="polite">Найдено: {list.length} из {stock.length}</p>
     <div className="lg-list">{list.map((v) => <div className="lg-row wrap" key={v.id}>
       <div className="flex-1 min-w-[150px]"><b>{v.name}</b><small>{VEHICLE_BODY_NAMES[v.body]}</small><small>{v.autopilot ? '🤖 автопилот · ' : ''}{v.ev ? '⚡ электро · ' : ''}до {Math.round(v.maxSpeed * 3.6)} км/ч</small></div>
       <div className="flex gap-1">{v.colors.map((c) => <button key={c} className={`lg-swatch ${(color[v.id] ?? v.colors[0]) === c ? 'on' : ''}`} style={{ background: c }} onClick={() => setColor({ ...color, [v.id]: c })} />)}</div>
       {!scooter && <button className="lg-btn sm" onClick={() => setTesting({ type: v.id, color: color[v.id] ?? v.colors[0] })}>Тест-драйв</button>}
-      <button className="lg-btn sm lg-btn-main" onClick={() => g.buyVehicle(v.id, color[v.id] ?? v.colors[0])}>{$(v.price)}</button></div>)}</div>
+      <button className="lg-btn sm lg-btn-main" onClick={() => g.buyVehicle(v.id, color[v.id] ?? v.colors[0])}>{$(v.price)}</button></div>)}
+      {!list.length && <p className="dealer-empty">Ничего не найдено. Измените фильтры или сбросьте их.</p>}
+    </div>
   </Modal>{testing && <TestDrive g={g} type={testing.type} color={testing.color} close={() => setTesting(null)} />}</>);
 }
 
@@ -458,6 +476,14 @@ function Market({ g, close, sellUid }: { g: Game; close: () => void; sellUid?: s
   </Modal>);
 }
 
+// Stable component types: recreating these on every HUD update unmounts their
+// buttons between pointer-down and pointer-up, so a click can disappear.
+function TuneRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return <div className="lg-tune-row"><span>{label}</span><div className="flex flex-wrap gap-1">{children}</div></div>;
+}
+function TuneOpt({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
+  return <button className={`lg-chip ${on ? 'on' : ''}`} onClick={onClick}>{children}</button>;
+}
 function TuningPanel({ g, uid, close }: { g: Game; uid: string; close: () => void }) {
   const o = g.getState().vehicles.find((x) => x.uid === uid)!;
   const [t, setT] = useState<Tuning>({ ...o.tuning });
@@ -470,8 +496,6 @@ function TuningPanel({ g, uid, close }: { g: Game; uid: string; close: () => voi
   const cost = g.tuningCost(o.tuning, t);
   const v = g.ownedVehicleNear(uid);
   const rc = v ? repairCost({ ...o, missing: v.model.missingParts() }) + v.model.missingWheels() * 150 : 0;
-  const Row = ({ label, children }: { label: string; children: React.ReactNode }) => <div className="lg-tune-row"><span>{label}</span><div className="flex flex-wrap gap-1">{children}</div></div>;
-  const Opt = ({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) => <button className={`lg-chip ${on ? 'on' : ''}`} onClick={onClick}>{children}</button>;
   const seenPatches = new Set<string>();
   const items = TUNE_CATALOG.filter(it => {
     if (it.cat !== cat || Object.keys(it.patch).length === 0 || it.patch.kit || (it.id === 'subwoofer' && !hasSubwooferTrunk(VEHICLES[o.type].body, VEHICLES[o.type].variant))) return false;
@@ -520,13 +544,13 @@ function TuningPanel({ g, uid, close }: { g: Game; uid: string; close: () => voi
             </button>
           ))}
         </div>
-        {cat === 'body' && <Row label={`Покраска (${$(TUNE_PRICES.paint)})`}>{PAINT_COLORS.map((c) => <button key={c} className={`lg-swatch ${t.paint === c ? 'on' : ''}`} style={{ background: c }} title={`Краска ${c}`} aria-label={`Краска ${c}`} onClick={() => setT({ ...t, paint: c })} />)}</Row>}
-        {cat === 'lights' && <Row label={`Тонировка (${$(TUNE_PRICES.tint)})`}>{[0, 1, 2, 3].map((n) => <Opt key={n} on={t.tint === n} onClick={() => setT({ ...t, tint: n })}>{['Нет', '30%', '60%', '90%'][n]}</Opt>)}</Row>}
-        {cat === 'perf' && <Row label={`Турбина (${$(TUNE_PRICES.turbo)}/ст.)`}>{[0, 1, 2, 3].map((n) => <Opt key={n} on={t.turbo === n} onClick={() => setT({ ...t, turbo: Math.max(o.tuning.turbo, n) })}>{n ? 'Ст.' + n : 'Сток'}</Opt>)}</Row>}
-        {cat === 'perf' && <Row label={`Двигатель (${$(TUNE_PRICES.engine)}/ст.)`}>{[0, 1, 2, 3].map((n) => <Opt key={n} on={t.engine === n} onClick={() => setT({ ...t, engine: Math.max(o.tuning.engine, n) })}>{n ? 'Ст.' + n : 'Сток'}</Opt>)}</Row>}
-        {cat === 'body' && <Row label={`Клиренс (${$(TUNE_PRICES.clearance)})`}>{[-2, -1, 0, 1, 2].map((n) => <Opt key={n} on={t.clearance === n} onClick={() => setT({ ...t, clearance: n })}>{n > 0 ? '+' + n : n}</Opt>)}</Row>}
-        {cat === 'neon' && <Row label={`Неон (${$(TUNE_PRICES.neon)})`}><Opt on={!t.neon} onClick={() => setT({ ...t, neon: null })}>Нет</Opt>{NEON_COLORS.map((c) => <button key={c} className={`lg-swatch ${t.neon === c ? 'on' : ''}`} style={{ background: c }} title={`Неон ${c}`} aria-label={`Неон ${c}`} onClick={() => setT({ ...t, neon: c })} />)}</Row>}
-        {cat === 'lights' && <Row label={`Фары (${$(TUNE_PRICES.lights)})`}>{LIGHT_COLORS.map((c) => <button key={c} className={`lg-swatch ${!t.rainbow && t.lights === c ? 'on' : ''}`} style={{ background: c }} title={`Фары ${c}`} aria-label={`Фары ${c}`} onClick={() => setT({ ...t, lights: c, rainbow: false })} />)}<Opt on={!!t.rainbow} onClick={() => setT({ ...t, rainbow: !t.rainbow })}>🌈 радужные ($12 000)</Opt></Row>}
+        {cat === 'body' && <TuneRow label={`Покраска (${$(TUNE_PRICES.paint)})`}>{PAINT_COLORS.map((c) => <button key={c} className={`lg-swatch ${t.paint === c ? 'on' : ''}`} style={{ background: c }} title={`Краска ${c}`} aria-label={`Краска ${c}`} onClick={() => setT({ ...t, paint: c })} />)}</TuneRow>}
+        {cat === 'lights' && <TuneRow label={`Тонировка (${$(TUNE_PRICES.tint)})`}>{[0, 1, 2, 3].map((n) => <TuneOpt key={n} on={t.tint === n} onClick={() => setT({ ...t, tint: n })}>{['Нет', '30%', '60%', '90%'][n]}</TuneOpt>)}</TuneRow>}
+        {cat === 'perf' && <TuneRow label={`Турбина (${$(TUNE_PRICES.turbo)}/ст.)`}>{[0, 1, 2, 3].map((n) => <TuneOpt key={n} on={t.turbo === n} onClick={() => setT({ ...t, turbo: Math.max(o.tuning.turbo, n) })}>{n ? 'Ст.' + n : 'Сток'}</TuneOpt>)}</TuneRow>}
+        {cat === 'perf' && <TuneRow label={`Двигатель (${$(TUNE_PRICES.engine)}/ст.)`}>{[0, 1, 2, 3].map((n) => <TuneOpt key={n} on={t.engine === n} onClick={() => setT({ ...t, engine: Math.max(o.tuning.engine, n) })}>{n ? 'Ст.' + n : 'Сток'}</TuneOpt>)}</TuneRow>}
+        {cat === 'body' && <TuneRow label={`Клиренс (${$(TUNE_PRICES.clearance)})`}>{[-2, -1, 0, 1, 2].map((n) => <TuneOpt key={n} on={t.clearance === n} onClick={() => setT({ ...t, clearance: n })}>{n > 0 ? '+' + n : n}</TuneOpt>)}</TuneRow>}
+        {cat === 'neon' && <TuneRow label={`Неон (${$(TUNE_PRICES.neon)})`}><TuneOpt on={!t.neon} onClick={() => setT({ ...t, neon: null })}>Нет</TuneOpt>{NEON_COLORS.map((c) => <button key={c} className={`lg-swatch ${t.neon === c ? 'on' : ''}`} style={{ background: c }} title={`Неон ${c}`} aria-label={`Неон ${c}`} onClick={() => setT({ ...t, neon: c })} />)}</TuneRow>}
+        {cat === 'lights' && <TuneRow label={`Фары (${$(TUNE_PRICES.lights)})`}>{LIGHT_COLORS.map((c) => <button key={c} className={`lg-swatch ${!t.rainbow && t.lights === c ? 'on' : ''}`} style={{ background: c }} title={`Фары ${c}`} aria-label={`Фары ${c}`} onClick={() => setT({ ...t, lights: c, rainbow: false })} />)}<TuneOpt on={!!t.rainbow} onClick={() => setT({ ...t, rainbow: !t.rainbow })}>🌈 радужные ($12 000)</TuneOpt></TuneRow>}
         <div className="workshop-checkout"><div className="flex-1"><small>{changed ? 'ИТОГО ЗА ИЗМЕНЕНИЯ' : 'НЕТ ИЗМЕНЕНИЙ'}</small><b>{$(cost)}</b></div><button className="lg-btn" disabled={!changed} onClick={() => { setT({ ...o.tuning }); setMsg('Предпросмотр сброшен'); }}>Сброс</button><button className="lg-btn lg-btn-main" disabled={unavailable || !changed} onClick={() => { const ok = g.applyTuning(uid, t); setMsg(ok ? 'Установлено и сохранено' : 'Не удалось установить: проверьте баланс и машину'); f((x) => x + 1); }}>Установить</button></div>
         <p className="workshop-footnote">Выбор — это предпросмотр. Оплата только после установки. Фары включаются клавишей H.</p>
       </div>

@@ -102,6 +102,12 @@ export interface RemoteState {
   vt?: string;
   /** Cosmetic snapshots of the owner's parked inscribed buses/trucks while connected. */
   vp?: import('./parkedInscribedVehicles').ParkedInscribedVehicle[];
+  /** Parked vehicles visible only while the owner is connected; cosmetic. */
+  pv?: import('./parkedVehicleVisual').ParkedVehicleVisual[];
+  pp?: import('./parkedVehicleVisual').ParkedVehiclePlate[];
+  /** Visible parked trunk animations, cosmetic and valid only while owner is online. */
+  tr?: import('./parkedTrunkVisual').ParkedTrunkVisual[];
+  th?: string; // id of the car whose lid this player is pulling, cosmetic only
   fish?: 1;                                      // только визуальная удочка, не улов
   cr?: number;                                    // присед
   lk?: number;                                    // машина заперта
@@ -172,8 +178,8 @@ interface Msg {
   /** авторизация онлайна: токен устройства и пароль-подсказка */
   token?: string; pass?: string;
   /** что умеет сервер (наш сервер пересылает §-протокол и умеет админ-команды) */
-  caps?: { state?: number; peds?: number; adm?: number; relay?: number; accounts?: number; saveIds?: number; voice?: number; radio?: number };
-  radios?: unknown; hamster?: unknown;
+  caps?: { state?: number; peds?: number; adm?: number; relay?: number; accounts?: number; saveIds?: number; voice?: number; radio?: number; fullPlayers?: number; hamsterWorld?: number };
+  radios?: unknown; hamster?: unknown; hamsterWorld?: unknown; world?: unknown;
   /** реклама на щитах: полный список от сервера и ответ на покупку */
   ads?: Record<string, RemoteAd>; ok?: boolean; error?: string;
   from?: number; signal?: VoiceSignal;
@@ -305,6 +311,10 @@ export class NetClient {
   radioSupported = false;
   onRadios: ((radios:NetworkRadio[])=>void) | null = null;
   onHamsterSpawn: ((spawn: unknown)=>void) | null = null;
+  onHamsterWorld: ((world: unknown)=>void) | null = null;
+  onHamsterPetError: ((error: string)=>void) | null = null;
+  hamsterWorldSupported = false;
+  private fullPlayers = false;
   onVoice: ((from:number, signal:VoiceSignal)=>void) | null = null;
   onVoiceDisconnect: (()=>void) | null = null;
   onPeds: ((from: number, list: number[][], vehs: (string | number)[][]) => void) | null = null;
@@ -366,6 +376,8 @@ export class NetClient {
 
   get legacyServer() { return this.legacy; }
   get ready() { return this.status === 'online' && !!this.ws && this.ws.readyState === WebSocket.OPEN; }
+  /** Открытый WebSocket сам по себе ещё не означает подтверждённый вход. */
+  get sessionReady() { return this.ready && this.authenticated && !this.conflict; }
 
   connect() {
     if (this.want && this.ws) return;
@@ -385,6 +397,7 @@ export class NetClient {
       if (this.ws === ws && ws.readyState !== WebSocket.OPEN) { try { ws.close(); } catch { /* */ } this.fail(); }
     }, CONNECT_TIMEOUT);
     ws.onopen = () => {
+      if (this.ws !== ws) return; // late event from a replaced connection
       window.clearTimeout(this.connectTimer);
       this.status = 'online'; this.retry = 0; this.everConnected = true;
       // Пароль отправляется только серверу, подтвердившему поддержку аккаунтов.
@@ -393,12 +406,12 @@ export class NetClient {
       this.sys('Подключено к серверу');
       this.onChange?.();
     };
-    ws.onmessage = (e) => { if (typeof e.data === 'string') this.handle(e.data); };
+    ws.onmessage = (e) => { if (this.ws === ws && typeof e.data === 'string') this.handle(e.data); };
     ws.onerror = () => { /* обработка в onclose */ };
     ws.onclose = () => {
       if (this.ws !== ws) return;
       window.clearTimeout(this.connectTimer);
-      this.onVoiceDisconnect?.(); this.voiceSupported=false; this.radioSupported=false; this.onRadios?.([]);
+      this.onVoiceDisconnect?.(); this.voiceSupported=false; this.radioSupported=false; this.hamsterWorldSupported=false; this.onRadios?.([]);
       this.ws = null; this.id = null; this.authenticated = false; this.lastSaveMoney = NaN; this.auction = null; this.kioskOwners = null; this.kioskOwnersRequested = 0;
       if (this.dead || !this.want) { this.status = 'offline'; this.onChange?.(); return; }
       this.fail();
@@ -454,6 +467,12 @@ export class NetClient {
       case 'login_success':
         if (!this.handshake || !m.caps?.accounts || !Number.isSafeInteger(m.accountRevision)) { this.die('Сервер не поддерживает безопасные аккаунты'); return; }
         this.onLoginSuccess(m, now); return;
+      case 'hamster_world':
+        if (this.authenticated && this.hamsterWorldSupported) this.onHamsterWorld?.(m.world);
+        return;
+      case 'hamster_pet_result':
+        if (this.authenticated && this.hamsterWorldSupported && m.ok === false) this.onHamsterPetError?.(String(m.error || 'unavailable'));
+        return;
       case 'radio_list':
         if (this.authenticated && this.radioSupported && Array.isArray(m.radios)) this.onRadios?.(m.radios.slice(0,128) as NetworkRadio[]);
         return;
@@ -464,7 +483,12 @@ export class NetClient {
         if (!this.flight || (this.saveIds && m.saveId !== this.flight.id)) return;
         if (!m.ok || m.revision !== this.flight.revision + 1) { this.conflict = true; this.onSaveError?.('Сохранение отклонено. Не выходите: проверьте соединение и обратитесь к администратору.'); return; }
         this.revision = m.revision; this.flight = null; this.flushAccount(); return;
-      case 'players_list': this.applyPlayers(m.players, now, false); return;
+      case 'players_list': {
+        // New servers explicitly advertise that each list is complete. Never
+        // interpret a malformed list as everyone disconnecting.
+        if (this.fullPlayers && (!Array.isArray(m.players) || !m.players.every(p=>p && typeof p.id==='number' && Number.isSafeInteger(p.id) && p.id>0))) return;
+        this.applyPlayers(m.players, now, this.fullPlayers); return;
+      }
       case 'chat': this.onChatMsg(m, now); return;
       case 'error': {
         const text = typeof m.text === 'string' && m.text.trim() ? m.text.trim() : 'Сервер отключил вас';
@@ -541,6 +565,8 @@ export class NetClient {
     this.saveIds = m.caps?.saveIds === 1;
     this.voiceSupported = m.caps?.voice === 1;
     this.radioSupported = m.caps?.radio === 1;
+    this.hamsterWorldSupported = m.caps?.hamsterWorld === 1;
+    this.fullPlayers = m.caps?.fullPlayers === 1;
     const next = m.accountRevision!;
     if (this.loggedOnce && this.revision !== null) {
       const expected = this.flight?.revision ?? this.revision;
@@ -577,7 +603,11 @@ export class NetClient {
     this.loggedOnce = true;
     if (first) this.sys(`Вы вошли как ${this.nick}`);
     this.onLogin?.(this.me, first, m.accountState);
+    // A consumer may reject an incompatible snapshot and close the client.
+    // Do not continue applying data or flushing a queued save afterwards.
+    if (!this.authenticated || !this.ws) return;
     this.onHamsterSpawn?.(m.hamster);
+    if (this.hamsterWorldSupported) this.onHamsterWorld?.(m.hamsterWorld);
     if (this.flight && !this.conflict) this.send({ type: 'account_save', revision: this.flight.revision, saveId: this.flight.id, state: JSON.parse(this.flight.json) });
     else this.flushAccount();
     this.onChange?.();
@@ -711,6 +741,7 @@ export class NetClient {
     try { ws.send(JSON.stringify(o)); } catch { /* сокет закрылся */ }
   }
 
+  petHamster() { if(this.sessionReady && this.hamsterWorldSupported) this.send({type:'hamster_pet'}); }
   sendRadio(radio:unknown) { if(this.authenticated && this.radioSupported) this.send({type:'radio_update',radio}); }
   requestRadios() { if(this.authenticated && this.radioSupported) this.send({type:'radio_list'}); }
 

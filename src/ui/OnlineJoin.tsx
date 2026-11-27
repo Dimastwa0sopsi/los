@@ -99,9 +99,9 @@ export function OnlineJoin({ variant = 'start', g, initial, onLaunch, onClose, o
           <p className="text-xs opacity-60 mt-2">{authMode === 'login' ? 'Можно ввести основной или запасной пароль.' : 'Запомните пароль: аккаунт не привязан к устройству.'}</p>
           <div className="flex flex-col gap-2 mt-4">
             {!alreadyOnline && <button className="lg-btn lg-btn-main" disabled={!valid || password.length < 10 || (authMode === 'register' && !!backup && backup.length < 10)} onClick={goOnline}>{authMode === 'login' ? 'Подключиться' : 'Зарегистрироваться'}</button>}
-            <button className="lg-btn" onClick={goSolo}>{alreadyOnline ? '🎮 соло' : '🎮 локальная игра'}</button>
+            {!g?.onlineRequired && <button className="lg-btn" onClick={goSolo}>{alreadyOnline ? '🎮 соло' : '🎮 локальная игра'}</button>}
           </div>
-          {alreadyOnline && <p className="text-xs opacity-60 mt-2">Ё — выйти из онлайна</p>}
+          {alreadyOnline && <p className="text-xs opacity-60 mt-2">Ё — {g?.onlineRequired ? 'выйти в меню' : 'выйти из онлайна'}</p>}
         </Modal>
         {down !== null && <ServerDownModal onMenu={() => { setDown(null); if (onMenu) onMenu(); else onClose?.(); }} />}
       </>

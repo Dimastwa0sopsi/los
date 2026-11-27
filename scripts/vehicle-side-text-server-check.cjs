@@ -10,5 +10,14 @@ const parked=JSON.parse(cleanVehicleStateMessage('§LG'+JSON.stringify({vp:[row,
 assert.deepEqual(parked.vp,[row]);
 const capped=JSON.parse(cleanVehicleStateMessage('§LG'+JSON.stringify({vp:Array.from({length:20},(_,i)=>['id'+i,...row.slice(1)])})).slice(3));
 assert.equal(capped.vp.length,12);
+const trunk=['a','bus','#aabbcc',1,2,3,0,1,'Привет'];
+const checked=JSON.parse(cleanVehicleStateMessage('§LG'+JSON.stringify({tr:[trunk,trunk,['b','bus','#aabbcc',1,2,3,0,1,'site.com'],['c','bus','#aabbcc',1,2,3,0,9,'']]})).slice(3));
+assert.deepEqual(checked.tr,[trunk]);
+const ordinary=['car','lada','#aabbcc',1,2,3,0,''];
+const vehicles=JSON.parse(cleanVehicleStateMessage('§LG'+JSON.stringify({pv:[ordinary,ordinary,['spam','bus','#aabbcc',1,2,3,0,'site.com']],pp:[['car','А123ВС 77',1,0],['car','А123ВС 77',1,1],['spam','А123ВС 77',1,1],['car','site.com',1,1]]})).slice(3));assert.deepEqual(vehicles.pv,[ordinary]);assert.deepEqual(vehicles.pp,[['car','А123ВС 77',1,0]]);
+const hand=o=>JSON.parse(cleanVehicleStateMessage('§LG'+JSON.stringify(o)).slice(3));
+assert.equal(hand({tr:[trunk],th:'a'}).th,'a');
+assert.equal(hand({tr:[trunk],th:'@spam'}).th,undefined);
+assert.equal(hand({tr:[],th:'a'}).th,undefined);
 assert.equal(cleanVehicleStateMessage('§LGN{}'),'§LGN{}');assert.equal(cleanVehicleStateMessage('§LG{broken'),'§LG{broken');
 console.log('✓ фильтр надписей в серверном relay');

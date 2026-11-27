@@ -58,6 +58,7 @@ export function GameView({ settings, newGame, gender, nick = '', mode = 'solo', 
 
       },
       onIntroEnd: () => { if (alive) { setPhase('play'); if (mode === 'online' && inst) inst.openPanel({ type: 'onlineJoin' }); } },
+      onOnlineExit: () => { if (alive) onExit(); },
       onError: (e) => { if (alive) { setError(e); setPhase('error'); } },
       // {type:'error'} с сервера (бан) или недоступный сервер — модальное окно поверх игры
       onNetError: (text) => {
@@ -68,7 +69,7 @@ export function GameView({ settings, newGame, gender, nick = '', mode = 'solo', 
     });
     inst = g;
     setGame(g);
-    g.init({ newGame, gender }).catch((e: unknown) => { console.error(e); if (alive) { setError(e instanceof Error ? e.message : String(e)); setPhase('error'); } });
+    g.init({ newGame, gender, onlineRequired: mode === 'online' }).catch((e: unknown) => { console.error(e); if (alive) { setError(e instanceof Error ? e.message : String(e)); setPhase('error'); } });
     const wd = setInterval(() => { if (phaseRef.current === 'loading' && Date.now() - lastProg.current > 30000) { setError('Загрузка мира остановилась (нет прогресса 30 секунд). Попробуйте снизить качество графики.'); setPhase('error'); } }, 2000);
     return () => { alive = false; clearInterval(wd); g.dispose(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -98,12 +99,13 @@ export function GameView({ settings, newGame, gender, nick = '', mode = 'solo', 
           <h2>Не удалось запустить мир</h2><p className="my-2">{error}</p>
           <div className="flex flex-wrap gap-2 justify-center mt-3">
             <button className="lg-btn lg-btn-main" onClick={onRetry}>Повторить</button>
-            <button className="lg-btn" onClick={onResetRetry}>Сбросить сохранение и повторить</button>
+            {mode !== 'online' && <button className="lg-btn" onClick={onResetRetry}>Сбросить сохранение и повторить</button>}
             <button className="lg-btn" onClick={onExit}>В меню</button>
           </div>
         </div></div>
       )}
       {phase === 'intro' && <button className="lg-skip" onClick={() => game?.skipIntro()}>Пропустить ⏭</button>}
+      {phase === 'play' && mode === 'online' && !panel && !hud?.online && netErr === null && <div className="lg-modal-back"><div className="lg-modal"><div className="lg-modal-body"><p>Подключение к серверу…</p><button className="lg-btn" onClick={onExit}>← В меню</button></div></div></div>}
       {game && hud && phase === 'play' && !hud.editor && !hud.camera && <Hud g={game} hud={hud} mobile={mobile} />}
       {game && hud && phase === 'play' && hud.camera && !panel && <CameraOverlay g={game} mode={hud.camera.mode} />}
       {hud && hud.flash > 0 && <div className="cam-flash" />}
@@ -115,8 +117,8 @@ export function GameView({ settings, newGame, gender, nick = '', mode = 'solo', 
       {game && panel && panel.type === 'map' && <BigMap g={game} mode={panel.mode} close={close} />}
       {game && panel && panel.type === 'onlineJoin' && (
         <OnlineJoin variant="panel" g={game} initial={{ nick: game.state.nick ?? nick, gender: game.state.look.gender }}
-          onClose={close}
-          onMenu={close}
+          onClose={() => { if (mode === 'online' && !game.online) onExit(); else close(); }}
+          onMenu={() => { if (mode === 'online' && !game.online) onExit(); else close(); }}
           onLaunch={(l) => {
             close();
             if (l.mode === 'solo') { if (game.online) game.leaveOnline(); return; }
@@ -135,11 +137,10 @@ export function GameView({ settings, newGame, gender, nick = '', mode = 'solo', 
       {netErr !== null && (
         <ServerDownModal
           text={netErr || undefined}
-          onMenu={() => { setNetErr(null); game?.fallbackOffline(); }}
-          // повторный вход без перезагрузки страницы: сервер мог только что перехватить старую сессию
+          onMenu={() => { setNetErr(null); if (mode === 'online') onExit(); else game?.fallbackOffline(); }}
+          // Повторный вход; неподтверждённые изменения могут требовать сверки с сервером.
           onRetry={game?.net ? () => { setNetErr(null); if (game) { game.input.enabled = true; game.net?.retryLogin(); } } : undefined}
-          // сервер недоступен — не выкидываем в меню, а продолжаем офлайн
-          onSolo={() => { setNetErr(null); game?.fallbackOffline(); }}
+          onSolo={mode === 'online' ? undefined : () => { setNetErr(null); game?.fallbackOffline(); }}
         />
       )}
     </div>

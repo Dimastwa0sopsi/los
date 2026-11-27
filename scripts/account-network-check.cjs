@@ -2,7 +2,7 @@
 const fs = require('fs'), path = require('path'), os = require('os'), { spawn } = require('child_process'), assert = require('assert');
 const WebSocket = require('ws');
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'los-accounts-'));
-for (const f of ['server.js', 'ads.cjs', 'moderation.cjs', 'account-auth.cjs', 'account-store.cjs', 'account-revisions.cjs', 'auction-store.cjs', 'business-owners.cjs']) fs.copyFileSync(path.join(__dirname, '../server', f), path.join(dir, f));
+for (const f of ['server.js', 'ads.cjs', 'moderation.cjs', 'account-auth.cjs', 'account-store.cjs', 'account-revisions.cjs', 'auction-store.cjs', 'business-owners.cjs', 'radio-sync.cjs', 'hamster-spawn.cjs', 'hamster-world.cjs', 'vehicle-side-text.cjs']) fs.copyFileSync(path.join(__dirname, '../server', f), path.join(dir, f));
 fs.writeFileSync(path.join(dir, 'package.json'), '{"type":"commonjs"}');
 const db = path.join(dir, 'db.sqlite');
 const port = 23000 + Math.floor(Math.random() * 20000);
@@ -32,6 +32,18 @@ async function auth(name, mode, password, backup) { const c = client(); assert.e
   let owner2 = await otherOwner.next('login_success'); assert(!owner2.adminSession); await owner.next('error'); otherOwner.ws.close();
   let legacy = client(); await legacy.next('hello'); legacy.send({ type:'login', name:'Tester' }); assert.equal((await legacy.next('error')).code, 'auth'); legacy.ws.close();
   let a = await auth('Tester', 'register', 'primary-password', 'backup-password'); let first = await a.next('login_success'); assert(!first.adminSession); assert.equal(first.accountState, null); assert.equal(first.accountRevision, 0);
+  // Shared cosmetic hamster state: server uses the session position, not a request coordinate.
+  {
+    const other=await auth('HamsterOther','register','hamster-test-password');const joined=await other.next('login_success');
+    assert.equal(first.caps.hamsterWorld,1);assert.equal(joined.hamsterWorld.event,null);
+    a.send({type:'hamster_pet',x:first.hamster.x,z:first.hamster.z});assert.equal((await a.next('hamster_pet_result')).error,'too_far');
+    a.send({type:'move',x:first.hamster.x,z:first.hamster.z,rot:0});
+    // Rate limit is per connection; use the second player for the accepted pet.
+    other.send({type:'move',x:first.hamster.x,z:first.hamster.z,rot:0});other.send({type:'hamster_pet'});
+    const wa=await a.next('hamster_world'),wb=await other.next('hamster_world');assert.deepEqual(wa.world,wb.world);assert.equal(wa.world.event.petter,joined.player.id);
+    a.ws.close();other.ws.close();
+    a=await auth('Tester','login','primary-password');first=await a.next('login_success');assert(first.hamsterWorld.event,'повторный вход получает текущее событие');assert.equal(first.accountState,null);assert.equal(first.player.money,20000);
+  }
   // Реальный WebSocket: публичный каталог показывает только активные лоты,
   // не раскрывает полный объект автомобиля и не позволяет делать ставки.
   const DatabaseAuction = require('better-sqlite3');
@@ -83,7 +95,7 @@ async function auth(name, mode, password, backup) { const c = client(); assert.e
   let banned = await auth('Tester', 'login', 'primary-password'); assert.equal((await banned.next('error')).code, 'banned'); banned.ws.close();
   const db2 = new Database(db); db2.prepare('UPDATE players SET banned_until = ? WHERE name = ?').run(Date.now()-1, 'Tester'); db2.close();
   b.ws.close(); await stop(); await start();
-  let c = await auth('tester', 'login', 'primary-password'); login = await c.next('login_success'); assert.deepStrictEqual(login.accountState, state); assert.equal(login.player.money, state.money); c.send({type:'account_save', state, revision:0, saveId}); const replay = await c.next('account_saved'); assert.equal(replay.replay,true); assert.equal(replay.saveId,saveId); assert.equal(replay.revision,1);
+  let c = await auth('tester', 'login', 'primary-password'); login = await c.next('login_success'); assert.deepStrictEqual(login.accountState, state); assert.equal(login.player.money, state.money); assert(login.hamsterWorld.event,'событие хомяка должно сохраниться после перезапуска сервера'); c.send({type:'account_save', state, revision:0, saveId}); const replay = await c.next('account_saved'); assert.equal(replay.replay,true); assert.equal(replay.saveId,saveId); assert.equal(replay.revision,1);
   c.send({type:'kiosk_owners'}); assert.deepStrictEqual((await c.next('kiosk_owners')).owners,[{id:3,name:'Tester'}]); c.ws.close();
   await stop(); fs.rmSync(dir, { recursive:true, force:true }); console.log('✓ аккаунты и прогресс; мут, варн, бан и истечение срока после перезапуска');
 })().catch(e => { console.error(e); if (proc) proc.kill(); process.exitCode = 1; });

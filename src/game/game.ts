@@ -1,6 +1,10 @@
 import { canUseWingJump, equipLimited, slipperSpeedMultiplier } from './limitedLook';
+import {stepCustody,validCustodyState} from './policeCustodyLab';
+import {planCustodyRoute} from './policeRouteLab';
+import {wipeOfflineSaves} from './offlineSaveCleanup';
+import {usableOnlineSnapshot} from './onlineSnapshot';
 import { NearbyVoice } from './voice';
-import { canDrive, issueDocument, type DocumentKind } from './documents';
+import { canDrive, purchaseDocument, DOCUMENT_PRICES, type DocumentKind } from './documents';
 import { generateSpeedCameras, cameraDetects, cameraFine, type SpeedCamera } from './speedCameras';
 // Игровой движок «Лос-Город»: цикл, игрок, транспорт, интерьеры, работа, полиция, такси, автопилот
 import * as THREE from 'three';
@@ -32,6 +36,8 @@ import { eyeSees, recognitionEye, POLICE_EYE, PED_EYE, type Eye } from './police
 import { Radio } from './radio';
 import { hamsterSpot, isHamsterSpot, makeHamster } from './hamster';
 import { petHamsterSolo, HAMSTER_PET_MS, HAMSTER_RUN_MS } from './hamsterReward';
+import {parseHamsterWorld,hamsterWorldPose,type HamsterWorld} from './hamsterOnlineWorld';
+import {applyHamsterPetVisual,remoteHamsterPetActive} from './hamsterPetVisual';
 import { CASINO_ITEMS, randomRouletteNumber, spinRouletteSolo, type RouletteBet } from './roulette';
 import { nextImmersion } from './vehicleSinking';
 import { carRadioVolume, radioGain, soundCloudUrl, type RadioPlace } from './radioSpatial';
@@ -40,6 +46,8 @@ import {speakerById, speakerVolume} from './speakers';
 import {hasSubwooferTrunk} from './data';
 import { stepTrunkMotion, TRUNK_OPEN_SECONDS, trunkMotionKind, trunkMotionPose, type TrunkMotionKind } from './trunkAnimation';
 import { parseParkedInscribed, MAX_PARKED_INSCRIBED, type ParkedInscribedVehicle } from './parkedInscribedVehicles';
+import {parseParkedTrunks,remoteTrunkHandReach, MAX_PARKED_TRUNKS, type ParkedTrunkVisual} from './parkedTrunkVisual';
+import {parseParkedVehicles,parseParkedPlates,MAX_PARKED_VEHICLES,type ParkedVehicleVisual,type ParkedVehiclePlate} from './parkedVehicleVisual';
 import { applyFishingVisual } from './fishingVisual';
 import { transferTrunkSolo } from './trunkSolo';
 import { trunkCount } from './trunk';
@@ -48,7 +56,7 @@ import {disposeHomeSpeaker, makeHomeSpeaker} from './speakerModel';
 import { setSoundCloudMobile } from './soundCloudWidget';
 import { allMaterials, disposeTextures, mat, GFX, getTex } from './textures';
 import { T, M } from './geom';
-import { LIMITED, limitedAvailable, CROPS, EMOTES, SCOOTER_RATE, HYDRO_PRICE, WEAPONS, WEAPON_ORDER, AMMO_NAMES, ITEMS, VEHICLES, TRAFFIC_TYPES, TRAFFIC_WEIGHTS, KIOSK_TYPES, KIOSK_PERIOD, KIOSK_MAX_PERIODS, SHOP_ITEMS, randomPlate, plateKey, type ShopKind, type Look, type Tuning, defaultTuning, TUNE_PRICES, TUNE_CATALOG, HAIR_STYLES, TOPS, BOTTOMS, BAR_DRINKS } from './data';
+import { LIMITED, limitedAvailable, CROPS, EMOTES, SCOOTER_RATE, HYDRO_PRICE, WEAPONS, WEAPON_ORDER, AMMO_NAMES, ITEMS, VEHICLES, TRAFFIC_TYPES, TRAFFIC_WEIGHTS, KIOSK_TYPES, KIOSK_PERIOD, KIOSK_MAX_PERIODS, SHOP_ITEMS, randomPlate, plateKey, normalizePlate, type ShopKind, type Look, type Tuning, defaultTuning, TUNE_PRICES, TUNE_CATALOG, HAIR_STYLES, TOPS, BOTTOMS, BAR_DRINKS } from './data';
 import { type GameState, newState, loadState, saveState, migrate, type OwnedVehicle, marketOffers, sellPrice, repairCost, carValue, uid, type MarketOffer } from './state';
 
 export interface HudState {
@@ -88,6 +96,7 @@ export interface GameCallbacks {
   onToast: (t: string) => void; onReady: () => void; onIntroEnd: () => void; onError: (e: string) => void;
   /** сеть: null — сервер недоступен, строка — текст ошибки/бана с сервера */
   onNetError?: (text: string | null) => void;
+  onOnlineExit?: () => void;
 }
 
 // мини-игра врача: симптомы → препарат
@@ -156,6 +165,7 @@ export class Game {
   private fogSaved: { color: number; near: number; far: number } | null = null;
   private swimHinted = false;
   inVeh: Vehicle | null = null; passenger = false;
+  private custodyCar: Vehicle | null = null; private custodyStuck = 0; private custodyReplan = 0; private custodyLast = {x:0,z:0}; private custodyNotice = 0;
   camYaw = 0; camPitch = 0.25; camDist = 5; lastLook = 0;
   /** вид от первого лица */
   firstPerson = false;
@@ -293,7 +303,7 @@ export class Game {
     if (!this.net.voiceSupported) { this.toast('Для голосового чата необходимо обновить сервер'); return; }
     void this.voice.start();
   }
-  online = false; private onlineInitialMoney: number | null = null; net: NetClient | null = null; remotes = new Map<number, Remote>(); private remoteSmokeT = new Map<number, number>();
+  online = false; onlineRequired = false; private onlineInitialMoney: number | null = null; net: NetClient | null = null; remotes = new Map<number, Remote>(); private remoteSmokeT = new Map<number, number>();
   private netT = 0; private netMoveT = 0; private netN = 0; private lastSpeed = 0;
   sky: THREE.Mesh | null = null; stars: THREE.Points | null = null; clouds: THREE.Group | null = null; private skyMat: THREE.ShaderMaterial | null = null;
   minimap: HTMLCanvasElement | null = null; private miniT = 0;
@@ -329,11 +339,13 @@ export class Game {
   private hamsterAction: { start:number; x:number; z:number; dx:number; dz:number } | null = null;
   private hamsterWaiting = false;
   private onlineHamsterReady = false;
+  private hamsterWorld: {world:HamsterWorld;received:number} | null = null; private hamsterPetRequestAt = -Infinity;
   constructor(private container: HTMLElement, settings: Settings, cb: GameCallbacks) {
     this.cb = cb; this.settings = { ...settings }; this.mobile = resolveMobile(settings); setSoundCloudMobile(this.mobile);
   }
   // ================= ЗАГРУЗКА =================
-  async init(opts: { newGame: boolean; gender: 'm' | 'f' }) {
+  async init(opts: { newGame: boolean; gender: 'm' | 'f'; onlineRequired?: boolean }) {
+    this.onlineRequired = !!opts.onlineRequired;
     const P = this.cb.onProgress;
     P(0.02, 'Подготовка рендера');
     this.renderer = new THREE.WebGLRenderer({ antialias: this.settings.quality !== 'low', powerPreference: 'high-performance' });
@@ -376,7 +388,7 @@ export class Game {
     P(0.95, 'Жители и транспорт');
     this.setupScene();
     // состояние
-    const loaded = opts.newGame ? null : loadState();
+    const loaded = opts.newGame || this.onlineRequired ? null : loadState();
     this.state = loaded ?? newState(opts.gender, this.L.playerSpawn);
     this.player = new Character(this.state.look);
     this.scene.add(this.player.root);
@@ -412,6 +424,7 @@ export class Game {
     this.mapIdx = new MapIndex(this.L);
     P(0.98, 'Размещение игрока');
     this.restorePosition();
+    this.restoreSoloCustody();
     this.sound.setVolume(this.settings.volume, this.settings.muted); this.voice.setVolume(this.settings.voiceVolume);
     P(1, 'Готово');
     this.setupQuest();
@@ -531,7 +544,11 @@ export class Game {
       const v = new Vehicle(o.type, 'owned', o.color, o);
       const p = o.pos ?? this.freeSpotNear(this.L.dealerLot.x, this.L.dealerLot.z);
       if (!o.pos && !preserveSnapshot) o.pos = { ...p, a: 0 };
-      v.place(p.x, p.z, o.pos?.a ?? 0, 0);
+      // Legacy accounts lack height. Use the same near-ground step threshold as
+      // driving; newer saves preserve the exact level (bridges, ramps, etc.).
+      const savedY=o.pos?.y;
+      const y=typeof savedY==='number' && Number.isFinite(savedY) && savedY>=-100 && savedY<=1000 ? savedY : this.col.groundAt(p.x,p.z,0,0.6,0.5);
+      v.place(p.x, p.z, o.pos?.a ?? 0, y);
       this.addVehicle(v);
     }
   }
@@ -688,6 +705,7 @@ export class Game {
     if (!silent) this.sound.door();
   }
   exitInterior() {
+    if (this.soloDetained()) { this.toast('Сначала отбытие срока'); return; }
     const loc = this.state.location; if (!loc) return;
     const b = this.L.buildings[loc.b];
     this.lying = false; this.furnitureSeat = null;
@@ -718,7 +736,8 @@ export class Game {
   }
   // ================= ГЛОБАЛЬНЫЕ КЛАВИШИ =================
   private globalKey(code: string) {
-    if (this.intro) return;
+    if (this.intro || (this.onlineRequired && (!this.online || !this.net?.sessionReady))) return;
+    if (this.soloDetained()) { if (code === K.pause) { if (this.panel) this.closePanel(); else this.openPanel({type:'settings'}); } return; }
     if (code === K.phone) { this.togglePanel({ type: 'phone' }); return; }
     // T — чат (Enter работает только как «отправить» внутри поля ввода)
     if (code === K.chat && !this.panel && !this.camMode) { this.input.releaseAll(); this.input.unlock(); this.chatFocus?.(); return; }
@@ -780,7 +799,7 @@ export class Game {
     return true;
   }
   openComputerRadio() { if (this.selectComputerRadioSource()) this.openPanel({type:'radio'}); }
-  openPanel(p: Panel) { if (this.economyLabPaused) return; this.beltHold = 0; this.beltTriggered = false; this.panel = p; this.input?.releaseAll(); if (this.input) this.input.enabled = false; this.input?.unlock(); this.cb.onPanel(p); this.sound.click(); }
+  openPanel(p: Panel) { if (this.economyLabPaused) return; if (this.soloDetained() && p.type !== 'settings') { this.toast('Вы задержаны'); return; } this.beltHold = 0; this.beltTriggered = false; this.panel = p; this.input?.releaseAll(); if (this.input) this.input.enabled = false; this.input?.unlock(); this.cb.onPanel(p); this.sound.click(); }
   closePanel() {
     if (this.panel?.type === 'trunk') {
       const uid = this.panel.uid;
@@ -814,6 +833,7 @@ export class Game {
   private update(dt: number) {
     // Freeze timers, movement, jobs and autosaves while reconciling; rendering continues.
     if (this.economyLabPaused) return;
+    if (this.onlineRequired && !this.intro && (!this.online || !this.net?.sessionReady)) { this.emitHud(dt); return; }
     const s = this.state;
     this.ensureOwnedMask();
     if (!this.panel) s.playTime += dt;
@@ -821,10 +841,14 @@ export class Game {
     const timeMul = this.lying ? 12 : 1;
     if (this.online) s.gameTime = (Date.now() / 1000) % 1440; // единое время для всех игроков (1 сек = 1 игровая минута)
     else s.gameTime = (s.gameTime + dt * timeMul) % 1440;
-    this.survival(dt);
+    const detained = this.soloDetained();
+    if (!detained) this.survival(dt);
     if (this.intro) { this.updateIntro(dt); this.updateWorldSystems(dt); this.emitHud(dt); return; }
-    if (!this.panel) this.handleInput(dt);
-    this.updatePlayer(dt);
+    if (!this.panel && !detained) this.handleInput(dt);
+    if (detained && this.state.soloCustody?.phase === 'jailed') {
+      this.player.root.position.set(this.px, this.py, this.pz); this.player.root.rotation.set(0, this.pa, 0); this.player.pose('idle', performance.now()/1000);
+    } else this.updatePlayer(dt);
+    this.updateSoloCustody(dt);
     this.enforceWorldBounds();
     this.updateWorldSystems(dt);
     if (!this.interior) this.updateGates(dt);
@@ -880,9 +904,10 @@ export class Game {
       if (this.invT > 15) { this.invT = 0; this.reportInventory(); }
     }
     // пешеходы
-    const vehs = this.vehicles.filter((v) => Math.abs(v.speed) > 4 && Math.abs(v.x - this.px) + Math.abs(v.z - this.pz) < 150).map((v) => ({ x: v.x, z: v.z, speed: v.speed, r: v.spec.len / 2, mine: v === this.inVeh && !this.passenger }));
+    // Стоящие машины тоже препятствия; скорость по-прежнему учитывается отдельно для наезда.
+    const vehs = this.interior ? [] : this.vehicles.filter((v) => v.model.group.visible && Math.abs(v.x - this.px) + Math.abs(v.z - this.pz) < 160).map((v) => ({ x: v.x, z: v.z, speed: v.speed, r: v.spec.len / 2, mine: v === this.inVeh && !this.passenger }));
     this.peds.update(dt, performance.now() / 1000, {
-      px: this.px, pz: this.pz, py: this.py, playerVisible: !this.inVeh && !this.rideRemote && this.state.health > 0, inside, viewDist: this.drawDist(),
+      px: this.px, pz: this.pz, py: this.py, playerVisible: !this.inVeh && !this.rideRemote && this.state.health > 0, otherPlayers: this.nearbyRemotePedestrians(), inside, viewDist: this.drawDist(),
       suppress: (x, z) => this.suppressed(x, z), lightState: (n, ew) => this.lightState(n, ew),
       hitPlayer: (d, fx, fz, heavy) => { this.trafficPanic(fx, fz, 45); return this.combat.takeHit(d, fx, fz, { heavy }); },
       foePos: (id) => { const r = this.remotes.get(id); return r && r.visible && r.hp > 0 && !r.inVeh ? { x: r.x, z: r.z } : null; },
@@ -1288,9 +1313,7 @@ export class Game {
       }
     }
     if (this.hamsterAction && Date.now() - this.hamsterAction.start < HAMSTER_PET_MS && !inWater) {
-      ch.torso.rotation.x = .34;
-      ch.shR.rotation.x = -1.15 + Math.sin(Date.now()/120) * .12;
-      ch.elR.rotation.x = -.45;
+      applyHamsterPetVisual(ch,Date.now());
     }
     this.netPose = { p: pose, k: Math.round(phase * 100) / 100, pt: Math.round(lean * 100) / 100 };
   }
@@ -1445,6 +1468,7 @@ export class Game {
     this.sound.click();
   }
   exitVehicle(force = false) {
+    if (!force && this.soloDetained()) { this.toast('Вы задержаны'); return; }
     this.cruise = 0;
     this.driftAssist = false;
     // музыка не глохнет при выходе из машины: радио играет и пешком (U)
@@ -1487,7 +1511,7 @@ export class Game {
     if (this.passenger) {
       this.px = v.x; this.pz = v.z; this.py = v.y;
       this.player.pose('passenger', 0);
-      this.driveByUpdate(dt, v);
+      if (!this.soloDetained()) this.driveByUpdate(dt, v);
       if (v.isHeli) return;
       return;
     }
@@ -1703,7 +1727,12 @@ export class Game {
     v.ai = ai; this.autopilot = true; this.toast('Автопилот включён: маршрут построен');
   }
   setAutopilot(on: boolean) { this.autopilot = on; if (!on && this.inVeh && (this.inVeh.role === 'owned' || this.inVeh.role === 'traffic')) this.inVeh.ai = null; }
-  private aiCtx(): AICtx { return { L: this.L, vehicles: this.vehicles, player: { x: this.px, z: this.pz, inVehicle: this.inVeh }, lightState: (n, ew) => this.lightState(n, ew), rand: () => this.rng.next(), col: this.col }; }
+  private nearbyRemotePedestrians() {
+    if (!this.online) return [];
+    const key = this.interiorKey();
+    return [...this.remotes.values()].filter(r => r.visible && r.ikey === key && !r.inVeh && r.hp > 0 && Math.abs(r.x-this.px)+Math.abs(r.z-this.pz)<180).map(r => ({x:r.x,z:r.z}));
+  }
+  private aiCtx(): AICtx { return { L: this.L, vehicles: this.vehicles, player: { x: this.px, z: this.pz, inVehicle: this.inVeh }, lightState: (n, ew) => this.lightState(n, ew), rand: () => this.rng.next(), col: this.col, pedestrians: this.interior ? [] : [...this.peds.peds.filter(p => p.kind !== 'static' && p.state !== 'gone' && p.state !== 'down' && p.state !== 'knocked' && p.active && (!this.peds.onlineMode || p.kind === 'puppet' || p.role === 'police')).map(p => ({x:p.x,z:p.z})), ...this.nearbyRemotePedestrians()] }; }
   // ================= ТРАФИК =================
   private updateVehicleSinking(dt: number) {
     for (const v of this.vehicles) {
@@ -1797,6 +1826,7 @@ export class Game {
   }
 
   private updatePolice(dt: number) {
+    if (this.soloDetained()) { this.sound.sirenSound(false); return; }
     const s = this.state;
     const chasers = this.vehicles.filter((v) => v.role === 'police' && v.sirens);
     if (!s.wanted) this.lastSeen = null;
@@ -1843,11 +1873,72 @@ export class Game {
       if (slow && copNear && (this.seenNow || close)) this.bustT += dt; else this.bustT = Math.max(0, this.bustT - dt);
       if (this.bustT > 3) this.busted();
     } else this.bustT = 0;
-    if (s.wanted === 0) for (const v of chasers) { v.sirens = false; v.model.sirens(0); v.ai!.mode = 'wander'; v.ai!.obeyLights = true; v.ai!.route = [nearestNodeFast(this.L, v.x, v.z)]; v.ai!.route.push(this.L.adj[v.ai!.route[0]][0].n); v.ai!.k = 0; v.model.rebuild(); }
+    if (s.wanted === 0 && !this.soloDetained()) for (const v of chasers) { v.sirens = false; v.model.sirens(0); v.ai!.mode = 'wander'; v.ai!.obeyLights = true; v.ai!.route = [nearestNodeFast(this.L, v.x, v.z)]; v.ai!.route.push(this.L.adj[v.ai!.route[0]][0].n); v.ai!.k = 0; v.model.rebuild(); }
     this.sound.sirenSound(chasers.some((v) => Math.hypot(v.x - this.px, v.z - this.pz) < 150) && s.wanted > 0);
+  }
+  private soloDetained() { return !this.online && validCustodyState(this.state?.soloCustody) && this.state.soloCustody.phase !== 'free'; }
+  private startSoloCustody(): boolean {
+    if (this.rideRemote || this.rideOn) { this.bustT=0; this.toast('Полиция ждёт, пока вы покинете транспорт'); return true; }
+    const plan=planCustodyRoute(this.vehicles,this.L.buildings,{x:this.px,z:this.pz},(v,b)=>this.routeFor(v,b));
+    if (!plan) { this.bustT=0; this.toast('Полиция ждёт машину с маршрутом к участку'); return true; }
+    const id=`custody-${Date.now()}-${Math.floor(Math.random()*1000000000)}`;
+    const next=stepCustody({phase:'free'},{type:'arrest',custodyId:id,stationId:plan.station.id,wanted:3,policePresent:true,stopped:true,now:Date.now()});
+    if (!next.ok) return false;
+    // Если задержали пассажира такси, завершить поездку до пересадки,
+    // иначе заказ и его счётчик продолжат работать без игрока.
+    if (this.taxi && this.taxi.stage !== 'leaving') this.cancelTaxi();
+    if (this.inVeh) this.exitVehicle(true);
+    this.closePanel(); this.state.soloCustody=next.state; this.state.wanted=0; this.bustT=0;
+    this.custodyCar=plan.patrol; this.custodyCar.hasDriver=true; this.custodyCar.addDummyDriver(); this.custodyCar.ai=plan.route; this.custodyCar.ai.obeyLights=true;
+    this.custodyCar.ai.onArrive=()=>this.arriveSoloCustody();
+    this.custodyStuck=0; this.custodyReplan=0; this.custodyLast={x:plan.patrol.x,z:plan.patrol.z};
+    this.seat(plan.patrol,true); this.save(); this.toast('Вас задержали. Полиция везёт вас в участок'); return true;
+  }
+  private arriveSoloCustody() {
+    const c=this.state.soloCustody; if (this.online || !c || c.phase!=='transport') return;
+    const station=this.L.buildings[c.stationId]; if (!station || station.kind!=='police' || !station.enter || station.removed) return;
+    const result=stepCustody(c,{type:'arrive',custodyId:c.custodyId,stationId:c.stationId,now:Date.now()}); if(!result.ok)return;
+    if (this.inVeh) this.exitVehicle(true);
+    if (this.custodyCar) { this.custodyCar.speed=0; this.custodyCar.sirens=false; if(this.custodyCar.ai)this.custodyCar.ai.mode='idle'; this.custodyCar=null; }
+    this.enterBuilding(station,true);
+    const spot=this.interior?.doorSpots.custody; if (!spot) return;
+    this.px=spot.x; this.pz=spot.z; this.py=spot.y; this.pa=spot.a; this.pvy=0; this.camYaw=spot.a;
+    this.state.soloCustody=result.state; this.save(); this.custodyNotice=0; this.toast('Вы в камере на 1 минуту');
+  }
+  private restoreSoloCustody() {
+    if (!this.soloDetained()) return;
+    const c=this.state.soloCustody!; if(c.phase==='free')return;
+    const station=this.L.buildings[c.stationId];
+    if (!station || station.kind!=='police' || !station.enter || station.removed) { this.toast('Не удалось восстановить участок задержания'); return; }
+    if (c.phase==='jailed') {
+      if (!this.interior || this.state.location?.b!==station.id) this.enterBuilding(station,true);
+      const spot=this.interior?.doorSpots.custody; if(spot){this.px=spot.x;this.pz=spot.z;this.py=spot.y;this.pa=spot.a;this.pvy=0;}
+      return;
+    }
+    if(this.interior)this.forceOutside();
+    const v=new Vehicle('police','police'); v.place(this.px,this.pz,this.pa); v.hasDriver=true; v.addDummyDriver(); v.sirens=true;
+    const ai=this.routeFor(v,station.door); if(ai){v.ai=ai;ai.onArrive=()=>this.arriveSoloCustody();}
+    this.addVehicle(v); this.custodyCar=v; this.custodyLast={x:v.x,z:v.z}; this.custodyStuck=0; this.custodyReplan=0; this.seat(v,true);
+    this.toast('Задержание восстановлено — полиция везёт вас в участок');
+  }
+  private updateSoloCustody(dt:number) {
+    if(!this.soloDetained())return;
+    const c=this.state.soloCustody!;
+    if(c.phase==='transport') {
+      const v=this.custodyCar;
+      if(v && Math.hypot(v.x-this.custodyLast.x,v.z-this.custodyLast.z)>3){this.custodyLast={x:v.x,z:v.z};this.custodyStuck=0;} else this.custodyStuck+=dt;
+      this.custodyReplan-=dt;
+      if(this.custodyStuck>45 && v && this.custodyReplan<=0){this.custodyReplan=15;const station=this.L.buildings[c.stationId];const ai=station && this.routeFor(v,station.door); if(ai){v.ai=ai;ai.onArrive=()=>this.arriveSoloCustody();} }
+      if(this.custodyStuck>120){this.toast('Патруль застрял: доставка в участок завершена диспетчером');this.arriveSoloCustody();}
+    } else if(c.phase==='jailed') {
+      const result=stepCustody(c,{type:'release',custodyId:c.custodyId,now:Date.now()});
+      if(result.ok){this.state.soloCustody=result.state;this.exitInterior();this.save();this.toast('Срок отбыт. Вы свободны');return;}
+      this.custodyNotice-=dt;if(this.custodyNotice<=0){this.custodyNotice=10;this.toast(`До освобождения: ${Math.max(0,Math.ceil((c.releaseAt-Date.now())/1000))} сек.`);}
+    }
   }
   private busted() {
     const s = this.state;
+    if (!this.online && s.wanted===3 && this.startSoloCustody()) return;
     if (this.inVeh) this.exitVehicle(true);
     s.wanted = 0; this.bustT = 0;
     const st = this.L.buildings.filter((b) => b.kind === 'police').sort((a, b) => Math.hypot(a.x - this.px, a.z - this.pz) - Math.hypot(b.x - this.px, b.z - this.pz))[0];
@@ -2514,7 +2605,7 @@ export class Game {
     this.toast(`Номер ${near.side === 'front' ? 'спереди' : 'сзади'} снят`);
   }
   private applyOnlineHamsterSpawn(value: unknown) {
-    this.onlineHamsterReady = false;
+    this.onlineHamsterReady = false; this.hamsterWorld=null; this.hamsterAction=null;
     if (!this.hamster) return;
     this.hamster.group.visible = false;
     if (!this.online || !value || typeof value !== 'object') return;
@@ -2524,11 +2615,35 @@ export class Game {
     this.hamster.group.position.set(spot.x,0,spot.z); this.hamster.group.rotation.y=0;
     this.onlineHamsterReady = true;
   }
+  private applyOnlineHamsterWorld(value:unknown) {
+    if (!this.online || !this.hamster) return;
+    const world=parseHamsterWorld(value,(x,z)=>isHamsterSpot(this.L,this.col,x,z)); if(!world)return;
+    if(this.hamsterWorld && world.seq<this.hamsterWorld.world.seq)return;
+    this.hamsterWorld={world,received:performance.now()}; this.onlineHamsterReady=true;
+    const e=world.event;
+    if(e && e.petter===this.net?.id && world.serverTime-e.start<HAMSTER_PET_MS) {
+      this.hamsterAction={start:Date.now()-(world.serverTime-e.start),x:world.x,z:world.z,dx:e.dx,dz:e.dz};
+      this.pa=Math.atan2(world.x-this.px,world.z-this.pz);
+      this.toast('🐹 Вы погладили хомяка. Онлайн-награда пока не подключена');
+    }
+  }
   private updateHamster(now: number) {
     const hamster = this.hamster;
     if (!hamster || !this.state) return;
     const h = hamster.group, action = this.hamsterAction;
-    if (this.online) { h.visible = this.onlineHamsterReady && !!this.net?.ready; if(h.visible) hamster.animate(now/1000); return; }
+    if (this.online) {
+      h.visible = this.onlineHamsterReady && !!this.net?.sessionReady;
+      if(this.hamsterWorld){
+        const pose=hamsterWorldPose(this.hamsterWorld.world,performance.now()-this.hamsterWorld.received);
+        const age=this.hamsterWorld.world.event ? this.hamsterWorld.world.serverTime + Math.max(0,performance.now()-this.hamsterWorld.received) - this.hamsterWorld.world.event.start : 0;
+        const hop=pose.phase==='running' ? Math.abs(Math.sin((age-HAMSTER_PET_MS)/HAMSTER_RUN_MS*Math.PI*5))*.07 : 0;
+        h.visible=h.visible && pose.phase!=='hidden'; h.position.set(pose.x,hop,pose.z);
+        if(pose.phase==='running' && this.hamsterWorld.world.event) h.rotation.y=Math.atan2(this.hamsterWorld.world.event.dx,this.hamsterWorld.world.event.dz);
+        if(this.hamsterAction && now-this.hamsterAction.start>=HAMSTER_PET_MS+HAMSTER_RUN_MS)this.hamsterAction=null;
+        if(h.visible)hamster.animate(now/1000,pose.phase==='running');
+      } else if(h.visible) hamster.animate(now/1000);
+      return;
+    }
     hamster.animate(now / 1000, !!action && now - action.start >= HAMSTER_PET_MS && now - action.start < HAMSTER_PET_MS + HAMSTER_RUN_MS);
     if (action) {
       const elapsed = Math.max(0, now - action.start);
@@ -2554,7 +2669,16 @@ export class Game {
   private petHamster() {
     const h = this.hamster?.group;
     if (!h || !h.visible || this.hamsterAction || this.interior || this.inVeh || this.rideRemote || Math.hypot(h.position.x-this.px,h.position.z-this.pz)>1.6) return;
-    if (this.online) { this.toast('🐹 Онлайн-награда пока недоступна: требуется безопасное сохранение на сервере'); return; }
+    if (this.online) {
+      if (!this.net?.sessionReady || !this.net.hamsterWorldSupported || !this.hamsterWorld) { this.toast('🐹 Для поглаживания нужен обновлённый сервер'); return; }
+      if(hamsterWorldPose(this.hamsterWorld.world,performance.now()-this.hamsterWorld.received).phase!=='idle') return;
+      const now=performance.now(); if(now-this.hamsterPetRequestAt<1000)return;
+      this.hamsterPetRequestAt=now;
+      // Send the current position first so a recent movement is not rejected
+      // because the periodic movement packet has not been sent yet.
+      const w=this.playerWorldPos(); this.net.sendMove(w.x,w.z,w.a);
+      this.net.petHamster(); return;
+    }
     const now = Date.now();
     let result: ReturnType<typeof petHamsterSolo>;
     try { result = petHamsterSolo(this.state, localStorage, now); } catch { result = {ok:false}; }
@@ -2620,9 +2744,9 @@ export class Game {
     if (trunkCar) {
       const anim = this.testTrunks.get(trunkCar);
       const opened = anim?.opening && anim.elapsed >= TRUNK_OPEN_SECONDS[anim.kind];
-      return { text: this.online ? 'E — тест крышки багажника' : opened ? 'E — вещи в багажнике' : 'E — открыть багажник', keys: ['E'], act: () => this.interactTrunk(trunkCar) };
+      return { text: this.online ? (anim?.opening ? 'E — закрыть багажник' : 'E — открыть багажник') : opened ? 'E — вещи в багажнике' : 'E — открыть багажник', keys: ['E'], act: () => this.interactTrunk(trunkCar) };
     }
-    if (this.hamster?.group.visible && !this.hamsterAction && (this.online || Date.now() >= (this.state.hamsterHiddenUntil ?? 0)) && Math.hypot(this.hamster.group.position.x-px,this.hamster.group.position.z-pz)<1.5)
+    if (this.hamster?.group.visible && !this.hamsterAction && (this.online ? (!this.hamsterWorld || hamsterWorldPose(this.hamsterWorld.world,performance.now()-this.hamsterWorld.received).phase==='idle') : Date.now() >= (this.state.hamsterHiddenUntil ?? 0)) && Math.hypot(this.hamster.group.position.x-px,this.hamster.group.position.z-pz)<1.5)
       return {text:'E — погладить хомяка 🐹',keys:['E'],act:()=>this.petHamster()};
     // аттракционы парка «Ракета»
     {
@@ -2872,11 +2996,14 @@ export class Game {
   issueCityDocument(kind: DocumentKind) {
     const loc = this.state.location;
     if (!loc || this.L.buildings[loc.b]?.kind !== 'cityhall') { this.toast('Документы выдают в мэрии'); return; }
-    const result = issueDocument(this.state.documents ??= {}, kind);
+    if (this.economyLabPaused) { this.toast('Дождитесь восстановления состояния'); return; }
+    const result = purchaseDocument(this.state, kind);
     if (result === 'passport_required') { this.toast('Сначала получите паспорт'); return; }
     if (result === 'already') { this.toast('Документ уже получен'); return; }
+    if (result === 'not_enough') { this.toast('Недостаточно денег'); this.sound.error(); return; }
+    if (result !== 'issued') { this.toast('Не удалось оформить документ'); return; }
     const names = { passport: 'Паспорт', driver: 'Водительская лицензия', weapon: 'Лицензия на оружие' };
-    this.toast(`${names[kind]} получена бесплатно`); this.save();
+    this.sound.coin(); this.toast(`${names[kind]}: оформлено за $${DOCUMENT_PRICES[kind]}`); this.save();
   }
   unitPrice(b: Building, u: number) { return (b.price ?? 12500) + (b.kind === 'apartment' ? u * 700 : 0); }
   // ================= МАГАЗИНЫ / ПРЕДМЕТЫ =================
@@ -4112,7 +4239,7 @@ export class Game {
     const trunk = this.state.vehicles.find(v => v.uid === uid)?.trunk;
     return trunk !== undefined && trunkCount(trunk) !== 0;
   }
-  /** Visual test also remains available online, without storage or synchronization. */
+  /** Cosmetic online animation; inventory transfer is not yet available online. */
   testTrunkCommand() {
     const v = this.nearbyTrunkVehicle();
     if (!v) { this.toast('Подойдите сзади к своей неподвижной машине'); return; }
@@ -4128,7 +4255,7 @@ export class Game {
       this.pa = Math.atan2(v.x - this.px, v.z - this.pz);
       this.trunkHand = { vehicle: v, started: performance.now(), kind };
     } else this.trunkHand = null;
-    this.toast(animation.opening ? (this.online ? 'Тест: крышка открывается. Онлайн-хранение ещё не работает' : 'Багажник открывается. После открытия нажмите E ещё раз') : 'Багажник закрывается');
+    this.toast(animation.opening ? (this.online ? 'Багажник открывается. Онлайн-хранение ещё не работает' : 'Багажник открывается. После открытия нажмите E ещё раз') : 'Багажник закрывается');
   }
   // ================= ЧАТ И КОМАНДЫ =================
   chatLog(): ChatMsg[] { return this.net?.chat ?? this.localChat; }
@@ -4965,7 +5092,7 @@ export class Game {
     this.job = null; this.carrying = false; this.autopilot = false; this.destination = null; this.lying = false; this.fallT = 0;
     if (this.taxi) { this.removeVehicle(this.taxi.v); this.taxi = null; }
     if (this.service) { this.removeVehicle(this.service.v); this.service = null; }
-    this.rental = null; this.emote = null; this.drugT = 0; this.renderer.domElement.style.filter = '';
+    this.rental = null; this.emote = null; this.drugT = 0; this.custodyCar = null; this.renderer.domElement.style.filter = '';
     for (const v of [...this.vehicles]) if (v.owned || (v.role === 'police' && v.sirens)) this.removeVehicle(v);
     if (this.online !== nextOnline) {
       this.hamsterAction = null;
@@ -4982,6 +5109,7 @@ export class Game {
     this.spawnOwnedVehicles(preserveSnapshot);
     this.poiCache = null; this.gpsRoute = null; this.bustT = 0;
     this.restorePosition();
+    this.restoreSoloCustody();
     this.camera.position.set(this.px - Math.sin(this.camYaw) * 5, this.py + 3, this.pz - Math.cos(this.camYaw) * 5);
   }
   enterOnline(nick: string, gender: 'm' | 'f', _fresh = false, allowIntro = false, credentials?: { mode: 'login' | 'register'; password: string; backup?: string }) {
@@ -4997,6 +5125,8 @@ export class Game {
     this.net.onVoiceDisconnect = () => this.voice.stop();
     this.net.onRadios = radios => this.remoteRadios.apply(radios,this.net?.id ?? null);
     this.net.onHamsterSpawn = value => this.applyOnlineHamsterSpawn(value);
+    this.net.onHamsterWorld = value => this.applyOnlineHamsterWorld(value);
+    this.net.onHamsterPetError = error => this.toast(error==='busy'?'🐹 Хомяк уже убегает':error==='too_far'?'🐹 Подойдите ближе к хомяку':'🐹 Не удалось погладить хомяка');
     this.net.onChange = null;
     this.net.onNews = (nm, txt) => this.toast(`📰 СМИ · ${nm}: ${txt}`);
     // объявления на щитах общие: сервер держит их и рассылает всем
@@ -5030,14 +5160,20 @@ export class Game {
       if (!first) return;
       let st: GameState | null = null;
       if (remoteState !== null && remoteState !== undefined) {
-        try { st = migrate(remoteState as Partial<GameState>); } catch { /* damaged save: never overwrite it */ }
-        if (!st) { this.cb.onNetError?.('Серверное сохранение повреждено; оно не перезаписано'); this.net?.close(); return; }
+        try { if (usableOnlineSnapshot(remoteState)) st = migrate(remoteState as Partial<GameState>); } catch { /* damaged save: never overwrite it */ }
+        if (!st) { this.cb.onNetError?.('Серверное сохранение повреждено или несовместимо с этой версией игры; оно не перезаписано'); this.net?.close(); return; }
       } else st = newState(p.gender === 'f' ? 'f' : 'm', this.L.playerSpawn);
       st.nick = p.name || clean;
       if (typeof p.money === 'number' && Number.isFinite(p.money)) { st.money = p.money; st.serverMoney = p.money; }
       this.peds.onlineMode = false; this.removeQuestPeds();
       this.swapState(st, true);
       this.net!.money = st.money;
+      // Удаляем одиночные слоты только после успешного входа и установки
+      // серверного состояния; онлайн-слоты и аккаунты не затрагиваем.
+      if (this.onlineRequired) {
+        try { const r=wipeOfflineSaves(localStorage); if(!r.ok)this.toast('Не удалось удалить все одиночные сохранения на устройстве'); }
+        catch { this.toast('Хранилище браузера недоступно: одиночные сохранения не удалены'); }
+      }
       this.save();
       if (!st.customized) setTimeout(() => { if (this.online && !this.intro) this.openEditor(true); }, 300);
       this.toast(`🌐 Онлайн: ${st.nick}. Прогресс сохраняется на сервере`);
@@ -5129,6 +5265,7 @@ export class Game {
       if (!net.accountSaved) { this.toast('Нет подтверждения сохранения. Проверьте соединение и попробуйте снова'); return; }
     }
     if (!this.online || this.net !== net) return;
+    if (this.onlineRequired) { this.cb.onOnlineExit?.(); return; }
     this.admFreeze = false;
     if (this.rideRemote) this.exitRemoteRide(true);
     this.voice.stop(); this.remoteRadios.clear(); this.net?.close(); this.net = null; this.onlineInitialMoney = null; this.pendingBuy = null; this.socialInvite = null; this.socialSent = null;
@@ -5249,6 +5386,31 @@ export class Game {
         parked.push([o.uid,car.spec.id,color,r2(car.x),r2(car.y),r2(car.z),r2(car.heading),o.sideText]);
       }
       st.vp = parseParkedInscribed(parked);
+      const parkedVehicles:ParkedVehicleVisual[]=[],parkedPlates:ParkedVehiclePlate[]=[];
+      for(const car of this.vehicles){
+        if(parkedVehicles.length>=MAX_PARKED_VEHICLES)break;
+        const o=car.owned;
+        if(!o || car===v || !this.state.vehicles.includes(o) || this.listingOfUid(o.uid))continue;
+        const color='#'+new THREE.Color(car.model.tuning.paint ?? car.model.color).getHexString();
+        const text=['bus','truck','semi'].includes(car.spec.body)&&validVehicleSideText(o.sideText) ? (o.sideText ?? '') : '';
+        parkedVehicles.push([o.uid,car.spec.id,color,r2(car.x),r2(car.y),r2(car.z),r2(car.heading),text]);
+        const plate=normalizePlate(car.model.tuning.plate ?? '') ?? '';
+        parkedPlates.push([o.uid,plate,car.model.tuning.plateFront===false?0:1,car.model.tuning.plateBack===false?0:1]);
+      }
+      st.pv=parseParkedVehicles(parkedVehicles);
+      st.pp=parseParkedPlates(parkedPlates).filter(p=>st.pv!.some(car=>car[0]===p[0]));
+      const trunks:ParkedTrunkVisual[]=[];
+      for(const [car,animation] of this.testTrunks){
+        if(trunks.length>=MAX_PARKED_TRUNKS)break;
+        const o=car.owned;
+        if(!o || car===v || !this.vehicles.includes(car) || !this.state.vehicles.includes(o) || (!animation.opening && animation.elapsed<=0) || !car.model.body.getObjectByName('experimental-trunk-pivot'))continue;
+        const color='#'+new THREE.Color(car.model.tuning.paint ?? car.model.color).getHexString();
+        const text=['bus','truck','semi'].includes(car.spec.body)&&validVehicleSideText(o.sideText) ? (o.sideText ?? '') : '';
+        trunks.push([o.uid,car.spec.id,color,r2(car.x),r2(car.y),r2(car.z),r2(car.heading),Math.min(TRUNK_OPEN_SECONDS[animation.kind],Math.max(0,animation.elapsed)),text]);
+      }
+      st.tr=parseParkedTrunks(trunks);
+      const handId=this.trunkHand?.vehicle.owned?.uid;
+      if(!host && handId && st.tr.some(t=>t[0]===handId))st.th=handId;
       if (v) { st.lean = r2(v.lean); st.wh = r2(v.wheelie); st.steer = r2(v.steer); st.slip = r2(v.slip); st.lt = v.model.lightsOn ? 1 : 0; st.pn = v.model.tuning.plate ?? ''; st.pf = v.model.tuning.plateFront === false ? 0 : 1; st.pb = v.model.tuning.plateBack === false ? 0 : 1; }
       if (!host) { st.p = this.lying ? 'lie' : this.fallT > 0 ? 'fall' : this.netPose.p; st.k = this.netPose.k; st.pt = this.netPose.pt; st.w = Math.max(0, WEAPON_ORDER.indexOf(this.weapon)); if (this.fishT >= 0 && this.player.item === 'rod') st.fish = 1; }
       if (this.crouch && !host) st.cr = 1;
@@ -5279,17 +5441,30 @@ export class Game {
     this.updateRemotes(dt);
     this.voice.tick(dt, net.id, [...this.remotes.values()].map(r => { const distance=Math.hypot(r.x-this.px,r.z-this.pz); return {id:r.id,near:r.ikey===this.interiorKey() && distance<40,distance}; }));
   }
-  private updateParkedInscribed(owner: number, raw: unknown) {
-    const snapshots = parseParkedInscribed(raw);
+  private updateParkedInscribed(owner: number, raw: unknown, rawTrunks?:unknown, rawVehicles?:unknown, rawPlates?:unknown) {
+    const snapshots = new Map<string,ParkedTrunkVisual>();
+    for(const [id,type,color,x,y,z,a,text] of parseParkedInscribed(raw))snapshots.set(id,[id,type,color,x,y,z,a,0,text]);
+    for(const [id,type,color,x,y,z,a,text] of parseParkedVehicles(rawVehicles))snapshots.set(id,[id,type,color,x,y,z,a,0,text]);
+    const plates=new Map(parseParkedPlates(rawPlates).map(p=>[p[0],p]));
+    const trunks=parseParkedTrunks(rawTrunks), trunkIds=new Set(trunks.map(t=>t[0]));
+    // Merge by owner and vehicle id: an inscribed truck with an open trunk must
+    // stay one object rather than overlapping cosmetic duplicates.
+    for(const trunk of trunks)snapshots.set(trunk[0],trunk);
     let cars = this.parkedInscribed.get(owner);
     if (!cars) { cars = new Map(); this.parkedInscribed.set(owner, cars); }
     const seen = new Set<string>();
-    for (const [id,type,color,x,y,z,a,text] of snapshots) {
+    for (const [id,type,color,x,y,z,a,elapsed,text] of snapshots.values()) {
       seen.add(id);
       let car = cars.get(id);
       if (car && (car.spec.id !== type || car.model.color !== color)) { this.removeVehicle(car); cars.delete(id); car = undefined; }
       if (!car) { car = new Vehicle(type, 'remote', color); this.addVehicle(car); cars.set(id,car); }
       car.place(x,z,a,y); car.model.setSideText(text);
+      const plate=plates.get(id), number=plate?.[1] ?? '', front=plate?.[2]===1, back=plate?.[3]===1;
+      if(car.model.tuning.plate!==number || car.model.tuning.plateFront!==front || car.model.tuning.plateBack!==back){
+        car.model.tuning.plate=number;car.model.tuning.plateFront=front;car.model.tuning.plateBack=back;car.model.updatePlate();
+      }
+      if(trunkIds.has(id)){car.model.setExperimentalTrunkAnimation(true);car.model.setExperimentalTrunkElapsed(elapsed);}
+      else car.model.setExperimentalTrunkElapsed(0);
       car.model.group.visible = !this.interior && Math.abs(x-this.px)+Math.abs(z-this.pz)<this.drawDist();
     }
     for (const [id,car] of cars) if (!seen.has(id)) { this.removeVehicle(car); cars.delete(id); }
@@ -5337,7 +5512,7 @@ export class Game {
       const st = p.st && now - p.stT < 15000 ? p.st : null;
       const tx = st ? st.x : p.x, tz = st ? st.z : p.y;
       if (!isFinite(tx) || !isFinite(tz)) continue;
-      this.updateParkedInscribed(p.id, st?.vp ?? []);
+      this.updateParkedInscribed(p.id, st?.vp ?? [], st?.tr ?? [], st?.pv ?? [], st?.pp ?? []);
       const display = p.nick ?? p.name;
       if (!r) {
         const char = new Character(randomLook()); this.scene.add(char.root);
@@ -5455,6 +5630,10 @@ export class Game {
       if (R.flinch > 0 && pose !== 'knock' && pose !== 'fall') { pose = 'flinch'; ph = 1 - R.flinch / 0.35; }
       R.char.pose(pose, now / 1000, ph, st?.pt ?? 0, sp > 0.3 ? 1 : 0);
       applyFishingVisual(R.char, st?.fish === 1 && pose !== 'swim' && pose !== 'tread');
+      const reach=st ? remoteTrunkHandReach(st.tr,st.th,now-p.stT,R.x,R.z,R.ikey,pose) : null;
+      if(reach!==null){R.char.shR.rotation.x=-1.5*reach;R.char.elR.rotation.x=-.5*reach;}
+      const hw=this.hamsterWorld;
+      if(this.net?.sessionReady && hw && remoteHamsterPetActive(hw.world,now-hw.received,R.id,R.ikey,pose)) applyHamsterPetVisual(R.char,Date.now());
       if (pose === 'tread' || pose === 'swim') R.char.blob.visible = false;
       R.char.root.visible = R.visible;
       R.tag.position.set(R.x, R.y + 2.35, R.z); R.tag.visible = R.visible;
@@ -5790,7 +5969,7 @@ export class Game {
     if (u >= 1) this.endIntro();
   }
   skipIntro() { if (this.intro) this.endIntro(); }
-  private endIntro() { this.intro = null; this.camYaw = this.pa; this.cb.onIntroEnd(); this.sound.ensure(); if (!this.state.customized && !this.state.location) setTimeout(() => { if (!this.panel) this.openEditor(true); }, 200); }
+  private endIntro() { this.intro = null; this.camYaw = this.pa; this.cb.onIntroEnd(); this.sound.ensure(); if (!this.onlineRequired && !this.state.customized && !this.state.location) setTimeout(() => { if (!this.panel) this.openEditor(true); }, 200); }
   // ================= HUD =================
   private emitHud(dt: number) {
     this.hudT += dt; if (this.hudT < 0.12) return;
@@ -5823,7 +6002,7 @@ export class Game {
       })(),
       prompt: this.prompt ? (this.prompt.r || this.prompt.l ? 'E — выбрать действие' : this.prompt.text) : null, promptKeys: this.prompt ? (this.prompt.r || this.prompt.l ? ['E'] : this.prompt.keys) : [], location: this.locationName(), job: this.jobText(), taxi: this.taxiText(), inside: !!this.interior,
       weapon: this.weapon, ammo: this.combat.reserve, lying: this.lying, fps: this.fps, intro: !!this.intro, carrying: this.carrying, destination: !!this.destination,
-      online: this.online && this.net ? { status: this.net.status, players: this.net.players.size, id: this.net.id, nick: s.nick ?? '' } : null,
+      online: this.online && this.net ? { status: this.net.status === 'online' && !this.net.sessionReady ? 'reconnecting' : this.net.status, players: this.net.players.size, id: this.net.id, nick: s.nick ?? '' } : null,
       gun: this.combat.armed ? { mag: this.combat.mag, reserve: this.combat.reserve, aiming: this.combat.aiming, spread: this.combat.spread, reloading: this.combat.reloadT > 0, name: WEAPONS[this.weapon]?.name ?? '', ammoName: AMMO_NAMES[WEAPONS[this.weapon]?.ammo ?? 'p'], driveBy: this.combat.driveBy } : null,
       camera: this.camMode ? { ...this.camMode } : null, flash: this.flashT,
       quest: this.questText(), rental: this.rental ? { min: Math.ceil(this.rental.paid / SCOOTER_RATE), cost: this.rental.paid } : null, trip: this.drugT > 0 ? Math.min(1, this.drugT / 6) : 0,
@@ -5878,10 +6057,10 @@ export class Game {
   }
   // ================= СОХРАНЕНИЕ =================
   save() {
-    if (this.economyLabPaused || !this.state) return;
+    if (this.economyLabPaused || !this.state || (this.onlineRequired && !this.online)) return;
     const s = this.state;
     if (!this.interior) { const p = this.playerWorldPos(); s.pos = { x: p.x, z: p.z, a: p.a }; }
-    for (const v of this.vehicles) if (v.owned) { v.owned.pos = { x: v.x, z: v.z, a: v.heading }; v.owned.condition = v.condition; v.owned.fuel = v.fuel; v.owned.mileage = Math.round(v.mileage); v.owned.missing = v.model.missingParts(); }
+    for (const v of this.vehicles) if (v.owned) { v.owned.pos = { x: v.x, z: v.z, a: v.heading, ...(Number.isFinite(v.y) && v.y>=-100 && v.y<=1000 ? {y:v.y} : {}) }; v.owned.condition = v.condition; v.owned.fuel = v.fuel; v.owned.mileage = Math.round(v.mileage); v.owned.missing = v.model.missingParts(); }
     saveState(s, this.online, s.nick);
     if (this.online) this.net?.saveAccount(s);
   }

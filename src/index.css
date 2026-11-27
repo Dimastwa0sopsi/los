@@ -1324,3 +1324,12 @@ button.tb-card:hover { background: rgba(255,255,255,.09); } button.tb-card:activ
 .trunk-columns section { min-width:0; background:rgba(255,255,255,.035); border:1px solid var(--line2); border-radius:12px; padding:10px; }
 .trunk-columns h3 { font-weight:800; margin-bottom:8px; }.trunk-columns .lg-list { max-height:300px; overflow-y:auto; }
 @media(max-width:640px) { .trunk-columns { grid-template-columns:1fr; }.trunk-columns .lg-list { max-height:180px; } }
+
+/* Поиск по каталогу автосалона: компактно и с крупными полями на телефоне. */
+.dealer-filters { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)) auto auto; align-items:end; gap:8px; margin:12px 0 6px; }
+.dealer-filters label { display:flex; flex-direction:column; gap:4px; color:var(--mut); font-size:12px; font-weight:650; min-width:0; }
+.dealer-filters .lg-input { min-height:42px; padding:9px 10px; font-size:15px; letter-spacing:normal; }
+.dealer-filters select option { color:#111827; background:#fff; }
+.dealer-filters .lg-btn { min-height:42px; }
+.dealer-result, .dealer-empty { color:var(--mut); font-size:13px; margin:8px 0; }
+@media(max-width:800px) { .dealer-filters { grid-template-columns:repeat(2,minmax(0,1fr)); } .dealer-filters label:first-child { grid-column:1/-1; } }

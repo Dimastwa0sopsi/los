@@ -1,0 +1,15 @@
+import {strict as assert} from 'node:assert';
+import {remoteHamsterPetActive,applyHamsterPetVisual} from '../src/game/hamsterPetVisual';
+import type {HamsterWorld} from '../src/game/hamsterOnlineWorld';
+const world:HamsterWorld={version:1,seq:2,x:10,z:5,serverTime:1000,event:{petter:42,start:1000,returnAt:123300,dx:1,dz:0}};
+assert(remoteHamsterPetActive(world,0,42,'','idle'));
+assert(remoteHamsterPetActive(world,899,42,'','idle'));
+assert(!remoteHamsterPetActive(world,900,42,'','idle'));
+assert(!remoteHamsterPetActive(world,0,43,'','idle'));
+assert(!remoteHamsterPetActive(world,0,42,'1:2','idle'));
+assert(!remoteHamsterPetActive(world,0,42,'','swim'));
+assert(!remoteHamsterPetActive(null,0,42,'','idle'));
+const part=()=>({rotation:{x:0}});const ch={torso:part(),shR:part(),elR:part()} as any;
+applyHamsterPetVisual(ch,0);assert.equal(ch.torso.rotation.x,.34);assert.equal(ch.shR.rotation.x,-1.15);assert.equal(ch.elR.rotation.x,-.45);
+applyHamsterPetVisual(ch,Math.PI*60);assert(Math.abs(ch.shR.rotation.x+1.03)<1e-10);
+console.log('✓ другие игроки: анимация поглаживания только у нужного персонажа и только в нужной фазе');

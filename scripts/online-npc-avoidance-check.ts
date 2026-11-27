@@ -1,0 +1,11 @@
+import './domstub';
+import {strict as assert} from 'node:assert';
+import {Game} from '../src/game/game';
+const g=Object.create(Game.prototype) as any;
+const remote=(x:number,ikey='',opts:object={})=>({x,z:0,ikey,visible:true,inVeh:false,hp:100,...opts});
+Object.assign(g,{online:true,px:0,pz:0,interior:null,state:{location:null},remotes:new Map([[1,remote(8)],[2,remote(9,'12::')],[3,remote(10,'',{inVeh:true})],[4,remote(11,'',{visible:false})],[5,remote(12,'',{hp:0})]]),peds:{onlineMode:false,peds:[{x:2,z:0,kind:'city',state:'walk',active:true}]},L:{},vehicles:[],rng:{next:()=>0.5},col:{}});
+assert.deepEqual(g.nearbyRemotePedestrians(),[{x:8,z:0}]);
+assert.deepEqual(g.aiCtx().pedestrians,[{x:2,z:0},{x:8,z:0}], 'местные NPC онлайн и пешие игроки учитываются водителями');
+g.online=false;assert.deepEqual(g.nearbyRemotePedestrians(),[]);
+g.online=true;g.interior={};g.state.location={b:12};assert.deepEqual(g.nearbyRemotePedestrians(),[{x:9,z:0}]);assert.deepEqual(g.aiCtx().pedestrians,[]);
+console.log('✓ онлайн-уклонение: учитываются видимые игроки пешком в том же пространстве и местные NPC');

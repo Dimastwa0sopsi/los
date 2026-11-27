@@ -5,7 +5,7 @@ import { type JoinLaunch } from './ui/OnlineJoin';
 import { AuthScreen } from './ui/AuthScreen';
 import { loadSettings, saveSettings, type Settings } from './game/config';
 import { hasSave, resetSave } from './game/state';
-import { currentAccount, flushAccountSave } from './game/accounts';
+
 
 type Screen = 'start' | 'game';
 const NICK_KEY = 'losgorod_nick';
@@ -34,8 +34,6 @@ export default function App() {
     setScreen('game');
   };
   const toMenu = () => {
-    const acc = currentAccount();
-    if (acc) flushAccountSave(acc.login);   // прогресс остаётся в слоте аккаунта
     setSaveExists(hasSave()); setScreen('start');
   };
 

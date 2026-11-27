@@ -29,6 +29,7 @@ const { createAuctionStore } = require('./auction-store.cjs');
 const { readKioskOwners } = require('./business-owners.cjs');
 const { createRadioRegistry } = require('./radio-sync.cjs');
 const { hamsterSpawn } = require('./hamster-spawn.cjs');
+const { createHamsterWorld } = require('./hamster-world.cjs');
 const { cleanVehicleStateMessage } = require('./vehicle-side-text.cjs');
 const radioRegistry = createRadioRegistry();
 
@@ -43,6 +44,9 @@ db.pragma('journal_mode = WAL');
 // база лежит на Google Drive: записи бывают медленными — ждём блокировку, а не падаем
 db.pragma('busy_timeout = 8000');
 db.pragma('synchronous = NORMAL');
+let hamsterWorld=null;
+try { hamsterWorld=createHamsterWorld(hamsterSpawn(),db); }
+catch (e) { console.error('[hamster] shared state disabled:',e.message); }
 const accounts = createAccountStore(db);
 // Только просмотр лотов; денежные операции пока не подключены к сети.
 const auctions = createAuctionStore(db);
@@ -1241,7 +1245,9 @@ wss.on('connection', (ws) => {
       radioRegistry.remove(row.id);
       me = row; active.set(row.id, { ws, row }); ws.playerId = row.id;
       console.log(`[login] ${row.name} вошёл (онлайн: ${active.size})`);
-      send(ws, { type: 'login_success', hamster: hamsterSpawn(), accountState: account.state, accountRevision: account.revision, accountSaveId: account.saveId, caps: { state: 1, peds: 1, adm: 1, relay: 1, accounts: 1, saveIds: 1, voice: 1, radio: 1 }, player: {
+      let hamsterSnapshot=null;
+      try { hamsterSnapshot=hamsterWorld?.snapshot() ?? null; } catch (e) { console.error('[hamster] state unavailable:',e.message); }
+      send(ws, { type: 'login_success', hamster: hamsterSpawn(), hamsterWorld: hamsterSnapshot, accountState: account.state, accountRevision: account.revision, accountSaveId: account.saveId, caps: { state: 1, peds: 1, adm: 1, relay: 1, accounts: 1, saveIds: 1, voice: 1, radio: 1, fullPlayers: 1, hamsterWorld: hamsterSnapshot ? 1 : 0 }, player: {
         id: row.id, name: row.name, gender: row.gender, money: row.money,
         x: row.pos_x, z: row.pos_z, rot: row.pos_rot, number: row.car_number, carNumber: row.car_number,
       } });
@@ -1252,6 +1258,20 @@ wss.on('connection', (ws) => {
 
     if (!me || active.get(me.id)?.ws !== ws) return;
     const row = me;
+
+    // Только общая анимация, без выплат: координаты движения пока поступают от клиента.
+    if (m.type === 'hamster_pet') {
+      const now=Date.now();
+      if (ws.hamsterPetAt && now-ws.hamsterPetAt<1000) return;
+      ws.hamsterPetAt=now;
+      if (!hamsterWorld) { send(ws,{type:'hamster_pet_result',ok:false,error:'storage'}); return; }
+      let result;
+      try { result=hamsterWorld.pet(row.id,{x:row.pos_x,z:row.pos_z},now); }
+      catch (e) { console.error('[hamster] failed to save event:',e.message); send(ws,{type:'hamster_pet_result',ok:false,error:'storage'}); return; }
+      if (!result.ok) { send(ws,{type:'hamster_pet_result',ok:false,error:result.error}); return; }
+      for (const player of active.values()) send(player.ws,{type:'hamster_world',world:result.world});
+      return;
+    }
 
     // Voice signaling is routed only to the target; never broadcast SDP/ICE.
     // Both browsers opt in and independently check proximity. This is not a
