@@ -123,7 +123,7 @@ export function GameView({ settings, newGame, gender, nick = '', mode = 'solo', 
             game.enterOnline(l.nick, l.gender, false, false, l.credentials);
           }} />
       )}
-      {game && panel && panel.type === 'radio' && <RadioPanel g={game} close={close} />}
+      {game && panel && panel.type === 'radio' && <RadioPanel g={game} close={close} listenOnly={!!panel.listenOnly} />}
       {game && panel && panel.type === 'trade' && <TradePanel g={game} />}
       {game && panel && panel.type === 'tradeInvite' && <TradeInvite g={game} close={close} />}
       {game && panel && panel.type === 'passport' && <Passport g={game} close={close} />}

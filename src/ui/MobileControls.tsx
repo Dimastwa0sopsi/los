@@ -201,6 +201,7 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
       { ico: '📜', label: 'Сюжет', on: () => g.openPanel({ type: 'quest' }) },
       { ico: '🎟️', label: 'Промокод', on: () => g.openPanel({ type: 'promo' }) },
       { ico: '📱', label: 'Телефон', on: () => g.openPanel({ type: 'phone' }) },
+      { ico: '🎵', label: 'Музыка рядом', on: () => g.openNearbyRadio() },
       { ico: '❓', label: 'Как играть?', on: () => g.openPanel({ type: 'help' }) },
       { ico: '⚙️', label: 'Настройки', on: () => g.openPanel({ type: 'settings' }) },
     ],

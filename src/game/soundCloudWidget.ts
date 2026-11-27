@@ -4,6 +4,12 @@ type Widget = { bind(event:string, cb:()=>void):void; play():void; pause():void;
 type SoundCloudApi = { Widget: ((iframe:HTMLIFrameElement)=>Widget) & {Events:{READY:string;PLAY:string;PAUSE:string;FINISH:string;ERROR:string}} };
 declare global { interface Window { SC?: SoundCloudApi } }
 let loading: Promise<SoundCloudApi> | null = null;
+export function setSoundCloudMobile(mobile:boolean) { document.body.classList.toggle('soundcloud-mobile',mobile); }
+function playerHost():HTMLElement {
+  let host=document.getElementById('soundcloud-player-host');
+  if(!host){host=document.createElement('div');host.id='soundcloud-player-host';host.className='soundcloud-host';document.body.appendChild(host);}
+  return host;
+}
 function loadApi(): Promise<SoundCloudApi> {
   if (window.SC?.Widget) return Promise.resolve(window.SC);
   if (loading) return loading;
@@ -30,7 +36,7 @@ export class SoundCloudWidget {
     this.destroy(); const generation=++this.generation;
     this.volume=Math.max(0,Math.min(1,volume));
     const frame=document.createElement('iframe'); frame.src=embed; frame.title='SoundCloud';
-    frame.allow='autoplay'; frame.className='soundcloud-widget' + (this.remoteSlot>=0 ? ` soundcloud-remote-${this.remoteSlot}` : ''); document.body.appendChild(frame); this.frame=frame;
+    frame.allow='autoplay'; frame.className='soundcloud-widget' + (this.remoteSlot>=0 ? ` soundcloud-remote-${this.remoteSlot}` : ''); playerHost().appendChild(frame); this.frame=frame;
     try {
       const api=await loadApi(); if (generation!==this.generation) return;
       const widget=api.Widget(frame); this.widget=widget;

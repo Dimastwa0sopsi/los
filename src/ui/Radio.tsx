@@ -1,96 +1,50 @@
-import { useEffect, useRef, useState } from 'react';
-import type { Game } from '../game/game';
-import type { RadioStation } from '../game/radio';
+import {useEffect, useState} from 'react';
+import type {Game} from '../game/game';
+import type {RadioStation} from '../game/radio';
+import {normalizeRadioFavorites, RADIO_FAVORITES_KEY, RADIO_FAVORITES_LIMIT} from '../game/radioFavorites';
 
-const FAV_KEY = 'losgorod_radio_fav';
-
-function loadFav(): RadioStation[] {
-  try { const raw = localStorage.getItem(FAV_KEY); if (raw) return JSON.parse(raw) as RadioStation[]; } catch { /* */ }
-  return [];
+function loadFavorites():RadioStation[]{
+  try{return normalizeRadioFavorites(JSON.parse(localStorage.getItem(RADIO_FAVORITES_KEY) || '[]'));}catch{return [];}
 }
-
-/** Радио в машине (T): поиск станции по слову + свои волны по ссылке. */
-export function RadioPanel({ g, close }: { g: Game; close: () => void }) {
-  const radio = g.radio;
-  const [q, setQ] = useState('');
-  const [url, setUrl] = useState('');
-  const [list, setList] = useState<RadioStation[]>(radio.list);
-  const [vol, setVol] = useState(Math.round(radio.volume * 100));
-  const [insideVol, setInsideVol] = useState(Math.round(radio.insideVolume * 100));
-  const [, tick] = useState(0);
-  const [fav, setFav] = useState<RadioStation[]>(loadFav);
-  const scroller = useRef<HTMLDivElement | null>(null);
-  useEffect(() => { radio.onChange = () => tick((x) => x + 1); return () => { radio.onChange = null; }; }, [radio]);
-  const st = radio.state();
-  const search = async (text?: string) => {
-    const res = await radio.search(text ?? q);
-    setList(res);
-    scroller.current?.scrollTo(0, 0);
+export function RadioPanel({g,close,listenOnly=false}:{g:Game;close:()=>void;listenOnly?:boolean}) {
+  const radio=g.radio;
+  const [url,setUrl]=useState('');
+  const [vol,setVol]=useState(Math.round(radio.volume*100));
+  const [insideVol,setInsideVol]=useState(Math.round(radio.insideVolume*100));
+  const [favorites,setFavorites]=useState<RadioStation[]>(loadFavorites);
+  const [message,setMessage]=useState('');
+  const [,tick]=useState(0);
+  useEffect(()=>{radio.onChange=()=>tick(x=>x+1);document.body.classList.add('radio-panel-open');return()=>{radio.onChange=null;document.body.classList.remove('radio-panel-open');};},[radio]);
+  const st=radio.state();
+  const persist=(next:RadioStation[])=>{
+    try{localStorage.setItem(RADIO_FAVORITES_KEY,JSON.stringify(next));setFavorites(next);setMessage('');}
+    catch{setMessage('Не удалось сохранить песни на этом устройстве');}
   };
-  const favToggle = (s: RadioStation) => {
-    const has = fav.some((f) => f.url === s.url);
-    const next = has ? fav.filter((f) => f.url !== s.url) : [...fav, s].slice(-30);
-    setFav(next);
-    try { localStorage.setItem(FAV_KEY, JSON.stringify(next)); } catch { /* */ }
+  const toggleFavorite=(s:RadioStation)=>{
+    if(favorites.some(f=>f.url===s.url)){persist(favorites.filter(f=>f.url!==s.url));return;}
+    if(favorites.length>=RADIO_FAVORITES_LIMIT){setMessage('Можно сохранить не больше 20 песен');return;}
+    const slug=s.url.split('/').filter(Boolean).pop() || 'SoundCloud';
+    persist(normalizeRadioFavorites([...favorites,{...s,name:s.name==='SoundCloud'?slug.replace(/[-_]/g,' '):s.name}]));
   };
-  const isFav = (s: RadioStation) => fav.some((f) => f.url === s.url);
-  const playUrl = () => { radio.playUrl(url); setList([...radio.list]); };
-  const playStation = (s: RadioStation) => { if (radio.station?.url === s.url && radio.playing) radio.pause(); else if (radio.station?.url === s.url) radio.resume(); else radio.play(s); };
-  const stop = (e: React.KeyboardEvent) => e.stopPropagation();
-  return (
-    <div className="rd-back" onPointerDown={(e) => e.stopPropagation()}>
-      <div className="rd">
-        <div className="rd-top">
-          <b>📻 Радио</b>
-          <span className={`rd-dot ${st.playing ? 'on' : ''}`} />
-          <span className="rd-now">{st.station ? st.station.name : 'волна не выбрана'}</span>
-          <button className="rd-x" onClick={close} aria-label="Закрыть">✕</button>
+  const playFavorite=(s:RadioStation)=>{radio.list=[...favorites];if(radio.station?.url===s.url&&radio.playing)radio.pause();else if(radio.station?.url===s.url)radio.resume();else radio.play(s);};
+  const stop=(e:React.KeyboardEvent)=>e.stopPropagation();
+  return <div className="rd-back" onPointerDown={e=>e.stopPropagation()}><div className="rd">
+    <div className="rd-top"><b>🎵 Музыка</b><span className={`rd-dot ${st.playing?'on':''}`}/><span className="rd-now">{listenOnly?'Радио рядом':st.station?.name || 'трек не выбран'}</span><button className="rd-x" onClick={close} aria-label="Закрыть">✕</button></div>
+    <div className="rd-widget-space">Плеер SoundCloud появится здесь</div>
+    <div className="rd-content">
+      {listenOnly ? <p className="rd-foot">Здесь видны плееры музыки рядом. Если звук не начался, нажмите ▶ в плеере. Включить свою музыку можно в машине или на домашнем компьютере.</p> : <>
+        <div className="rd-ctl"><button className="ui-btn sm" onClick={()=>radio.next(-1)}>⏮</button><button className="ui-btn sm main" onClick={()=>radio.toggle()}>{st.playing?'⏸':'▶'}</button><button className="ui-btn sm" onClick={()=>radio.next(1)}>⏭</button><button className="ui-btn sm ghost" onClick={()=>radio.stop()}>■</button><button className="ui-btn sm" disabled={!st.station} onClick={()=>st.station&&toggleFavorite(st.station)}>{st.station&&favorites.some(f=>f.url===st.station!.url)?'❤️ В избранном':'🤍 В избранное'}</button></div>
+        <label className="rd-volume"><span>🔊 Снаружи</span><input className="rd-vol" type="range" min={0} max={100} value={vol} onKeyDown={stop} onChange={e=>{const v=+e.target.value;setVol(v);radio.setVolume(v/100);}}/><span>{vol}%</span></label>
+        <label className="rd-volume"><span>🚗 Внутри</span><input className="rd-vol" type="range" min={0} max={100} value={insideVol} onKeyDown={stop} onChange={e=>{const v=+e.target.value;setInsideVol(v);radio.setInsideVolume(v/100);}}/><span>{insideVol}%</span></label>
+        <div className="rd-search"><input className="ui-input" value={url} placeholder="Ссылка на трек SoundCloud" onKeyDown={stop} onChange={e=>setUrl(e.target.value)} onKeyUp={e=>{if(e.key==='Enter')radio.playUrl(url);}}/><button className="ui-btn" onClick={()=>radio.playUrl(url)}>Включить</button></div>
+        {st.error&&<p className="rd-err">{st.error}</p>}{message&&<p className="rd-err">{message}</p>}
+        <div className="rd-list"><div className="rd-cap">❤️ Любимые песни · {favorites.length}/{RADIO_FAVORITES_LIMIT}</div>
+          {favorites.map(s=><div key={s.url} className={`rd-row ${st.station?.url===s.url?'on':''}`}><button className="rd-play" onClick={()=>playFavorite(s)}>{st.station?.url===s.url&&st.playing?'⏸':'▶'}</button><div className="rd-meta" onClick={()=>playFavorite(s)}><b>{s.name}</b><small>SoundCloud</small></div><button className="rd-star on" aria-label="Удалить из любимых" onClick={()=>toggleFavorite(s)}>❤️</button></div>)}
+          {!favorites.length&&<p className="rd-foot">Включите песню по ссылке и нажмите «В избранное».</p>}
         </div>
-        <div className="rd-ctl">
-          <button className="ui-btn sm" onClick={() => radio.next(-1)}>⏮</button>
-          <button className="ui-btn sm main" onClick={() => radio.toggle()}>{st.playing ? '⏸' : '▶'}</button>
-          <button className="ui-btn sm" onClick={() => radio.next(1)}>⏭</button>
-          <button className="ui-btn sm ghost" onClick={() => radio.stop()}>■</button>
-        </div>
-        <label className="rd-volume"><span>🔊 Снаружи</span><input className="rd-vol" type="range" min={0} max={100} value={vol} onKeyDown={stop}
-          onChange={(e) => { const v = +e.target.value; setVol(v); radio.setVolume(v / 100); }} /><span>{vol}%</span></label>
-        <label className="rd-volume"><span>🚗 В салоне</span><input className="rd-vol" type="range" min={0} max={100} value={insideVol} onKeyDown={stop}
-          onChange={(e) => { const v = +e.target.value; setInsideVol(v); radio.setInsideVolume(v / 100); }} /><span>{insideVol}%</span></label>
-        <div className="rd-search">
-          <input className="ui-input" value={q} placeholder="Что включить: record, jazz, самара, 101…" onKeyDown={stop}
-            onChange={(e) => setQ(e.target.value)} onKeyUp={(e) => { if (e.key === 'Enter') void search(); }} />
-          <button className="ui-btn main" disabled={radio.loading} onClick={() => void search()}>{radio.loading ? '…' : 'Найти'}</button>
-        </div>
-        <div className="rd-search">
-          <input className="ui-input" value={url} placeholder="Ссылка SoundCloud или https-потока" onKeyDown={stop}
-            onChange={(e) => setUrl(e.target.value)} onKeyUp={(e) => { if (e.key === 'Enter') playUrl(); }} />
-          <button className="ui-btn" onClick={playUrl}>Включить</button>
-        </div>
-        {st.error && <p className="rd-err">{st.error}</p>}
-        <div className="rd-list" ref={scroller}>
-          {fav.length > 0 && <div className="rd-cap">Мои волны</div>}
-          {fav.map((s) => (
-            <div key={'f' + s.id} className={`rd-row ${st.station?.url === s.url ? 'on' : ''}`}>
-              <button className="rd-play" onClick={() => playStation(s)}>{st.station?.url === s.url && st.playing ? '⏸' : '▶'}</button>
-              <div className="rd-meta" onClick={() => playStation(s)}><b>{s.name}</b><small>{s.genre || 'моя волна'}</small></div>
-              <button className="rd-star on" onClick={() => favToggle(s)}>★</button>
-            </div>
-          ))}
-          <div className="rd-cap">{q ? `Поиск: ${q}` : 'Станции'}</div>
-          {list.map((s) => (
-            <div key={s.id} className={`rd-row ${st.station?.url === s.url ? 'on' : ''}`}>
-              <button className="rd-play" onClick={() => playStation(s)}>{st.station?.url === s.url && st.playing ? '⏸' : '▶'}</button>
-              <div className="rd-meta" onClick={() => playStation(s)}>
-                <b>{s.name}</b><small>{[s.genre, s.country].filter(Boolean).join(' · ')}</small>
-              </div>
-              <button className={`rd-star ${isFav(s) ? 'on' : ''}`} onClick={() => favToggle(s)}>★</button>
-            </div>
-          ))}
-          {!list.length && !radio.loading && <p className="rd-err">Ничего не нашлось — попробуйте другое слово.</p>}
-        </div>
-        <p className="rd-foot">Музыка идёт из машины или домашнего компьютера и затихает на расстоянии. В онлайне передаются ссылки SoundCloud; другие станции пока слышны только вам. Если браузер не разрешил запуск, нажмите ▶ в плеере SoundCloud.</p>
-        {g.online && !g.net?.radioSupported && <p className="rd-err">Для музыки другим игрокам нужно обновить и перезапустить сервер Colab.</p>}
-      </div>
+        <p className="rd-foot">Любимые песни хранятся на этом устройстве. В машине без сабвуфера максимальная громкость — 70%, с сабвуфером — 100%. Если звука нет, нажмите ▶ в плеере SoundCloud.</p>
+        {g.online&&!g.net?.radioSupported&&<p className="rd-err">Для музыки другим игрокам нужно обновить и перезапустить сервер Colab.</p>}
+      </>}
     </div>
-  );
+  </div></div>;
 }

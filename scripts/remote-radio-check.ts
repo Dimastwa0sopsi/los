@@ -7,7 +7,7 @@ const factory=Object.assign((_frame:unknown)=>{
   return {bind:(event:string,cb:()=>void)=>{p.callbacks[event]=cb;},play:()=>{p.played++;},pause:()=>{},setVolume:(v:number)=>{p.volume=v;},seekTo:(v:number)=>{p.seek=v;},getPosition:(cb:(v:number)=>void)=>cb(p.seek)};
 },{Events:{READY:'ready',PLAY:'play',PAUSE:'pause',FINISH:'finish',ERROR:'error'}});
 (globalThis as any).window={SC:{Widget:factory}};
-(globalThis as any).document={createElement:()=>{const p={callbacks:{},volume:-1,seek:-1,played:0,removed:false};instances.push(p);return {remove:()=>{p.removed=true;}};},body:{appendChild:()=>{}}};
+(globalThis as any).document={getElementById:()=>({appendChild:()=>{}}),createElement:()=>{const p={callbacks:{},volume:-1,seek:-1,played:0,removed:false};instances.push(p);return {remove:()=>{p.removed=true;}};},body:{appendChild:()=>{}}};
 (async()=>{
  const remote=new RemoteRadios();
  const s:NetworkRadio={owner:2,kind:'vehicle',url:'https://soundcloud.com/artist/song',x:10,z:10,buildingId:null,exteriorX:10,exteriorZ:10,position:5000,outside:.8,inside:.4,playing:true,updatedAt:Date.now()};

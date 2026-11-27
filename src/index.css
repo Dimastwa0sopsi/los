@@ -953,11 +953,16 @@ button.tb-card:hover { background: rgba(255,255,255,.09); } button.tb-card:activ
 .rd-star.on { color: #fbbf24; }
 .rd-err { margin: 2px 0; font-size: 12px; color: #fca5a5; }
 .rd-foot { margin: 0; font-size: 11px; color: #64748b; text-align: center; }
-.soundcloud-widget { position: fixed; right: 8px; bottom: 8px; width: min(310px, 70vw); height: 100px; border: 0; border-radius: 10px; z-index: 80; background: #fff; }
-.soundcloud-remote-0 { top: 8px; bottom: auto; }
-.soundcloud-remote-1 { top: 112px; bottom: auto; }
-.soundcloud-remote-2 { top: 216px; bottom: auto; }
-@media (max-height: 450px) { .soundcloud-widget { width: min(240px, 48vw); height: 86px; } .soundcloud-remote-1 { top: 98px; } .soundcloud-remote-2 { top: 188px; } }
+.soundcloud-host { position: fixed; left: 50%; bottom: 8px; transform: translateX(-50%); width: min(310px, 70vw); max-height: min(320px, 45vh); overflow-y: auto; z-index: 80; }
+.soundcloud-widget { display: block; width: 100%; height: 100px; border: 0; border-radius: 10px; background: #fff; margin-top: 4px; }
+.rd-widget-space { display: none; }
+.rd-content { display: flex; flex-direction: column; gap: 8px; min-height: 0; flex: 1; }
+.soundcloud-mobile .soundcloud-host { opacity: 0; pointer-events: none; }
+.soundcloud-mobile.radio-panel-open .soundcloud-host { opacity: 1; pointer-events: auto; top: calc((100vh - min(86vh, 640px)) / 2 + 46px); bottom: auto; width: min(432px, calc(100vw - 52px)); max-height: 100px; }
+.soundcloud-mobile .rd { height: min(86vh, 640px); box-sizing: border-box; }
+.soundcloud-mobile .rd-widget-space { display: grid; place-items: center; flex: none; height: 100px; color: #64748b; background: #0a0f19; border-radius: 10px; font-size: 11px; }
+.soundcloud-mobile .rd-content { overflow-y: auto; }
+@media (max-height: 450px) { .soundcloud-widget { height: 86px; } .soundcloud-mobile.radio-panel-open .soundcloud-host { max-height: 86px; } .soundcloud-mobile .rd-widget-space { height: 86px; } }
 
 /* гардероб в инвентаре */
 .ward { margin: 6px 0 10px; }

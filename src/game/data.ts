@@ -262,6 +262,8 @@ export const TRAFFIC_WEIGHTS = [5, 5, 5, 4, 3, 3, 2, 2, 2, 2, 3, 2, 2, 2, 0.6, 1
 export interface Tuning {
   paint?: string; tint: number; turbo: number; engine: number; rims: number; spoiler: boolean;
   clearance: number; chrome: boolean; neon: string | null; lights: string;
+  /** Сабвуфер установлен в этой машине. */
+  subwoofer?: boolean;
   /** радужные фары (переливаются всеми цветами) */
   rainbow?: boolean;
   /** государственный номер X000XX 00 */
@@ -271,7 +273,7 @@ export interface Tuning {
   kit?: string | null;
 }
 export const defaultTuning = (): Tuning => ({ tint: 0, turbo: 0, engine: 0, rims: 0, spoiler: false, clearance: 0, chrome: false, neon: null, lights: '#fff8e0', rainbow: false, plate: undefined, kit: null });
-export const TUNE_PRICES = { paint: 800, tint: 300, turbo: 4500, engine: 3000, rims: 1200, spoiler: 900, clearance: 500, chrome: 1500, neon: 1100, lights: 400 };
+export const TUNE_PRICES = { paint: 800, tint: 300, turbo: 4500, engine: 3000, rims: 1200, spoiler: 900, clearance: 500, chrome: 1500, neon: 1100, lights: 400, subwoofer: 1500 };
 export const PAINT_COLORS = ['#d50000', '#ff6d00', '#ffd600', '#00c853', '#00b8d4', '#2962ff', '#6200ea', '#c51162', '#ffffff', '#9e9e9e', '#212121', '#795548', '#1b5e20', '#0d47a1'];
 export const NEON_COLORS = ['#00e5ff', '#ff00e5', '#76ff03', '#ff1744', '#ffea00', '#ffffff'];
 export const LIGHT_COLORS = ['#fff8e0', '#cfe8ff', '#7fb2ff', '#ffd27f', '#c084fc'];
@@ -328,6 +330,7 @@ export const TUNE_CATALOG: TuneItem[] = [
   _tune('engine3', 'Двигатель III', 'perf', 11000, { engine: 3 }, '⚙️'),
   _tune('ecu', 'Прошивка ECU', 'perf', 5200, { engine: 1, turbo: 1 }, '💻'),
   _tune('weight', 'Облегчение кузова', 'perf', 4800, { clearance: -1, chrome: false }, '🪶'),
+  _tune('subwoofer', 'Сабвуфер · громкость 100%', 'style', TUNE_PRICES.subwoofer, { subwoofer: true }, '🔊'),
   _tune('chrome_pack', 'Хром-пакет', 'style', 1500, { chrome: true }, '✨'),
   _tune('wrap_matte', 'Матовая плёнка', 'style', 3600, { paint: '#2b2b2b' }, '🎨'),
   _tune('wrap_gloss', 'Глянцевая плёнка', 'style', 3600, { paint: '#f8fafc' }, '🎨'),

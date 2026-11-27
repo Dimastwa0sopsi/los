@@ -1,0 +1,11 @@
+import './domstub';
+import {strict as assert} from 'node:assert';
+import {Game} from '../src/game/game';
+const g=Object.create(Game.prototype) as any;
+const sent:any[]=[];const net={ready:true,radioSupported:true,requestRadios:()=>{},sendRadio:(m:unknown)=>sent.push(m)};
+const car={x:7,z:9,owned:{tuning:{subwoofer:false}}};const station={url:'https://soundcloud.com/artist/song'};
+g.net=net;g.online=true;g.radioSource={kind:'vehicle',vehicle:car};g.radio={station,playing:true,volume:1,insideVolume:.5,getPosition:(cb:(n:number)=>void)=>cb(1000)};
+g.syncRadio();assert.equal(sent[0].outside,.7);assert.equal(sent[0].inside,.35);
+car.owned.tuning.subwoofer=true;g.syncRadio();assert.equal(sent[1].outside,1);assert.equal(sent[1].inside,.5);
+g.radioSource={kind:'computer',place:{kind:'computer',x:1,z:2,buildingId:7,exteriorX:9,exteriorZ:9}};g.syncRadio();assert.equal(sent[2].outside,1);assert.equal(sent[2].inside,.5);
+console.log('✓ сабвуфер: 70%/100% на сетевом источнике, ПК не ограничен');
