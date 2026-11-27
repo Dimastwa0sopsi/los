@@ -155,6 +155,7 @@ export interface PlayersListEntry {
   number?: string | null;
 }
 interface LegacyPlayer { x?: number; y?: number; z?: number; color?: string; name?: string; gender?: string; rot?: number }
+export interface NetworkRadio { owner:number; kind:'vehicle'|'computer'; url:string; x:number; z:number; buildingId:number|null; exteriorX:number; exteriorZ:number; position:number; outside:number; inside:number; playing:boolean; updatedAt:number }
 interface Msg {
   type?: string; id?: number; name?: string; nick?: string; text?: string; gender?: string;
   money?: number; player?: ServerPlayer;
@@ -166,7 +167,8 @@ interface Msg {
   /** авторизация онлайна: токен устройства и пароль-подсказка */
   token?: string; pass?: string;
   /** что умеет сервер (наш сервер пересылает §-протокол и умеет админ-команды) */
-  caps?: { state?: number; peds?: number; adm?: number; relay?: number; accounts?: number; saveIds?: number; voice?: number };
+  caps?: { state?: number; peds?: number; adm?: number; relay?: number; accounts?: number; saveIds?: number; voice?: number; radio?: number };
+  radios?: unknown;
   /** реклама на щитах: полный список от сервера и ответ на покупку */
   ads?: Record<string, RemoteAd>; ok?: boolean; error?: string;
   from?: number; signal?: VoiceSignal;
@@ -295,6 +297,8 @@ export class NetClient {
   onChange: (() => void) | null = null;
   onEvent: ((from: number, ev: NetEvent) => void) | null = null;
   voiceSupported = false;
+  radioSupported = false;
+  onRadios: ((radios:NetworkRadio[])=>void) | null = null;
   onVoice: ((from:number, signal:VoiceSignal)=>void) | null = null;
   onVoiceDisconnect: (()=>void) | null = null;
   onPeds: ((from: number, list: number[][], vehs: (string | number)[][]) => void) | null = null;
@@ -388,7 +392,7 @@ export class NetClient {
     ws.onclose = () => {
       if (this.ws !== ws) return;
       window.clearTimeout(this.connectTimer);
-      this.onVoiceDisconnect?.(); this.voiceSupported=false;
+      this.onVoiceDisconnect?.(); this.voiceSupported=false; this.radioSupported=false; this.onRadios?.([]);
       this.ws = null; this.id = null; this.authenticated = false; this.lastSaveMoney = NaN; this.auction = null; this.kioskOwners = null; this.kioskOwnersRequested = 0;
       if (this.dead || !this.want) { this.status = 'offline'; this.onChange?.(); return; }
       this.fail();
@@ -444,6 +448,9 @@ export class NetClient {
       case 'login_success':
         if (!this.handshake || !m.caps?.accounts || !Number.isSafeInteger(m.accountRevision)) { this.die('Сервер не поддерживает безопасные аккаунты'); return; }
         this.onLoginSuccess(m, now); return;
+      case 'radio_list':
+        if (this.authenticated && this.radioSupported && Array.isArray(m.radios)) this.onRadios?.(m.radios.slice(0,128) as NetworkRadio[]);
+        return;
       case 'voice_signal':
         if (this.authenticated && this.voiceSupported && Number.isSafeInteger(m.from) && m.signal && typeof m.signal==='object') this.onVoice?.(m.from!, m.signal);
         return;
@@ -527,6 +534,7 @@ export class NetClient {
     this.probeSent = false;
     this.saveIds = m.caps?.saveIds === 1;
     this.voiceSupported = m.caps?.voice === 1;
+    this.radioSupported = m.caps?.radio === 1;
     const next = m.accountRevision!;
     if (this.loggedOnce && this.revision !== null) {
       const expected = this.flight?.revision ?? this.revision;
@@ -695,6 +703,9 @@ export class NetClient {
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
     try { ws.send(JSON.stringify(o)); } catch { /* сокет закрылся */ }
   }
+
+  sendRadio(radio:unknown) { if(this.authenticated && this.radioSupported) this.send({type:'radio_update',radio}); }
+  requestRadios() { if(this.authenticated && this.radioSupported) this.send({type:'radio_list'}); }
 
   private lastSaveMoney = NaN;
   /** {type:'save', money} — держим серверный баланс в актуальном состоянии (только при изменениях) */

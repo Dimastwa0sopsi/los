@@ -88,7 +88,8 @@ export function RadioPanel({ g, close }: { g: Game; close: () => void }) {
           ))}
           {!list.length && !radio.loading && <p className="rd-err">Ничего не нашлось — попробуйте другое слово.</p>}
         </div>
-        <p className="rd-foot">Музыка идёт из машины или домашнего компьютера и затихает на расстоянии. SoundCloud: при необходимости нажмите ▶ в его плеере.</p>
+        <p className="rd-foot">Музыка идёт из машины или домашнего компьютера и затихает на расстоянии. В онлайне передаются ссылки SoundCloud; другие станции пока слышны только вам. Если браузер не разрешил запуск, нажмите ▶ в плеере SoundCloud.</p>
+        {g.online && !g.net?.radioSupported && <p className="rd-err">Для музыки другим игрокам нужно обновить и перезапустить сервер Colab.</p>}
       </div>
     </div>
   );

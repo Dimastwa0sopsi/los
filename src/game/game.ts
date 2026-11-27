@@ -32,7 +32,8 @@ import { eyeSees, recognitionEye, POLICE_EYE, PED_EYE, type Eye } from './police
 import { Radio } from './radio';
 import { hamsterSpot, makeHamster } from './hamster';
 import { nextImmersion } from './vehicleSinking';
-import { radioGain, type RadioPlace } from './radioSpatial';
+import { radioGain, soundCloudUrl, type RadioPlace } from './radioSpatial';
+import { RemoteRadios } from './remoteRadio';
 import { allMaterials, disposeTextures, mat, GFX, getTex } from './textures';
 import { T, M } from './geom';
 import { LIMITED, limitedAvailable, CROPS, EMOTES, SCOOTER_RATE, HYDRO_PRICE, WEAPONS, WEAPON_ORDER, AMMO_NAMES, ITEMS, VEHICLES, TRAFFIC_TYPES, TRAFFIC_WEIGHTS, KIOSK_TYPES, KIOSK_PERIOD, KIOSK_MAX_PERIODS, SHOP_ITEMS, randomPlate, plateKey, type ShopKind, type Look, type Tuning, defaultTuning, TUNE_PRICES, TUNE_CATALOG, HAIR_STYLES, TOPS, BOTTOMS, BAR_DRINKS } from './data';
@@ -262,6 +263,8 @@ export class Game {
   /** радио в машине (T) */
   radio = new Radio();
   private radioSource: {kind:'vehicle'; vehicle:Vehicle} | {kind:'computer'; place: Extract<RadioPlace,{kind:'computer'}>} | null = null;
+  private remoteRadios = new RemoteRadios(() => this.toast('📻 Рядом играет радио. Если звука нет, нажмите ▶ в плеере SoundCloud'));
+  private radioNetTimer = 0;
   /** дрифт-ассист для телефона: одна кнопка держит ручник и обостряет руль */
   driftAssist = false;
   /** подсказка про гидравлику показана только один раз за сессию */
@@ -735,6 +738,19 @@ export class Game {
     if (this.radioSource?.kind !== 'vehicle' || this.radioSource.vehicle !== v) { this.radio.stop(); this.radioSource={kind:'vehicle',vehicle:v}; }
     this.openPanel({type:'radio'});
   }
+  private syncRadio() {
+    const net=this.net;
+    if(!this.online || !net?.ready || !net.radioSupported) return;
+    net.requestRadios();
+    const source=this.radioSource, station=this.radio.station;
+    if(!source || !station || !soundCloudUrl(station.url) || !this.radio.playing){net.sendRadio({stop:true});return;}
+    const radio=this.radio;
+    radio.getPosition(position=>{
+      if(this.net!==net || this.radioSource!==source || this.radio.station!==station || !radio.playing)return;
+      const place=source.kind==='vehicle'?{kind:'vehicle',x:source.vehicle.x,z:source.vehicle.z}:source.place;
+      net.sendRadio({...place,url:station.url,position,outside:radio.volume,inside:radio.insideVolume,playing:true});
+    });
+  }
   openComputerRadio() {
     const id=this.state.location?.b, building=id===undefined ? undefined : this.L.buildings[id];
     if (!this.interior || !building) { this.toast('📻 Откройте домашний компьютер'); return; }
@@ -804,6 +820,10 @@ export class Game {
         this.radio.setOutputVolume(radioGain(place,listener,this.radio.volume,this.radio.insideVolume));
       }
     }
+    const radioListener={x:this.px,z:this.pz,buildingId:this.interior ? this.state.location?.b ?? null : null,vehicleId:null};
+    this.remoteRadios.update(radioListener,this.rideRemote?.id ?? null);
+    this.radioNetTimer+=dt;
+    if(this.radioNetTimer>=2){this.radioNetTimer=0;this.syncRadio();}
     this.rides?.update(dt);
     this.ads?.update();
     if (this.rideOn) this.updateRide(dt);
@@ -4797,6 +4817,7 @@ export class Game {
     this.net.onEvent = (from, ev) => this.handleNetEvent(from, ev);
     this.net.onVoice = (from, signal) => { if (this.net?.id !== null && this.net?.id !== undefined) void this.voice.receive(this.net.id,from,signal); };
     this.net.onVoiceDisconnect = () => this.voice.stop();
+    this.net.onRadios = radios => this.remoteRadios.apply(radios,this.net?.id ?? null);
     this.net.onChange = null;
     this.net.onNews = (nm, txt) => this.toast(`📰 СМИ · ${nm}: ${txt}`);
     // объявления на щитах общие: сервер держит их и рассылает всем
@@ -4931,7 +4952,7 @@ export class Game {
     if (!this.online || this.net !== net) return;
     this.admFreeze = false;
     if (this.rideRemote) this.exitRemoteRide(true);
-    this.voice.stop(); this.net?.close(); this.net = null; this.onlineInitialMoney = null; this.pendingBuy = null; this.socialInvite = null; this.socialSent = null;
+    this.voice.stop(); this.remoteRadios.clear(); this.net?.close(); this.net = null; this.onlineInitialMoney = null; this.pendingBuy = null; this.socialInvite = null; this.socialSent = null;
     for (const r of this.remotes.values()) this.disposeRemote(r);
     this.remotes.clear(); this.peds.clearPuppets(); this.removeCarPuppets(); this.peds.onlineMode = false; this.trade = null; this.tradeInvite = null;
     const solo = loadState(false) ?? newState(this.state.look.gender, this.L.playerSpawn);
@@ -5794,7 +5815,7 @@ export class Game {
     cancelAnimationFrame(this.raf);
     this.net?.close(); this.net = null;
     try { this.save(); } catch { /* */ }
-    this.input?.dispose(); this.sound.dispose(); this.radio.dispose(); this.resizeObs?.();
+    this.input?.dispose(); this.sound.dispose(); this.radio.dispose(); this.remoteRadios.clear(); this.resizeObs?.();
     this.interior?.dispose();
     this.scene.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh && m.geometry && !Object.values(T).includes(m.geometry as never)) m.geometry.dispose(); });
     disposeTextures();

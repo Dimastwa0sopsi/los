@@ -27,6 +27,8 @@ const { createAdsStore, AD_TTL } = require('./ads.cjs');
 const { createAccountStore, normalizeLogin } = require('./account-store.cjs');
 const { createAuctionStore } = require('./auction-store.cjs');
 const { readKioskOwners } = require('./business-owners.cjs');
+const { createRadioRegistry } = require('./radio-sync.cjs');
+const radioRegistry = createRadioRegistry();
 
 const BUILD = (() => {
   try { return crypto.createHash('sha1').update(fs.readFileSync(__filename)).digest('hex').slice(0, 12); }
@@ -575,13 +577,14 @@ function banAction(a, notify) {
   q.ban.run(reason, a.name);
   db.prepare('UPDATE players SET banned_until = ? WHERE name = ?').run(until, a.name);
   const on = liveOf(a.name);
-  if (on) { if (notify) send(on.ws, { type: 'error', text: 'Вы забанены: ' + reason }); try { on.ws.close(); } catch { /* */ } active.delete(on.row.id); pushPlayers(); }
+  if (on) { if (notify) send(on.ws, { type: 'error', text: 'Вы забанены: ' + reason }); try { on.ws.close(); } catch { /* */ } radioRegistry.remove(on.row.id); active.delete(on.row.id); pushPlayers(); }
   return { ok: true, message: `${a.name} забанен (${reason})` };
 }
 function kickPlayer(name, text) {
   const on = liveOf(name); if (!on) return false;
   send(on.ws, { type: 'error', text });
   try { on.ws.close(); } catch { /* */ }
+  radioRegistry.remove(on.row.id);
   active.delete(on.row.id);
   pushPlayers();
   return true;
@@ -1233,9 +1236,10 @@ wss.on('connection', (ws) => {
         active.delete(busy.row.id);
       }
       // деньги — только серверные: локальный сейв клиента в онлайн не переносится
+      radioRegistry.remove(row.id);
       me = row; active.set(row.id, { ws, row }); ws.playerId = row.id;
       console.log(`[login] ${row.name} вошёл (онлайн: ${active.size})`);
-      send(ws, { type: 'login_success', accountState: account.state, accountRevision: account.revision, accountSaveId: account.saveId, caps: { state: 1, peds: 1, adm: 1, relay: 1, accounts: 1, saveIds: 1, voice: 1 }, player: {
+      send(ws, { type: 'login_success', accountState: account.state, accountRevision: account.revision, accountSaveId: account.saveId, caps: { state: 1, peds: 1, adm: 1, relay: 1, accounts: 1, saveIds: 1, voice: 1, radio: 1 }, player: {
         id: row.id, name: row.name, gender: row.gender, money: row.money,
         x: row.pos_x, z: row.pos_z, rot: row.pos_rot, number: row.car_number, carNumber: row.car_number,
       } });
@@ -1259,6 +1263,21 @@ wss.on('connection', (ws) => {
       const target=active.get(m.to); if(!target) return;
       if(kind!=='bye' && Math.hypot(row.pos_x-target.row.pos_x,row.pos_z-target.row.pos_z)>55) return;
       send(target.ws,{type:'voice_signal',from:row.id,signal}); return;
+    }
+
+    if (m.type === 'radio_update') {
+      const now = Date.now();
+      if (now - (ws.radioUpdateAt || 0) < 300) return;
+      ws.radioUpdateAt = now;
+      radioRegistry.update(row.id, m.radio, now);
+      return;
+    }
+    if (m.type === 'radio_list') {
+      const now = Date.now();
+      if (now - (ws.radioListAt || 0) < 500) return;
+      ws.radioListAt = now;
+      send(ws, { type: 'radio_list', radios: radioRegistry.snapshot(now), serverTime: now });
+      return;
     }
 
     if (m.type === 'kiosk_owners') {
@@ -1360,6 +1379,7 @@ wss.on('connection', (ws) => {
   ws.on('close', () => {
     // удаляем только свою запись: иначе закрытие старого сокета снимало новую сессию того же игрока
     if (ws.playerId && active.get(ws.playerId)?.ws === ws) {
+      radioRegistry.remove(ws.playerId);
       active.delete(ws.playerId); pushPlayers();
       console.log(`[logout] ${ws.playerId} (онлайн: ${active.size})`);
     }

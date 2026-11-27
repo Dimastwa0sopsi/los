@@ -24,17 +24,17 @@ export class SoundCloudWidget {
   private volume = 0.7;
   private ready = false;
   private pendingSeek: number | null = null;
-  constructor(private onPlaying:(playing:boolean)=>void,private onError:(message:string)=>void,private onReady:()=>void=()=>{}) {}
+  constructor(private onPlaying:(playing:boolean)=>void,private onError:(message:string)=>void,private onReady:()=>void=()=>{},private autoPlay=true,private remoteSlot=-1) {}
   async open(url:string,volume:number) {
     const embed=soundCloudEmbed(url); if (!embed) { this.onError('Нужна публичная ссылка SoundCloud на трек или плейлист'); return; }
     this.destroy(); const generation=++this.generation;
     this.volume=Math.max(0,Math.min(1,volume));
     const frame=document.createElement('iframe'); frame.src=embed; frame.title='SoundCloud';
-    frame.allow='autoplay'; frame.className='soundcloud-widget'; document.body.appendChild(frame); this.frame=frame;
+    frame.allow='autoplay'; frame.className='soundcloud-widget' + (this.remoteSlot>=0 ? ` soundcloud-remote-${this.remoteSlot}` : ''); document.body.appendChild(frame); this.frame=frame;
     try {
       const api=await loadApi(); if (generation!==this.generation) return;
       const widget=api.Widget(frame); this.widget=widget;
-      widget.bind(api.Widget.Events.READY,()=>{if(generation!==this.generation)return;this.ready=true;widget.setVolume(Math.round(this.volume*100));if(this.pendingSeek!==null){widget.seekTo(this.pendingSeek);this.pendingSeek=null;}this.onReady();widget.play();});
+      widget.bind(api.Widget.Events.READY,()=>{if(generation!==this.generation)return;this.ready=true;widget.setVolume(Math.round(this.volume*100));if(this.pendingSeek!==null){widget.seekTo(this.pendingSeek);this.pendingSeek=null;}this.onReady();if(this.autoPlay)widget.play();});
       widget.bind(api.Widget.Events.PLAY,()=>{if(generation===this.generation)this.onPlaying(true);});
       widget.bind(api.Widget.Events.PAUSE,()=>{if(generation===this.generation)this.onPlaying(false);});
       widget.bind(api.Widget.Events.FINISH,()=>{if(generation===this.generation)this.onPlaying(false);});

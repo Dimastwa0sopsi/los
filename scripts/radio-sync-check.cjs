@@ -1,0 +1,12 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {createRadioRegistry,trackUrl,TTL}=require('../server/radio-sync.cjs');
+const r=createRadioRegistry(), url='https://soundcloud.com/rudikk/emoslut666-miniyubka?utm_source=clipboard';
+assert.equal(trackUrl(url),'https://soundcloud.com/rudikk/emoslut666-miniyubka');
+for (const bad of ['https://evil.test/a/b','https://soundcloud.com/a/b?secret_token=s-x','https://soundcloud.com/a/b/s-secret','http://soundcloud.com/a/b']) assert.equal(trackUrl(bad),null);
+const m={url,kind:'vehicle',x:10,z:20,position:1200,outside:.8,inside:.5,playing:true};
+assert.equal(r.update(1,m,1000),true); assert.equal(r.snapshot(1500)[0].position,1700);
+assert.equal(r.update(2,{...m,outside:Infinity},2000),false); assert.equal(r.update(2,{...m,kind:'computer'},2000),false);
+assert.equal(r.snapshot(1000+TTL+1).length,0);r.update(1,{...m,playing:false},20000); assert.equal(r.snapshot(21000)[0].position,1200);
+r.remove(1);assert.equal(r.snapshot(21000).length,0);
+console.log('✓ сетевое состояние радио: URL, проверка данных, время, пауза, отключение и срок жизни');
