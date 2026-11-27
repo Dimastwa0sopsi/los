@@ -7,8 +7,9 @@ export const TRUNK_OPEN_SECONDS={hinged:1.15,rollup:2.2} as const;
 
 /** Unsupported vehicles deliberately have neither a trunk nor an opening animation. */
 export function trunkMotionKind(body:BodyKind,variant?:string):TrunkMotionKind|null {
-  if (body==='moto' || body==='scooter' || body==='quad' || body==='heli' || body==='combine' || body==='bus') return null;
-  if (body==='truck' || body==='semi') return variant==='tank' || variant==='flat' ? null : 'rollup';
+  if (body==='moto' || body==='scooter' || body==='quad' || body==='heli' || body==='combine') return null;
+  if (body==='bus') return 'hinged';
+  if (body==='truck' || body==='semi') return variant==='tank' || variant==='flat' ? 'hinged' : 'rollup';
   if (body==='sedan' || body==='sport' || body==='hatch' || body==='suv' || body==='van' || body==='pickup') return 'hinged';
   return null;
 }
@@ -20,8 +21,10 @@ export function trunkMotionPose(kind:TrunkMotionKind,elapsed:number):TrunkMotion
   const position=smooth(p);
   if(kind==='rollup') {
     // The hand reaches upwards during the initial pull, releases before the door reaches the top.
-    const arm=p<.5?smooth(p/.5):1-smooth((p-.5)/.28);
-    return {progress:p,lidAngle:0,lidLift:position,armReach:arm};
+    const arm=p<.22?smooth(p/.22):1-smooth((p-.22)/.25);
+    // Сначала потянуть дверь рукой; после отпускания она поднимается сама.
+    const lift=smooth((p-.2)/.8);
+    return {progress:p,lidAngle:0,lidLift:lift,armReach:arm};
   }
   const arm=p<.65?smooth(p/.65):1-smooth((p-.65)/.3);
   return {progress:p,lidAngle:position===0?0:1.25*position,lidLift:0,armReach:arm};

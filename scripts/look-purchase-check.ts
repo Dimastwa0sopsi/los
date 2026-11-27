@@ -1,0 +1,15 @@
+import './domstub';
+import { strict as assert } from 'node:assert';
+import { Game } from '../src/game/game';
+import { newState } from '../src/game/state';
+const state = newState('m', {x:0,z:0,a:0});
+const g = Object.create(Game.prototype) as any;
+let saves=0; let preview:any; let allow=false;
+Object.assign(g,{state,player:{setLook:(l:any)=>preview=l},addWardrobe:()=>{},toast:()=>{},save:()=>{saves++},pay:()=>allow});
+const face={...state.look,eyes:'#abcdef'};
+assert.equal(g.buyLook(face),true); assert.equal(state.look.eyes,'#abcdef'); assert.equal(preview.eyes,'#abcdef'); assert.equal(saves,1);
+const shoes={...state.look,shoes:state.look.shoes === '#ffffff' ? '#111111' : '#ffffff'};
+assert.equal(g.buyLook(shoes),false); assert.notEqual(state.look.shoes,shoes.shoes); assert.equal(saves,1);
+allow=true; assert.equal(g.buyLook(shoes),true); assert.equal(state.look.shoes,shoes.shoes); assert.equal(saves,2);
+assert.equal(g.buyLook({...state.look}),true); assert.equal(saves,2);
+console.log('✓ примерочная: бесплатное лицо сохраняется, отказ оплаты не меняет образ, покупка применяется');

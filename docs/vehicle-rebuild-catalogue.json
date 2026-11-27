@@ -1,0 +1,712 @@
+{
+  "note": "Запрошенный каталог; ещё не подключён к игре. Цена указана пользователем в рублях.",
+  "vehicles": [
+    {
+      "name": "Lada Classic 2107",
+      "speedKmh": 140,
+      "brakingPercent": 45,
+      "price": 20000,
+      "category": "Седан"
+    },
+    {
+      "name": "Lada Granta",
+      "speedKmh": 160,
+      "brakingPercent": 50,
+      "price": 35000,
+      "category": "Седан"
+    },
+    {
+      "name": "Renault Logan",
+      "speedKmh": 165,
+      "brakingPercent": 55,
+      "price": 40000,
+      "category": "Седан"
+    },
+    {
+      "name": "Hyundai Solaris",
+      "speedKmh": 175,
+      "brakingPercent": 60,
+      "price": 55000,
+      "category": "Седан"
+    },
+    {
+      "name": "VW Polo",
+      "speedKmh": 180,
+      "brakingPercent": 65,
+      "price": 60000,
+      "category": "Седан"
+    },
+    {
+      "name": "Kia Rio",
+      "speedKmh": 180,
+      "brakingPercent": 62,
+      "price": 62000,
+      "category": "Седан"
+    },
+    {
+      "name": "Lada Vesta",
+      "speedKmh": 185,
+      "brakingPercent": 68,
+      "price": 75000,
+      "category": "Седан"
+    },
+    {
+      "name": "Skoda Octavia",
+      "speedKmh": 190,
+      "brakingPercent": 70,
+      "price": 90000,
+      "category": "Седан"
+    },
+    {
+      "name": "Toyota Camry",
+      "speedKmh": 200,
+      "brakingPercent": 75,
+      "price": 150000,
+      "category": "Седан"
+    },
+    {
+      "name": "Ford Mondeo",
+      "speedKmh": 195,
+      "brakingPercent": 72,
+      "price": 130000,
+      "category": "Седан"
+    },
+    {
+      "name": "Niva 4x4",
+      "speedKmh": 130,
+      "brakingPercent": 60,
+      "price": 45000,
+      "category": "Внедорожник"
+    },
+    {
+      "name": "UAZ Patriot",
+      "speedKmh": 140,
+      "brakingPercent": 55,
+      "price": 65000,
+      "category": "Внедорожник"
+    },
+    {
+      "name": "Renault Duster",
+      "speedKmh": 170,
+      "brakingPercent": 70,
+      "price": 80000,
+      "category": "Кроссовер"
+    },
+    {
+      "name": "Haval Jolion",
+      "speedKmh": 180,
+      "brakingPercent": 72,
+      "price": 100000,
+      "category": "Кроссовер"
+    },
+    {
+      "name": "Chery Tiggo",
+      "speedKmh": 185,
+      "brakingPercent": 74,
+      "price": 115000,
+      "category": "Кроссовер"
+    },
+    {
+      "name": "Toyota RAV4",
+      "speedKmh": 190,
+      "brakingPercent": 78,
+      "price": 160000,
+      "category": "Кроссовер"
+    },
+    {
+      "name": "Kia Sportage",
+      "speedKmh": 195,
+      "brakingPercent": 80,
+      "price": 175000,
+      "category": "Кроссовер"
+    },
+    {
+      "name": "VW Tiguan",
+      "speedKmh": 200,
+      "brakingPercent": 82,
+      "price": 190000,
+      "category": "Кроссовер"
+    },
+    {
+      "name": "BMW X5",
+      "speedKmh": 220,
+      "brakingPercent": 85,
+      "price": 350000,
+      "category": "Внедорожник"
+    },
+    {
+      "name": "Mercedes G-Class",
+      "speedKmh": 210,
+      "brakingPercent": 80,
+      "price": 400000,
+      "category": "Внедорожник"
+    },
+    {
+      "name": "Lada Largus",
+      "speedKmh": 155,
+      "brakingPercent": 55,
+      "price": 50000,
+      "category": "Минивэн"
+    },
+    {
+      "name": "Gazelle Next",
+      "speedKmh": 130,
+      "brakingPercent": 50,
+      "price": 70000,
+      "category": "Минивэн"
+    },
+    {
+      "name": "VW Transporter",
+      "speedKmh": 170,
+      "brakingPercent": 65,
+      "price": 110000,
+      "category": "Минивэн"
+    },
+    {
+      "name": "Toyota Hiace",
+      "speedKmh": 160,
+      "brakingPercent": 60,
+      "price": 120000,
+      "category": "Минивэн"
+    },
+    {
+      "name": "Ford Transit",
+      "speedKmh": 150,
+      "brakingPercent": 58,
+      "price": 95000,
+      "category": "Минивэн"
+    },
+    {
+      "name": "Mitsubishi L200",
+      "speedKmh": 175,
+      "brakingPercent": 70,
+      "price": 140000,
+      "category": "Пикап"
+    },
+    {
+      "name": "Toyota Hilux",
+      "speedKmh": 180,
+      "brakingPercent": 75,
+      "price": 180000,
+      "category": "Пикап"
+    },
+    {
+      "name": "Ford F-150",
+      "speedKmh": 190,
+      "brakingPercent": 72,
+      "price": 220000,
+      "category": "Пикап"
+    },
+    {
+      "name": "Dodge RAM",
+      "speedKmh": 185,
+      "brakingPercent": 70,
+      "price": 250000,
+      "category": "Пикап"
+    },
+    {
+      "name": "Tesla Cybertruck",
+      "speedKmh": 200,
+      "brakingPercent": 85,
+      "price": 300000,
+      "category": "Пикап"
+    },
+    {
+      "name": "Mazda RX-7",
+      "speedKmh": 240,
+      "brakingPercent": 80,
+      "price": 250000,
+      "category": "Спорткар"
+    },
+    {
+      "name": "Nissan Silvia S15",
+      "speedKmh": 235,
+      "brakingPercent": 82,
+      "price": 260000,
+      "category": "Спорткар"
+    },
+    {
+      "name": "Toyota Supra",
+      "speedKmh": 250,
+      "brakingPercent": 85,
+      "price": 300000,
+      "category": "Спорткар"
+    },
+    {
+      "name": "Nissan Skyline R34",
+      "speedKmh": 260,
+      "brakingPercent": 88,
+      "price": 350000,
+      "category": "Спорткар"
+    },
+    {
+      "name": "Subaru Impreza WRX",
+      "speedKmh": 245,
+      "brakingPercent": 84,
+      "price": 280000,
+      "category": "Спорткар"
+    },
+    {
+      "name": "Mitsubishi Lancer Evo",
+      "speedKmh": 250,
+      "brakingPercent": 86,
+      "price": 290000,
+      "category": "Спорткар"
+    },
+    {
+      "name": "Honda Civic Type R",
+      "speedKmh": 240,
+      "brakingPercent": 83,
+      "price": 270000,
+      "category": "Спорткар"
+    },
+    {
+      "name": "BMW M3",
+      "speedKmh": 270,
+      "brakingPercent": 90,
+      "price": 400000,
+      "category": "Спорткар"
+    },
+    {
+      "name": "Audi RS6",
+      "speedKmh": 280,
+      "brakingPercent": 92,
+      "price": 450000,
+      "category": "Спорткар"
+    },
+    {
+      "name": "Mercedes AMG GT",
+      "speedKmh": 290,
+      "brakingPercent": 93,
+      "price": 500000,
+      "category": "Спорткар"
+    },
+    {
+      "name": "Ford Mustang GT",
+      "speedKmh": 260,
+      "brakingPercent": 85,
+      "price": 380000,
+      "category": "Маслкар"
+    },
+    {
+      "name": "Chevrolet Camaro SS",
+      "speedKmh": 265,
+      "brakingPercent": 86,
+      "price": 390000,
+      "category": "Маслкар"
+    },
+    {
+      "name": "Dodge Challenger",
+      "speedKmh": 270,
+      "brakingPercent": 84,
+      "price": 410000,
+      "category": "Маслкар"
+    },
+    {
+      "name": "Chevrolet Corvette C8",
+      "speedKmh": 300,
+      "brakingPercent": 94,
+      "price": 600000,
+      "category": "Суперкар"
+    },
+    {
+      "name": "Nissan GT-R R35",
+      "speedKmh": 315,
+      "brakingPercent": 95,
+      "price": 700000,
+      "category": "Суперкар"
+    },
+    {
+      "name": "Porsche 911 Turbo",
+      "speedKmh": 320,
+      "brakingPercent": 96,
+      "price": 850000,
+      "category": "Суперкар"
+    },
+    {
+      "name": "Audi R8 V10",
+      "speedKmh": 325,
+      "brakingPercent": 95,
+      "price": 900000,
+      "category": "Суперкар"
+    },
+    {
+      "name": "Lamborghini Huracan",
+      "speedKmh": 330,
+      "brakingPercent": 97,
+      "price": 1200000,
+      "category": "Суперкар"
+    },
+    {
+      "name": "Ferrari F8 Tributo",
+      "speedKmh": 335,
+      "brakingPercent": 97,
+      "price": 1300000,
+      "category": "Суперкар"
+    },
+    {
+      "name": "McLaren 720S",
+      "speedKmh": 340,
+      "brakingPercent": 98,
+      "price": 1400000,
+      "category": "Суперкар"
+    },
+    {
+      "name": "Lamborghini Aventador",
+      "speedKmh": 350,
+      "brakingPercent": 98,
+      "price": 1800000,
+      "category": "Гиперкар"
+    },
+    {
+      "name": "Bugatti Chiron",
+      "speedKmh": 420,
+      "brakingPercent": 99,
+      "price": 3500000,
+      "category": "Гиперкар"
+    },
+    {
+      "name": "Koenigsegg Jesko",
+      "speedKmh": 440,
+      "brakingPercent": 99,
+      "price": 4000000,
+      "category": "Гиперкар"
+    },
+    {
+      "name": "Pagani Huayra",
+      "speedKmh": 380,
+      "brakingPercent": 98,
+      "price": 3000000,
+      "category": "Гиперкар"
+    },
+    {
+      "name": "Ferrari LaFerrari",
+      "speedKmh": 360,
+      "brakingPercent": 99,
+      "price": 2500000,
+      "category": "Гиперкар"
+    },
+    {
+      "name": "Porsche 918 Spyder",
+      "speedKmh": 345,
+      "brakingPercent": 98,
+      "price": 2200000,
+      "category": "Гиперкар"
+    },
+    {
+      "name": "McLaren P1",
+      "speedKmh": 350,
+      "brakingPercent": 98,
+      "price": 2300000,
+      "category": "Гиперкар"
+    },
+    {
+      "name": "Aston Martin Valkyrie",
+      "speedKmh": 400,
+      "brakingPercent": 99,
+      "price": 3200000,
+      "category": "Гиперкар"
+    },
+    {
+      "name": "SSC Tuatara",
+      "speedKmh": 450,
+      "brakingPercent": 99,
+      "price": 3800000,
+      "category": "Гиперкар"
+    },
+    {
+      "name": "Hennessey Venom F5",
+      "speedKmh": 460,
+      "brakingPercent": 99,
+      "price": 4500000,
+      "category": "Гиперкар"
+    },
+    {
+      "name": "Rimac Nevera (Электро)",
+      "speedKmh": 410,
+      "brakingPercent": 99,
+      "price": 3600000,
+      "category": "Гиперкар"
+    },
+    {
+      "name": "Lada 2101 (Ретро)",
+      "speedKmh": 120,
+      "brakingPercent": 40,
+      "price": 15000,
+      "category": "Ретро"
+    },
+    {
+      "name": "ГАЗ-21 Волга",
+      "speedKmh": 130,
+      "brakingPercent": 45,
+      "price": 25000,
+      "category": "Ретро"
+    },
+    {
+      "name": "ГАЗ-24 Волга",
+      "speedKmh": 140,
+      "brakingPercent": 50,
+      "price": 35000,
+      "category": "Ретро"
+    },
+    {
+      "name": "Москвич 412",
+      "speedKmh": 125,
+      "brakingPercent": 42,
+      "price": 18000,
+      "category": "Ретро"
+    },
+    {
+      "name": "ВАЗ 2106",
+      "speedKmh": 135,
+      "brakingPercent": 45,
+      "price": 22000,
+      "category": "Ретро"
+    },
+    {
+      "name": "Ford Model T (Винтаж)",
+      "speedKmh": 80,
+      "brakingPercent": 30,
+      "price": 50000,
+      "category": "Ретро"
+    },
+    {
+      "name": "VW Beetle (Жук)",
+      "speedKmh": 110,
+      "brakingPercent": 40,
+      "price": 40000,
+      "category": "Ретро"
+    },
+    {
+      "name": "Mini Cooper Classic",
+      "speedKmh": 130,
+      "brakingPercent": 55,
+      "price": 45000,
+      "category": "Ретро"
+    },
+    {
+      "name": "Chevrolet Bel Air",
+      "speedKmh": 150,
+      "brakingPercent": 50,
+      "price": 80000,
+      "category": "Ретро"
+    },
+    {
+      "name": "Cadillac Eldorado",
+      "speedKmh": 160,
+      "brakingPercent": 55,
+      "price": 100000,
+      "category": "Ретро"
+    },
+    {
+      "name": "Toyota Corolla AE86",
+      "speedKmh": 200,
+      "brakingPercent": 78,
+      "price": 180000,
+      "category": "Дрифт (Ретро)"
+    },
+    {
+      "name": "Nissan 180SX",
+      "speedKmh": 220,
+      "brakingPercent": 80,
+      "price": 200000,
+      "category": "Дрифт"
+    },
+    {
+      "name": "Mazda MX-5 Miata",
+      "speedKmh": 210,
+      "brakingPercent": 82,
+      "price": 160000,
+      "category": "Родстер"
+    },
+    {
+      "name": "BMW E30",
+      "speedKmh": 210,
+      "brakingPercent": 80,
+      "price": 190000,
+      "category": "Седан (Ретро)"
+    },
+    {
+      "name": "Mercedes 190E",
+      "speedKmh": 215,
+      "brakingPercent": 82,
+      "price": 210000,
+      "category": "Седан (Ретро)"
+    },
+    {
+      "name": "Honda NSX (Старая)",
+      "speedKmh": 270,
+      "brakingPercent": 88,
+      "price": 350000,
+      "category": "Суперкар (Ретро)"
+    },
+    {
+      "name": "Toyota MR2",
+      "speedKmh": 230,
+      "brakingPercent": 84,
+      "price": 220000,
+      "category": "Спорткар"
+    },
+    {
+      "name": "Porsche 944",
+      "speedKmh": 240,
+      "brakingPercent": 85,
+      "price": 280000,
+      "category": "Спорткар"
+    },
+    {
+      "name": "Lotus Elise",
+      "speedKmh": 250,
+      "brakingPercent": 90,
+      "price": 320000,
+      "category": "Спорткар"
+    },
+    {
+      "name": "Alfa Romeo Giulia",
+      "speedKmh": 260,
+      "brakingPercent": 88,
+      "price": 340000,
+      "category": "Спорткар"
+    },
+    {
+      "name": "Yamaha YZF-R1 (Мото)",
+      "speedKmh": 299,
+      "brakingPercent": 85,
+      "price": 450000,
+      "category": "Мотоцикл"
+    },
+    {
+      "name": "Kawasaki Ninja H2 (Мото)",
+      "speedKmh": 330,
+      "brakingPercent": 88,
+      "price": 800000,
+      "category": "Мотоцикл"
+    },
+    {
+      "name": "Suzuki Hayabusa (Мото)",
+      "speedKmh": 312,
+      "brakingPercent": 86,
+      "price": 600000,
+      "category": "Мотоцикл"
+    },
+    {
+      "name": "Honda CBR1000RR (Мото)",
+      "speedKmh": 290,
+      "brakingPercent": 84,
+      "price": 400000,
+      "category": "Мотоцикл"
+    },
+    {
+      "name": "Ducati Panigale (Мото)",
+      "speedKmh": 310,
+      "brakingPercent": 87,
+      "price": 700000,
+      "category": "Мотоцикл"
+    },
+    {
+      "name": "Harley-Davidson (Круизер)",
+      "speedKmh": 200,
+      "brakingPercent": 70,
+      "price": 350000,
+      "category": "Мотоцикл"
+    },
+    {
+      "name": "BMW S1000RR (Мото)",
+      "speedKmh": 305,
+      "brakingPercent": 86,
+      "price": 550000,
+      "category": "Мотоцикл"
+    },
+    {
+      "name": "KTM Duke 1290 (Мото)",
+      "speedKmh": 280,
+      "brakingPercent": 82,
+      "price": 380000,
+      "category": "Мотоцикл"
+    },
+    {
+      "name": "Урал (Мото с коляской)",
+      "speedKmh": 120,
+      "brakingPercent": 50,
+      "price": 60000,
+      "category": "Мотоцикл (Ретро)"
+    },
+    {
+      "name": "Минск (Мото)",
+      "speedKmh": 100,
+      "brakingPercent": 40,
+      "price": 15000,
+      "category": "Мотоцикл (Ретро)"
+    },
+    {
+      "name": "Ford Focus (Хэтчбек)",
+      "speedKmh": 185,
+      "brakingPercent": 68,
+      "price": 85000,
+      "category": "Хэтчбек"
+    },
+    {
+      "name": "VW Golf GTI",
+      "speedKmh": 210,
+      "brakingPercent": 78,
+      "price": 150000,
+      "category": "Хэтчбек"
+    },
+    {
+      "name": "Renault Sandero Stepway",
+      "speedKmh": 165,
+      "brakingPercent": 60,
+      "price": 55000,
+      "category": "Хэтчбек"
+    },
+    {
+      "name": "Kia Ceed",
+      "speedKmh": 190,
+      "brakingPercent": 70,
+      "price": 95000,
+      "category": "Хэтчбек"
+    },
+    {
+      "name": "Hyundai i30 N",
+      "speedKmh": 220,
+      "brakingPercent": 82,
+      "price": 180000,
+      "category": "Хэтчбек"
+    },
+    {
+      "name": "Honda Fit",
+      "speedKmh": 170,
+      "brakingPercent": 62,
+      "price": 50000,
+      "category": "Хэтчбек"
+    },
+    {
+      "name": "Toyota Yaris",
+      "speedKmh": 175,
+      "brakingPercent": 64,
+      "price": 60000,
+      "category": "Хэтчбек"
+    },
+    {
+      "name": "Peugeot 208",
+      "speedKmh": 180,
+      "brakingPercent": 66,
+      "price": 70000,
+      "category": "Хэтчбек"
+    },
+    {
+      "name": "Mini Cooper S (Новый)",
+      "speedKmh": 220,
+      "brakingPercent": 80,
+      "price": 160000,
+      "category": "Хэтчбек"
+    },
+    {
+      "name": "Audi A3 Sportback",
+      "speedKmh": 210,
+      "brakingPercent": 78,
+      "price": 170000,
+      "category": "Хэтчбек"
+    }
+  ]
+}

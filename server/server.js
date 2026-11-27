@@ -29,6 +29,7 @@ const { createAuctionStore } = require('./auction-store.cjs');
 const { readKioskOwners } = require('./business-owners.cjs');
 const { createRadioRegistry } = require('./radio-sync.cjs');
 const { hamsterSpawn } = require('./hamster-spawn.cjs');
+const { cleanVehicleStateMessage } = require('./vehicle-side-text.cjs');
 const radioRegistry = createRadioRegistry();
 
 const BUILD = (() => {
@@ -1340,7 +1341,7 @@ wss.on('connection', (ws) => {
       // не режем до 200 символов и не пишем в историю чата.
       const raw = String(m.text || '');
       const proto = raw.charAt(0) === '§';
-      const text = raw.slice(0, proto ? 20000 : 200);
+      const text = cleanVehicleStateMessage(raw.slice(0, proto ? 20000 : 200));
       if (!text) return;
       let dm = null;
       if (text.startsWith('§LGE')) { try { const event = JSON.parse(text.slice(4)); if (event.e === 'dm') dm = String(event.text || ''); } catch { /* невалидное событие игнорируется получателем */ } }

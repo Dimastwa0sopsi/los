@@ -1,0 +1,22 @@
+import './domstub';
+import { strict as assert } from 'node:assert';
+import { Game } from '../src/game/game';
+import { Character } from '../src/game/character';
+import { newState } from '../src/game/state';
+import { applyFishingVisual } from '../src/game/fishingVisual';
+const state = newState('m', {x:0,z:0,a:0});
+const char = new Character(state.look);
+char.setItem('rod'); assert(char.itemG.children.length >= 4); char.pose('idle',0); applyFishingVisual(char,true); assert.equal(char.shR.rotation.x,-1.05); assert.equal(char.elR.rotation.x,-.35); char.pose('idle',0); applyFishingVisual(char,false); assert.notEqual(char.shR.rotation.x,-1.05); char.setItem('fists'); assert.equal(char.itemG.children.length, 0);
+const g = Object.create(Game.prototype) as any;
+let water = true, message = '';
+Object.assign(g, {state, player:char, fishT:-1, weapon:'fists', online:true, nearWater:()=>water, toast:(s:string)=>message=s, sound:{coin:()=>{}}});
+g.castRod(); assert.equal(g.fishT,-1); assert(message.includes('Нужна удочка'));
+state.inventory.rod = 1; water = false; g.castRod(); assert.equal(g.fishT,-1);
+water = true; g.castRod(); assert.equal(char.item,'rod'); assert(g.fishT > 0);
+water = false; g.updateServices(.1); assert.equal(g.fishT,-1); assert.equal(char.item,'fists');
+water = true; g.castRod(); g.inVeh = {}; g.updateServices(.1); assert.equal(g.fishT,-1); assert.equal(char.item,'none');
+g.inVeh = null; g.castRod(); delete state.inventory.rod; g.updateServices(.1); assert.equal(g.fishT,-1); assert.equal(char.item,'fists'); assert.equal(state.inventory.fish,undefined);
+state.inventory.rod=1; g.castRod(); g.fishT = .01; const random = Math.random; Math.random = () => 0;
+try { g.updateServices(.1); } finally { Math.random = random; }
+assert.equal(state.inventory.fish,1); assert.equal(char.item,'fists'); assert.equal(g.fishT,-1);
+console.log('✓ удочка появляется при забросе, убирается после улова или прерывания');

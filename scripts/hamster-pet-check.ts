@@ -14,7 +14,7 @@ assert.deepEqual(petHamsterSolo(restored,store,1200),{ok:false});
 result=petHamsterSolo(restored,store,restored.hamsterHiddenUntil!);assert(result.ok);assert.equal(result.reward,0);assert.equal(restored.money,10100);
 const fresh=newState('m',{x:0,z:0,a:0});const before=JSON.stringify(fresh);
 assert.deepEqual(petHamsterSolo(fresh,{setItem:()=>{throw Error('quota');}},2000),{ok:false});assert.equal(JSON.stringify(fresh),before);
-const h=makeHamster();assert.equal(h.group.scale.y,1.16);h.group.position.set(10,0,10);
+const h=makeHamster();assert.equal(h.group.scale.y,1.23);h.group.position.set(10,0,10);
 const g=Object.create(Game.prototype) as any;g.hamster=h;g.state=state;g.online=false;g.hamsterWaiting=false;
 g.hamsterAction={start:1000,x:10,z:10,dx:1,dz:0};g.L={parks:[{x0:0,z0:0,x1:20,z1:20}],river:{depth:()=>0},roadSegments:[]};g.col={query:()=>[]};
 g.updateHamster(1000+HAMSTER_PET_MS+HAMSTER_RUN_MS/2);assert(h.group.position.x>10);assert(h.group.visible);

@@ -32,7 +32,7 @@ export function hamsterSpot(layout: WorldLayout, collision: Collision, random: (
 
 /** Little golden hamster holding a sunflower seed. Shared geometries/materials. */
 export function makeHamster() {
-  const group = new THREE.Group(); group.name = 'hamster'; group.scale.y = 1.16;
+  const group = new THREE.Group(); group.name = 'hamster'; group.scale.y = 1.23;
   const sphere=(color:string,x:number,y:number,z:number,sx:number,sy:number,sz:number,parent:THREE.Object3D=group)=>{
     const mesh=new THREE.Mesh(T.sphere,mat('c:'+color)); mesh.position.set(x,y,z);mesh.scale.set(sx,sy,sz);parent.add(mesh);return mesh;
   };

@@ -10,6 +10,12 @@ function isRequest(x: any): x is EconomyRequest {
     !x.payload || typeof x.payload !== 'object' || Array.isArray(x.payload)) return false;
   if (x.action === 'bid') return Object.keys(x.payload).sort().join(',') === 'bid,id' && Number.isSafeInteger(x.payload.id) && x.payload.id > 0 && Number.isSafeInteger(x.payload.bid) && x.payload.bid > 0 && x.payload.bid <= 2147483647;
   if (x.action === 'list') return Object.keys(x.payload).sort().join(',') === 'key,kind,price' && ['vehicle','business','apartment','house'].includes(x.payload.kind) && typeof x.payload.key === 'string' && x.payload.key.length > 0 && x.payload.key.length <= 128 && Number.isSafeInteger(x.payload.price) && x.payload.price > 0 && x.payload.price <= 2147483647;
+  if (x.action === 'trunk') {
+    const p=x.payload;
+    return Object.keys(p).sort().join(',') === 'amount,direction,item,uid' && typeof p.uid === 'string' && p.uid.length>0 && p.uid.length<=128 &&
+      typeof p.item==='string' && /^[a-z0-9_]{1,64}$/.test(p.item) && !['__proto__','constructor','prototype'].includes(p.item) &&
+      Number.isSafeInteger(p.amount) && p.amount>0 && p.amount<=2147483647 && (p.direction==='put' || p.direction==='take');
+  }
   return false;
 }
 function journalKey(server: string, nick: string): string | null {

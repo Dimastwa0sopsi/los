@@ -261,7 +261,7 @@ for (const [id, name, kmh, accel, price, r, deck, seat, dual, susp, colors] of S
 export const TRAFFIC_TYPES = ['volga', 'lada', 'pchelka', 'kolibri', 'taiga', 'bizon', 'gazelka', 'volta', 'drakon', 'fenghuang', 'taxi', 'titan', 'bus', 'strizh', 'police', 'semi', ...MORE.map((r) => r[0]).filter((id) => VEHICLES[id].price < 150000), 'dalnoboy', 'severyanin', 'titanxl', 'refr'];
 export const TRAFFIC_WEIGHTS = [5, 5, 5, 4, 3, 3, 2, 2, 2, 2, 3, 2, 2, 2, 0.6, 1, ...MORE.filter((r) => VEHICLES[r[0]].price < 150000).map(() => 0.9), 0.5, 0.5, 0.5, 0.5];
 
-export function hasSubwooferTrunk(body:BodyKind):boolean { return ['sedan','hatch','suv','pickup','sport','van'].includes(body); }
+export function hasSubwooferTrunk(body:BodyKind, variant?: VSpec['variant']):boolean { return ['sedan','hatch','suv','pickup','sport','van'].includes(body) || ((body === 'truck' || body === 'semi') && variant !== 'tank' && variant !== 'flat'); }
 
 export interface Tuning {
   paint?: string; tint: number; turbo: number; engine: number; rims: number; spoiler: boolean;

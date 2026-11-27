@@ -1,0 +1,16 @@
+import {strict as assert} from 'node:assert';
+import {prepareOwnedTrunkTransfer} from '../src/game/trunkTransaction';
+import {newState} from '../src/game/state';
+import {defaultTuning,VEHICLES} from '../src/game/data';
+const spec=Object.values(VEHICLES).find(v=>v.body==='sedan')!;
+const moto=Object.values(VEHICLES).find(v=>v.body==='moto')!;
+const state=newState('m',{x:0,z:0,a:0});state.inventory={water:31};
+state.vehicles=[{uid:'own',type:spec.id,color:'#fff',tuning:defaultTuning(),condition:1,mileage:0,year:2026,fuel:50,pos:null,missing:[],paid:1000}];
+const allowed=new Set(['water']); const before=JSON.stringify(state);
+assert.deepEqual(prepareOwnedTrunkTransfer(state,'other','water',1,'put',allowed),{ok:false,error:'vehicle'});
+assert.deepEqual(prepareOwnedTrunkTransfer(state,'own','water',31,'put',allowed),{ok:false,error:'full'});assert.equal(JSON.stringify(state),before);
+const r=prepareOwnedTrunkTransfer(state,'own','water',30,'put',allowed);assert(r.ok);assert.equal(r.state.inventory.water,1);assert.equal(r.state.vehicles[0].trunk?.water,30);assert.equal(JSON.stringify(state),before);
+const back=prepareOwnedTrunkTransfer(r.state,'own','water',30,'take',allowed);assert(back.ok);assert.equal(back.state.inventory.water,31);assert.deepEqual(back.state.vehicles[0].trunk,{});
+state.vehicles[0].type=moto.id;assert.deepEqual(prepareOwnedTrunkTransfer(state,'own','water',1,'put',allowed),{ok:false,error:'vehicle'});
+state.vehicles=[{...state.vehicles[0],type:spec.id},{...state.vehicles[0],type:spec.id}];assert.deepEqual(prepareOwnedTrunkTransfer(state,'own','water',1,'put',allowed),{ok:false,error:'vehicle'});
+console.log('✓ прототип переноса: собственный транспорт, лимит 30, копирование без мутаций, мотоциклы и дубли UID');

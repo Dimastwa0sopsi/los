@@ -1,0 +1,14 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {cleanVehicleStateMessage}=require('../server/vehicle-side-text.cjs');
+const msg=value=>'§LG'+JSON.stringify({x:1,z:2,v:'bus',vt:value});
+const result=value=>JSON.parse(cleanVehicleStateMessage(msg(value)).slice(3));
+assert.equal(result('Привет').vt,'Привет');assert.equal(result('').vt,'');
+for(const bad of ['site.com','@name','a'.repeat(49),'\nстрока',{},null])assert.equal(result(bad).vt,undefined);
+const row=['abc','bus','#aabbcc',1,2,3,0,'Привет'];
+const parked=JSON.parse(cleanVehicleStateMessage('§LG'+JSON.stringify({vp:[row,row,['bad','bus','#aabbcc',1,2,3,0,'site.com']]})).slice(3));
+assert.deepEqual(parked.vp,[row]);
+const capped=JSON.parse(cleanVehicleStateMessage('§LG'+JSON.stringify({vp:Array.from({length:20},(_,i)=>['id'+i,...row.slice(1)])})).slice(3));
+assert.equal(capped.vp.length,12);
+assert.equal(cleanVehicleStateMessage('§LGN{}'),'§LGN{}');assert.equal(cleanVehicleStateMessage('§LG{broken'),'§LG{broken');
+console.log('✓ фильтр надписей в серверном relay');
