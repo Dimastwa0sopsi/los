@@ -4,6 +4,9 @@
 // Если каталог недоступен (нет сети, закрыт), остаётся встроенный список и ручная
 // вставка ссылки на поток — радио работает всегда, «любым способом».
 
+import { soundCloudUrl } from './radioSpatial';
+import { SoundCloudWidget } from './soundCloudWidget';
+
 export interface RadioStation {
   id: string;
   name: string;
@@ -34,12 +37,15 @@ export type RadioState = { station: RadioStation | null; playing: boolean; loadi
 
 export class Radio {
   private audio: HTMLAudioElement | null = null;
+  private cloud: SoundCloudWidget | null = null;
+  private outputVolume: number | null = null;
   list: RadioStation[] = [...SEED];
   station: RadioStation | null = null;
   playing = false;
   loading = false;
   error = '';
   volume = 0.7;
+  insideVolume = 0.7;
   onChange: (() => void) | null = null;
 
   private emit() { this.onChange?.(); }
@@ -67,25 +73,38 @@ export class Radio {
 
   setVolume(v: number) {
     this.volume = Math.max(0, Math.min(1, v));
-    if (this.audio) this.audio.volume = this.volume;
+    this.applyVolume();
     this.emit();
   }
+  setInsideVolume(v:number) { this.insideVolume=Math.max(0,Math.min(1,v)); this.emit(); }
+  /** Effective local loudness is recomputed from source position each frame. */
+  setOutputVolume(v: number) { const next=Number.isFinite(v)?Math.max(0,Math.min(1,v)):0; if (this.outputVolume!==null && Math.abs(next-this.outputVolume)<0.002) return; this.outputVolume=next; this.applyVolume(); }
+  private applyVolume() { const v=this.outputVolume ?? this.volume; if (this.audio) this.audio.volume=v; this.cloud?.setVolume(v); }
 
   play(st: RadioStation) {
     this.station = st;
     this.error = '';
     this.loading = true;
+    const sc = soundCloudUrl(st.url);
+    if (sc) {
+      this.audio?.pause(); this.cloud?.destroy();
+      this.cloud = new SoundCloudWidget(playing => { this.playing=playing; this.loading=false; if (playing) this.error=''; this.emit(); }, message => { this.playing=false; this.loading=false; this.error=message; this.emit(); }, () => { this.loading=false; this.emit(); });
+      void this.cloud.open(sc,this.outputVolume ?? this.volume);
+      this.error = 'Если музыка не запустилась, нажмите ▶ в плеере SoundCloud';
+      this.emit(); return;
+    }
+    this.cloud?.destroy(); this.cloud=null;
     const a = this.el();
     a.src = st.url;
-    a.volume = this.volume;
+    a.volume = this.outputVolume ?? this.volume;
     const p = a.play();
     if (p && typeof p.catch === 'function') p.catch(() => { this.loading = false; this.error = 'Не удалось включить — нажмите ещё раз'; this.emit(); });
     this.emit();
   }
 
-  resume() { if (this.station) this.play(this.station); }
-  pause() { this.audio?.pause(); this.playing = false; this.emit(); }
-  stop() { if (this.audio) { this.audio.pause(); this.audio.removeAttribute('src'); this.audio.load(); } this.playing = false; this.loading = false; this.emit(); }
+  resume() { if (this.cloud) this.cloud.play(); else if (this.station) this.play(this.station); }
+  pause() { this.audio?.pause(); this.cloud?.pause(); this.playing = false; this.emit(); }
+  stop() { this.cloud?.destroy(); this.cloud=null; if (this.audio) { this.audio.pause(); this.audio.removeAttribute('src'); this.audio.load(); } this.playing = false; this.loading = false; this.emit(); }
   toggle() {
     if (this.playing) this.pause();
     else if (this.station) this.resume();
@@ -102,14 +121,19 @@ export class Radio {
   /** ссылка на поток вручную: «любым способом» */
   playUrl(url: string, name = 'Своя волна') {
     const clean = url.trim();
-    if (!/^https?:\/\//i.test(clean)) { this.error = 'Нужна ссылка на поток, например https://…/stream.mp3'; this.emit(); return; }
-    if (/^http:\/\//i.test(clean) && typeof location !== 'undefined' && location.protocol === 'https:') {
+    let parsed: URL;
+    try { parsed = new URL(clean); } catch { this.error = 'Нужна ссылка на поток или публичный трек SoundCloud'; this.emit(); return; }
+    if (clean.length > 2048 || !['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password) { this.error = 'Нужна ссылка на поток или публичный трек SoundCloud'; this.emit(); return; }
+    const hostname = parsed.hostname.toLowerCase(), sc = soundCloudUrl(clean);
+    if ((hostname === 'soundcloud.com' || hostname.endsWith('.soundcloud.com')) && !sc) { this.error = 'Нужна публичная ссылка на трек или плейлист SoundCloud'; this.emit(); return; }
+    if (parsed.protocol === 'http:' && typeof location !== 'undefined' && location.protocol === 'https:') {
       this.error = 'На https-странице http-поток браузер блокирует — ищите https-ссылку';
       this.emit();
       return;
     }
-    const st: RadioStation = { id: 'custom-' + clean.slice(-24), name, url: clean };
-    this.list = [st, ...this.list.filter((s) => s.url !== clean)];
+    const canonical = sc ?? clean;
+    const st: RadioStation = { id: 'custom-' + canonical, name: sc && name === 'Своя волна' ? 'SoundCloud' : name, url: canonical };
+    this.list = [st, ...this.list.filter((s) => s.url !== canonical)];
     this.play(st);
   }
 

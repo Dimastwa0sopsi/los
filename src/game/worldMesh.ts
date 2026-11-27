@@ -217,6 +217,22 @@ export async function buildWorldMeshes(L: WorldLayout, progress: (p: number, lab
     }
     db.build().forEach((m) => { m.receiveShadow = true; root.add(m); });
   }
+  // Детали речной отмели: небольшие группы камыша на мелководье.
+  // Не ставим их под мостами или на пляже; они декоративные, без коллизий.
+  for (let z = GZ0 + 15; z < GZ1 - 10; z += 27) {
+    if (z > L.beach.z0 - 15 && z < L.beach.z1 + 15) continue;
+    for (const side of [-1, 1]) {
+      const x = bankX(z) + side * bankHalf * 0.97;
+      if (L.bridges.some(b => x > b.x0 - 5 && x < b.x1 + 5 && z > b.z0 - 6 && z < b.z1 + 6)) continue;
+      const depth = L.river.depth(x,z), base = -depth, h = depth + 0.4;
+      const b = B(x,z);
+      for (let k=0;k<4;k++) {
+        const xx=x+(k-1.5)*0.14, zz=z+Math.sin(k*3+z)*0.18;
+        b.add('c:#577047',T.cylB,M(xx,base,zz,0,0.025,h+0.08*(k%2),0.025));
+        b.add('c:#694a31',T.cyl,M(xx,base+h,zz,0,0.045,0.2,0.045));
+      }
+    }
+  }
   // вода: три слоя прозрачности, чтобы отмель просвечивала, а фарватер был тёмным
   const waters: THREE.Mesh[] = [];
   for (const [batcher, key] of [[wShallow, 'waterShallow'], [wMid, 'waterMid'], [wDeep, 'waterDeep']] as const) {

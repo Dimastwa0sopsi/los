@@ -237,7 +237,7 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
     title: `Машина · ${v.name}`, tiles: [
       { ico: '🏁', label: hud.race ? 'Стоп гонку' : 'Уличная гонка', on: () => g.startRace() },
       ...(v?.beltAvailable ? [{ ico: '🔒', label: v.belt ? 'Снять ремень' : 'Пристегнуть ремень', on: () => g.toggleSeatbelt() }] : []),
-      { ico: '📻', label: 'Радио', on: () => g.openPanel({ type: 'radio' }) },
+      { ico: '📻', label: 'Радио', on: () => g.openVehicleRadio() },
       { ico: '↯', label: hud.driftAssist ? 'Дрифт: вкл' : 'Дрифт-помощник', on: () => g.toggleDrift() },
       { ico: '🛞', label: v.cruise > 0 ? `Круиз ${Math.round(v.cruise * 3.6)} км/ч` : 'Круиз-контроль', on: () => { g.cruise = g.cruise > 0 ? 0 : Math.max(4.5, Math.abs(v.kmh / 3.6)); g.toast(g.cruise > 0 ? `Круиз-контроль: ${Math.round(g.cruise * 3.6)} км/ч` : 'Круиз-контроль выключен'); } },
       ...(v.canHydro ? [

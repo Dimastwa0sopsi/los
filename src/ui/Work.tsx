@@ -32,6 +32,7 @@ export function PcPanel({ g, mode, close }: { g: Game; mode: 'office' | 'home'; 
         {app === 'desk' && (
           <div className="pc-desk">
             <button onClick={() => setApp('work')}><span>💼</span>Фриланс-биржа<small>$18 за задачу</small></button>
+            <button onClick={() => { close(); g.openComputerRadio(); }}><span>📻</span>Радио<small>музыка из компьютера</small></button>
             <button onClick={() => { close(); g.openPanel({ type: 'phone', tab: 'store' }); }}><span>🛍️</span>LosSt<small>приложения</small></button>
             <button onClick={() => { close(); g.openPanel({ type: 'phone', tab: 'gallery' }); }}><span>🖼️</span>Галерея<small>ваши фото</small></button>
             <button onClick={() => { close(); g.openPanel({ type: 'phone', tab: 'support' }); }}><span>🛟</span>Поддержка<small>жалобы</small></button>

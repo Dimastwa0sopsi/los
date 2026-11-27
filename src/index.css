@@ -936,6 +936,9 @@ button.tb-card:hover { background: rgba(255,255,255,.09); } button.tb-card:activ
 .rd-ctl { display: flex; align-items: center; gap: 6px; }
 .rd-vol { flex: 1; height: 26px; }
 .rd-hint { font-size: 11px; color: #94a3b8; width: 34px; text-align: right; }
+.rd-volume { display: flex; align-items: center; gap: 8px; color: #cbd5e1; font-size: 12px; }
+.rd-volume span:first-child { min-width: 92px; }
+.rd-volume span:last-child { width: 34px; text-align: right; }
 .rd-search { display: flex; gap: 6px; }
 .rd-search .ui-input { flex: 1; }
 .rd-list { flex: 1; min-height: 120px; overflow: auto; border-radius: 12px; background: #0a0f19; border: 1px solid #16213a; padding: 6px; }
@@ -950,6 +953,8 @@ button.tb-card:hover { background: rgba(255,255,255,.09); } button.tb-card:activ
 .rd-star.on { color: #fbbf24; }
 .rd-err { margin: 2px 0; font-size: 12px; color: #fca5a5; }
 .rd-foot { margin: 0; font-size: 11px; color: #64748b; text-align: center; }
+.soundcloud-widget { position: fixed; right: 8px; bottom: 8px; width: min(310px, 70vw); height: 100px; border: 0; border-radius: 10px; z-index: 80; background: #fff; }
+@media (max-height: 450px) { .soundcloud-widget { width: min(240px, 48vw); height: 86px; } }
 
 /* гардероб в инвентаре */
 .ward { margin: 6px 0 10px; }
