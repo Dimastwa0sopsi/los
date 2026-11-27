@@ -1,0 +1,17 @@
+import './domstub';
+import {strict as assert} from 'node:assert';
+import {newState} from '../src/game/state';
+import {rouletteColor,randomRouletteNumber,spinRouletteSolo,CASINO_ITEMS} from '../src/game/roulette';
+import {VEHICLES} from '../src/game/data';
+import {buildInterior} from '../src/game/interiors';
+const counts={red:0,black:0,green:0};for(let n=0;n<=36;n++) counts[rouletteColor(n)!]++;
+assert.deepEqual(counts,{red:18,black:18,green:1});assert.equal(rouletteColor(37),null);
+let calls=0;assert.equal(randomRouletteNumber({getRandomValues:((a:Uint32Array)=>{a[0]=calls++===0?4294967295:37;return a;}) as Crypto['getRandomValues']}),0);assert.equal(calls,2);
+const s=newState('m',{x:0,z:0,a:0});s.money=10000;let saved='';const storage={setItem:(_k:string,v:string)=>{saved=v;}};
+assert.deepEqual(spinRouletteSolo(s,1000,'red',storage,()=>1),{ok:true,number:1,color:'red',payout:2000});assert.equal(s.money,11000);assert.equal(JSON.parse(saved).money,11000);
+assert.equal(spinRouletteSolo(s,1000,'green',storage,()=>0).ok,true);assert.equal(s.money,46000);
+assert.equal(spinRouletteSolo(s,1000,'black',storage,()=>0).ok,true);assert.equal(s.money,45000);
+const before=JSON.stringify(s);assert.equal(spinRouletteSolo(s,NaN,'red',storage,()=>1).ok,false);assert.equal(spinRouletteSolo(s,1000,'red',{setItem:()=>{throw Error();}},()=>1).ok,false);assert.equal(JSON.stringify(s),before);
+assert.equal(CASINO_ITEMS.durman>110,true);assert.equal(VEHICLES.bus.forSale,'dealer');
+const interior=buildInterior('casino');assert(interior.acts.some(a=>a.action==='gamble'));assert(interior.acts.some(a=>a.action==='roulette'));assert(interior.acts.some(a=>a.action==='casino_bar'));interior.dispose();
+console.log('roulette, casino actions, prices and bus checked');

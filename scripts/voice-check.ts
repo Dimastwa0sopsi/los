@@ -14,6 +14,10 @@ async function main() {
   const next=voice.start(); resolve(stream); await next; assert.equal(voice.active,true);
   voice.stopMicrophone(); assert.equal(stopped,2); assert.equal(voice.active,true); assert.equal(voice.micOn,false);
   voice.stop(); assert.equal(voice.active,false);
-  console.log('✓ voice permission cancellation and track cleanup');
+  let calls=0;
+  Object.defineProperty(globalThis,'navigator',{value:{mediaDevices:{getUserMedia:async()=>{calls++;if(calls===1)throw Object.assign(new Error('denied'),{name:'NotAllowedError'});return stream;}}},configurable:true});
+  await voice.start();assert.equal(voice.starting,false);assert.equal(voice.micOn,false);assert(messages.some(m=>m.includes('настройках сайта')));
+  await voice.start();assert.equal(calls,2);assert.equal(voice.micOn,true);voice.stop();
+  console.log('✓ voice permission cancellation, retry after denial and track cleanup');
 }
 void main();

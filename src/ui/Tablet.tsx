@@ -9,6 +9,7 @@ import { InventoryGrid } from './InventoryGrid';
 import { SUPPORT_BOT } from '../game/support';
 import { type Settings, defaultSettings } from '../game/config';
 import { currentAccount, removeAccount, logout } from '../game/accounts';
+import { MicrophonePermission } from './MicrophonePermission';
 
 const $ = (n: number) => '$' + Math.round(n).toLocaleString('ru');
 type Scr = 'rules' | 'store' | 'tg' | 'gallery' | 'vzhuh' | 'food' | 'coffee' | 'pizza' | 'pharm' | 'limited' | 'quest' | 'home' | 'map' | 'taxi' | 'homes' | 'cars' | 'bazaar' | 'jobs' | 'biz' | 'bank' | 'inv' | 'players' | 'support' | 'promo' | 'settings' | 'profile' | 'estate' | 'all' | 'tasks' | 'ach' | 'danger';
@@ -96,7 +97,7 @@ function Ach({ g }: { g: Game }) {
   const done = list.filter((a) => a.done).length;
   return (
     <div className="tb-pad">
-      <div className="tb-hero-mini">🏆 Открыто {done} из {list.length}{g.raceBest > 0 ? ` · рекорд трассы ${g.raceBest.toFixed(1)} с` : ''}</div>
+      <div className="tb-hero-mini">🏆 Открыто {done} из {list.length}</div>
       {list.map((a) => (
         <div className={`tb-card ${a.done ? 'ok' : 'dim'}`} key={a.id}>
           <div className="tb-card-row"><b>{a.icon} {a.name}</b><span>{a.done ? '✅' : '🔒'}</span></div>
@@ -155,7 +156,6 @@ function Home({ g, go }: P) {
         { ico: '📷', label: 'Камера', color: '#0f172a', on: () => g.startCamera('rear') },
         { ico: '🖼️', label: 'Галерея', color: '#0369a1', on: () => go('gallery') },
         { ico: '🪪', label: 'Профиль', color: '#0f766e', on: () => go('profile') },
-        { ico: '🏁', label: 'Гонка', color: '#f59e0b', on: () => { g.startRace(); close(); } },
         { ico: '📋', label: 'Задания', color: '#22c55e', on: () => go('tasks'), badge: g.dailyList().filter((d) => d.ready).length || undefined },
         { ico: '🏆', label: 'Достижения', color: '#eab308', on: () => go('ach'), badge: g.achList().filter((a) => a.done).length || undefined },
         ...(g.online ? [{ ico: '👥', label: 'Игроки', color: '#06b6d4', on: () => go('players'), badge: g.net?.players.size } as Item] : []),
@@ -266,7 +266,10 @@ function SettingsApp({ g, close }: { g: Game; close: () => void }) {
       </div>}
       {tab === 'sound' && <div className="lg-settings">
         <label>Громкость</label><Range k="volume" min={0} max={1} step={0.05} fmt={(v) => Math.round(v * 100) + '%'} />
+        <label>Голос игроков рядом</label><Seg k="voiceEnabled" opts={[[true, 'Включён'], [false, 'Выключен']]} />
         <label>Громкость голосового чата</label><Range k="voiceVolume" min={0} max={1} step={0.05} fmt={(v) => Math.round(v * 100) + '%'} />
+        <MicrophonePermission />
+        <p className="tb-note">Пешком: O — начать и закончить разговор. В машине O — аварийка; используйте кнопку микрофона.</p>
         <label>Звук</label><Seg k="muted" opts={[[false, 'Включён'], [true, 'Выключен']]} />
       </div>}
       {tab === 'game' && <div className="lg-settings">

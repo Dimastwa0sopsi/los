@@ -28,6 +28,7 @@ const { createAccountStore, normalizeLogin } = require('./account-store.cjs');
 const { createAuctionStore } = require('./auction-store.cjs');
 const { readKioskOwners } = require('./business-owners.cjs');
 const { createRadioRegistry } = require('./radio-sync.cjs');
+const { hamsterSpawn } = require('./hamster-spawn.cjs');
 const radioRegistry = createRadioRegistry();
 
 const BUILD = (() => {
@@ -1239,7 +1240,7 @@ wss.on('connection', (ws) => {
       radioRegistry.remove(row.id);
       me = row; active.set(row.id, { ws, row }); ws.playerId = row.id;
       console.log(`[login] ${row.name} вошёл (онлайн: ${active.size})`);
-      send(ws, { type: 'login_success', accountState: account.state, accountRevision: account.revision, accountSaveId: account.saveId, caps: { state: 1, peds: 1, adm: 1, relay: 1, accounts: 1, saveIds: 1, voice: 1, radio: 1 }, player: {
+      send(ws, { type: 'login_success', hamster: hamsterSpawn(), accountState: account.state, accountRevision: account.revision, accountSaveId: account.saveId, caps: { state: 1, peds: 1, adm: 1, relay: 1, accounts: 1, saveIds: 1, voice: 1, radio: 1 }, player: {
         id: row.id, name: row.name, gender: row.gender, money: row.money,
         x: row.pos_x, z: row.pos_z, rot: row.pos_rot, number: row.car_number, carNumber: row.car_number,
       } });

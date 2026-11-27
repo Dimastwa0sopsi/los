@@ -5,6 +5,7 @@ import { Batcher, T, M } from './geom';
 import type { Box } from './worldgen';
 import { INTERIOR_ORIGIN } from './config';
 import { dressInterior } from './interiorDetail';
+import { HomeTv } from './homeTv';
 
 export interface Interact { x: number; z: number; r: number; label: string; action: string; y?: number }
 export type InteriorSeat = { x: number; z: number; a: number; kind: 'computer' | 'toilet' | 'sofa'; label: string };
@@ -16,6 +17,7 @@ export interface Interior {
   lights: THREE.Light[];
   bed?: { x: number; z: number; y: number; a: number }; doorSpots: Record<string, { x: number; z: number; a: number; y: number }>;
   pots?: { x: number; z: number }[];
+  homeTv?: HomeTv;
   /** динамические объекты интерьера (анимируются игрой): вагонетки шахты */
   carts?: THREE.Object3D[];
   /** что получилось при сборке: пригодится проверкам и отладке */
@@ -38,6 +40,7 @@ export class IB {
   ox = INTERIOR_ORIGIN.x; oz = INTERIOR_ORIGIN.z; doorSpots: Interior['doorSpots'] = {};
   seats: InteriorSeat[] = [];
   bed?: Interior['bed']; pots: { x: number; z: number }[] = []; carts: THREE.Object3D[] = [];
+  homeTv?: HomeTv;
   /** сколько вывесок, светильников и дверей нарисовали — для проверок */
   signs = 0; fixtures = 0; doors = 0; windows = 0;
   residential = false; retail = false;
@@ -266,7 +269,11 @@ export class IB {
   }
   tv(x: number, z: number, w: number, ry: number) {
     this.f('c:#0a0a0a', x, 1.0, z, Math.abs(Math.sin(ry)) > 0.5 ? 0.06 : w, w * 0.56, Math.abs(Math.sin(ry)) > 0.5 ? w : 0.06, false);
-    this.f('glow:#1e3a8a', x + Math.sin(ry) * 0.04, 1.03, z + Math.cos(ry) * 0.04, Math.abs(Math.sin(ry)) > 0.5 ? 0.01 : w - 0.1, w * 0.5, Math.abs(Math.sin(ry)) > 0.5 ? w - 0.1 : 0.01, false);
+    const screen = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.1, w * 0.5), new THREE.MeshBasicMaterial({color:'#111827'}));
+    screen.name='home-tv-screen';screen.rotation.y=ry;
+    screen.position.set(this.ox+x+Math.sin(ry)*0.055, 1.03+w*0.25, this.oz+z+Math.cos(ry)*0.055);
+    this.group.add(screen);this.homeTv=new HomeTv(screen);
+    this.act(x+Math.sin(ry)*0.85,z+Math.cos(ry)*0.85,1.25,'Телевизор','home_tv');
     this.f('c:#292524', x, 0, z, 0.5, 0.6, 0.35, true);
   }
   /** рабочее место с ПК: ry=0 — пользователь сидит со стороны +z */
@@ -382,9 +389,9 @@ export class IB {
     return {
       group: g, seats: this.seats, colliders: this.cols, acts: this.acts, npcs: this.npcs, spawn: { ...spawn, x: this.ox + spawn.x, z: this.oz + spawn.z },
       bounds: { x0: this.ox + bounds.x0, x1: this.ox + bounds.x1, z0: this.oz + bounds.z0, z1: this.oz + bounds.z1, h: bounds.h },
-      bed: this.bed, doorSpots: this.doorSpots, pots: this.pots.map((p) => ({ x: this.ox + p.x, z: this.oz + p.z })), lights: this.lights, carts: this.carts,
+      bed: this.bed, doorSpots: this.doorSpots, pots: this.pots.map((p) => ({ x: this.ox + p.x, z: this.oz + p.z })), lights: this.lights, carts: this.carts, homeTv: this.homeTv,
       stats: { meshes: g.children.length, signs: this.signs, fixtures: this.fixtures, doors: this.doors, windows: this.windows },
-      dispose: () => { g.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) { m.geometry.dispose(); if (o.userData.steam) (m.material as THREE.Material).dispose(); } }); g.parent?.remove(g); },
+      dispose: () => { this.homeTv?.dispose(); g.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) { m.geometry.dispose(); if (o.userData.steam) (m.material as THREE.Material).dispose(); } }); g.parent?.remove(g); },
     };
   }
 }
@@ -1490,6 +1497,12 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
       ib.cyl('c:#fbbf24', 0, 0.95, -1.6, 2.6, 0.04, false);
       for (let i = 0; i < 6; i++) ib.cyl('c:' + ['#dc2626', '#1d4ed8', '#111827'][i % 3], -0.9 + (i % 3) * 0.9, 0.95, -1.6 + (i < 3 ? -0.5 : 0.5), 0.16, 0.1 + (i % 3) * 0.05);
       ib.act(0, 1.2, 2.4, '💣 Игра «Бомба» — ставки от $30 000 до $1 000 000', 'gamble');
+      // Отдельный стол рулетки; остаётся свободный проход между столами.
+      ib.cyl('c:#3b2412', 6, 0, -2.5, 1.45, .94, true);
+      ib.cyl('tex:felt', 6, .95, -2.5, 1.4, .08);
+      for (let i=0;i<12;i++) { const a=i*Math.PI/6; ib.cyl(i%2?'c:#111827':'c:#dc2626',6+Math.cos(a)*.82,1.04,-2.5+Math.sin(a)*.82,.15,.04); }
+      ib.cyl('c:#16a34a',6,1.05,-2.5,.22,.05);
+      ib.act(6, -.1, 2, '🎡 Рулетка', 'roulette');
       // стойки игровых автоматов вдоль стен
       for (const sx of [-W / 2 + 1.6, W / 2 - 1.6]) for (let z = -D / 2 + 3; z <= D / 2 - 5; z += 3.2) {
         const west = sx < 0;
@@ -1497,7 +1510,7 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
         ib.f('glow:' + ['#facc15', '#f472b6', '#22d3ee', '#a855f7'][Math.abs(Math.round(z)) % 4], sx + (west ? -0.3 : 0.3), 1.3, z, 0.1, 0.9, 0.6, false);
       }
       // касса обмена фишек и барная стойка у юго-западного угла
-      ib.counter(-7.4, D / 2 - 2.6, 4.6, 'Касса: обменяйте выигрыш на наличные', 'counter');
+      ib.counter(-7.4, D / 2 - 2.6, 4.6, '🍸 Бар казино', 'casino_bar');
       // вывеска и неон над входом
       ib.plane(`sign:${(venue || 'КАЗИНО «ЖАР-ПТИЦА»').toUpperCase()} · ×5 ДЖЕКПОТ|#f59e0b`, 0, H - 1.2, -D / 2 + 0.2, 8.4, 0.9, 0);
       ib.f('glow:#f59e0b', 0, H - 0.7, -D / 2 + 0.16, 9.0, 0.16, 0.06, false);

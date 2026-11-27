@@ -26,6 +26,7 @@ async function run(listenerId:number){
  for(const id of [1,2])voices[id].tick(0,id,[{id:3-id,near:true}]);
  while(q.length){const m=q.shift()!;await voices[m.to].receive(m.to,m.from,m.signal);}
  voices[listenerId].setVolume(0.3); assert(audios.some(a=>a.volume===0.3));
+ voices[listenerId].tick(0,listenerId,[{id:senderId,near:true,distance:20}]);assert(audios.some(a=>Math.abs(a.volume-0.15)<1e-9));
  assert(pcs.some(p=>p.receiving)); assert(pcs.some(p=>p.tracks===1)); assert(pcs.filter(p=>p.remoteDescription).length>=2);
  voices[listenerId].tick(0,listenerId,[{id:senderId,near:false}]);assert(pcs.some(p=>p.closed));
  voices[senderId].stopMicrophone(); assert(voices[senderId].active && !voices[senderId].micOn);
