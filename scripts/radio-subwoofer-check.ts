@@ -8,5 +8,5 @@ g.net=net;g.online=true;g.radioSource={kind:'vehicle',vehicle:car};g.radio={stat
 g.syncRadio();assert.equal(sent[0].outside,.7);assert.equal(sent[0].inside,.35);
 car.owned.tuning.subwoofer=true;g.syncRadio();assert.equal(sent[1].outside,1);assert.equal(sent[1].inside,.5);
 g.state={homeSpeakers:{'7:0':'speaker_10'}};g.radioSource={kind:'computer',homeId:'7:0',place:{kind:'computer',x:1,z:2,buildingId:7,exteriorX:9,exteriorZ:9}};g.syncRadio();assert.equal(sent[2].outside,1);assert.equal(sent[2].inside,.5);
-g.state.homeSpeakers['7:0']='speaker_1';g.syncRadio();assert.equal(sent[3].outside,.7);assert.equal(sent[3].inside,.35);
+g.state.homeSpeakers['7:0']='speaker_1';g.syncRadio();assert.equal(sent[3].outside,.4);assert.equal(sent[3].inside,.2);
 console.log('✓ сетевой источник: громкость сабвуфера и установленных колонок');

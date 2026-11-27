@@ -2,7 +2,7 @@ import './domstub';
 import { strict as assert } from 'node:assert';
 import { Game } from '../src/game/game';
 let enabled = false; let text = '';
-const car: any = {x:0,z:0,speed:0,owned:{uid:'own'},spec:{len:4},forward:()=>({x:0,z:1}),model:{group:{visible:true},setExperimentalTrunkAnimation:()=>{enabled=true;return true;},body:{getObjectByName:()=>enabled?{}:null}}};
+const car: any = {x:0,z:0,speed:0,owned:{uid:'own'},spec:{len:4,body:'sedan'},forward:()=>({x:0,z:1}),model:{group:{visible:true},setExperimentalTrunkAnimation:()=>{enabled=true;return true;},body:{getObjectByName:()=>enabled?{}:null}}};
 const game: any = {inVeh:null,interior:null,px:0,pz:-2,vehicles:[car],state:{vehicles:[{uid:'own'}]},testTrunks:new Map(),toast:(s:string)=>text=s};
 Game.prototype.testTrunkCommand.call(game);
 assert(enabled); assert.equal(game.testTrunks.get(car).opening,true); assert(text.includes('Хранение'));

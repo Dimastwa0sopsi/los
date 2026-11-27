@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import type { Game } from '../game/game';
 import { Modal } from './MenuScreens';
 import { SPEAKERS, speakerById } from '../game/speakers';
+import { RadioPanel } from './Radio';
+import { Tablet } from './Tablet';
 
 type Task = { kind: 'sum'; title: string; nums: number[]; answer: string } | { kind: 'code'; title: string; code: string; answer: string } | { kind: 'mail'; title: string; subject: string; options: string[]; answer: string };
 const SUBJ: [string, string][] = [['Счёт №4471 за аренду офиса', 'Счета'], ['Вы выиграли миллион! Перейдите по ссылке', 'Спам'], ['Отчёт за квартал: продажи выросли', 'Отчёты'], ['Клиент просит перезвонить по договору', 'Клиенты'],
@@ -18,11 +20,13 @@ export function PcPanel({ g, mode, close }: { g: Game; mode: 'office' | 'home'; 
   const [task, setTask] = useState<Task>(makeTask);
   const [val, setVal] = useState('');
   const [log, setLog] = useState<{ ok: boolean; pay: number }[]>([]);
-  const [app, setApp] = useState<'work' | 'desk' | 'speakers'>(mode === 'office' ? 'work' : 'desk');
+  const [app, setApp] = useState<'work' | 'desk' | 'speakers' | 'music' | 'tablet'>(mode === 'office' ? 'work' : 'desk');
+  const [tabletPage,setTabletPage]=useState('home');
   const [start,setStart]=useState(false);
   const [,refresh]=useState(0);
-  const open=(next:'work'|'desk'|'speakers')=>{setApp(next);setStart(false);};
-  const music=()=>{close();g.openComputerRadio();};
+  const open=(next:'work'|'desk'|'speakers'|'music'|'tablet')=>{setApp(next);setStart(false);};
+  const music=()=>{if(g.selectComputerRadioSource())open('music');};
+  const tablet=(page:string)=>{setTabletPage(page);open('tablet');};
   const earned = log.reduce((a, l) => a + l.pay, 0);
   const submit = (ans: string) => {
     const ok = ans.trim().toUpperCase() === task.answer.toUpperCase();
@@ -38,14 +42,17 @@ export function PcPanel({ g, mode, close }: { g: Game; mode: 'office' | 'home'; 
           <div className="pc-desk">
             <button onClick={() => setApp('work')}><span>💼</span>Фриланс-биржа<small>$18 за задачу</small></button>
             <button onClick={music}><span>🎵</span>Музыка<small>SoundCloud</small></button>
-            <button onClick={() => open('speakers')}><span>🔊</span>Колонки<small>магазин и установка</small></button>
-            <button onClick={() => { close(); g.openPanel({ type: 'phone', tab: 'store' }); }}><span>🛍️</span>LosSt<small>приложения</small></button>
-            <button onClick={() => { close(); g.openPanel({ type: 'phone', tab: 'gallery' }); }}><span>🖼️</span>Галерея<small>ваши фото</small></button>
-            <button onClick={() => { close(); g.openPanel({ type: 'phone', tab: 'support' }); }}><span>🛟</span>Поддержка<small>жалобы</small></button>
+            <button onClick={() => open('speakers')}><span>⚙️</span>Настройки<small>колонки</small></button>
+            <button onClick={() => tablet('home')}><span>🧩</span>Приложения<small>все приложения планшета</small></button>
+            <button onClick={() => tablet('store')}><span>🛍️</span>LosSt<small>приложения</small></button>
+            <button onClick={() => tablet('gallery')}><span>🖼️</span>Галерея<small>ваши фото</small></button>
+            <button onClick={() => tablet('support')}><span>🛟</span>Поддержка<small>жалобы</small></button>
           </div>
         )}
+        {app === 'music' && mode === 'home' && <div className="lsos-app"><RadioPanel g={g} close={() => open('desk')} embedded /></div>}
+        {app === 'tablet' && mode === 'home' && <div className="lsos-app"><Tablet key={tabletPage} g={g} initial={tabletPage} close={() => open('desk')} embedded /></div>}
         {app === 'speakers' && mode === 'home' && <div className="lsos-speakers">
-          <div className="lsos-window-title"><b>🔊 Колонки</b><button onClick={() => open('desk')} aria-label="Закрыть окно">✕</button></div>
+          <div className="lsos-window-title"><b>⚙️ Настройки · колонки</b><button onClick={() => open('desk')} aria-label="Закрыть окно">✕</button></div>
           <p>Установлена: <b>{speakerById(g.homeSpeaker())?.name ?? 'нет'}</b> · Выберите колонку для своего дома или квартиры.</p>
           <div className="lsos-speaker-list">{SPEAKERS.map(s=>{
             const count=g.getState().inventory[s.id]??0, installed=g.homeSpeaker()===s.id;
@@ -75,8 +82,8 @@ export function PcPanel({ g, mode, close }: { g: Game; mode: 'office' | 'home'; 
           </div>
         )}
         {mode === 'home' && <>
-          {start && <div className="lsos-start"><b>LSos · Пуск</b><button onClick={() => open('desk')}>🖥️ Рабочий стол</button><button onClick={() => open('work')}>💼 Фриланс</button><button onClick={music}>🎵 Музыка</button><button onClick={() => open('speakers')}>🔊 Колонки</button><button onClick={close}>⏻ Выйти из компьютера</button></div>}
-          <div className="lsos-taskbar"><button className={start?'on':''} onClick={()=>setStart(!start)} aria-label="Пуск">🪟</button><button onClick={()=>open('desk')} title="Рабочий стол">🖥️</button><button onClick={()=>open('work')} title="Фриланс">💼</button><button onClick={music} title="Музыка">🎵</button><button onClick={()=>open('speakers')} title="Колонки">🔊</button><span>LSos</span><time>{new Date().toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})}</time></div>
+          {start && <div className="lsos-start"><b>LSos · Пуск</b><button onClick={() => open('desk')}>🖥️ Рабочий стол</button><button onClick={() => open('work')}>💼 Фриланс</button><button onClick={music}>🎵 Музыка</button><button onClick={() => open('speakers')}>⚙️ Настройки колонок</button><button onClick={() => tablet('home')}>🧩 Приложения планшета</button><button onClick={close}>⏻ Выйти из компьютера</button></div>}
+          <div className="lsos-taskbar"><button className={start?'on':''} onClick={()=>setStart(!start)} aria-label="Пуск">🪟</button><button onClick={()=>open('desk')} title="Рабочий стол">🖥️</button><button onClick={()=>open('work')} title="Фриланс">💼</button><button onClick={music} title="Музыка">🎵</button><button onClick={()=>open('speakers')} title="Настройки колонок">⚙️</button><button onClick={()=>tablet('home')} title="Приложения">🧩</button><span>LSos</span><time>{new Date().toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})}</time></div>
         </>}
       </div>
     </Modal>

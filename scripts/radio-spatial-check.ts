@@ -16,6 +16,9 @@ assert.equal(soundCloudUrl('https://soundcloud.com/artist/song?utm_source=foo'),
 const shared = 'https://soundcloud.com/rudikk/emoslut666-miniyubka?si=68da6a7f6d2c4cd1a32c3b7bd7f035ba&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing';
 const expected = 'https://soundcloud.com/rudikk/emoslut666-miniyubka';
 assert.equal(soundCloudUrl(shared),expected);
+const problemTrack='https://soundcloud.com/user-979159477/vopros?si=83ff50d6622e4deea7d5108dd7193422&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing';
+assert.equal(soundCloudUrl(problemTrack),'https://soundcloud.com/user-979159477/vopros');
+assert.equal(new URL(soundCloudEmbed(problemTrack)!).searchParams.get('url'),'https://soundcloud.com/user-979159477/vopros');
 const sharedEmbed=soundCloudEmbed(shared); assert(sharedEmbed); assert.equal(new URL(sharedEmbed).searchParams.get('url'),expected);
 assert.equal(soundCloudUrl('https://www.soundcloud.com/artist/sets/list'),'https://soundcloud.com/artist/sets/list');
 for (const input of ['http://soundcloud.com/a/b','https://soundcloud.com.evil.test/a/b','https://evil.test/soundcloud.com/a/b','https://soundcloud.com/a/b?secret_token=s-abc','https://soundcloud.com/a/b/s-secret','https://soundcloud.com/a','https://soundcloud.com@evil.test/a/b','javascript:alert(1)','https://soundcloud.com:444/a/b']) assert.equal(soundCloudUrl(input),null,input);
