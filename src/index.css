@@ -364,6 +364,9 @@ button.tb-card:hover { background: rgba(255,255,255,.09); } button.tb-card:activ
 .lsos-start { position: absolute; z-index: 2; left: 6px; bottom: 51px; width: min(300px, 88%); display: grid; gap: 3px; padding: 14px; border: 1px solid #ffffff50; border-radius: 10px; background: #15283ef2; box-shadow: 0 12px 30px #0008; }
 .lsos-start b { padding: 4px 8px 10px; }.lsos-start button { text-align: left; padding: 9px; border: 0; border-radius: 6px; background: transparent; color: white; }.lsos-start button:hover { background: #ffffff20; }
 .lsos-speakers { flex: 1; margin: 12px; padding: 12px; min-height: 0; background: #14263deb; border: 1px solid #b7d7ff66; border-radius: 10px; }
+.lsos-app { flex: 1; display: flex; min-height: 0; padding: 10px; }
+.lsos-app .tb-embedded { position: static; inset: auto; padding: 0; background: none; backdrop-filter: none; flex: 1; min-width: 0; }
+.lsos-app .tb-embedded .tb.tb2 { width: 100%; height: min(55vh, 440px); border: 1px solid #b7d7ff66; border-radius: 8px; box-shadow: none; }
 .lsos-window-title { display: flex; justify-content: space-between; }.lsos-window-title button { border: 0; background: transparent; color: white; }
 .lsos-speakers p { font-size: 12px; margin: 8px 0; }.lsos-speaker-list { max-height: 260px; overflow: auto; }.lsos-speaker { display: flex; align-items: center; gap: 8px; padding: 6px; border-bottom: 1px solid #ffffff1a; }.lsos-speaker > div { flex: 1; min-width: 0; }.lsos-speaker small { display: block; font-size: 11px; color: #b6cce0; }
 @media (max-width: 550px) { .lsos-speaker { flex-wrap: wrap; }.lsos-speaker > div { min-width: 55%; } }
@@ -968,16 +971,15 @@ button.tb-card:hover { background: rgba(255,255,255,.09); } button.tb-card:activ
 .rd-star.on { color: #fbbf24; }
 .rd-err { margin: 2px 0; font-size: 12px; color: #fca5a5; }
 .rd-foot { margin: 0; font-size: 11px; color: #64748b; text-align: center; }
-.soundcloud-host { position: fixed; left: 50%; bottom: 8px; transform: translateX(-50%); width: min(310px, 70vw); max-height: min(320px, 45vh); overflow-y: auto; z-index: 80; }
-.soundcloud-widget { display: block; width: 100%; height: 100px; border: 0; border-radius: 10px; background: #fff; margin-top: 4px; }
-.rd-widget-space { display: none; }
-.rd-content { display: flex; flex-direction: column; gap: 8px; min-height: 0; flex: 1; }
-.soundcloud-mobile .soundcloud-host { opacity: 0; pointer-events: none; }
-.soundcloud-mobile.radio-panel-open .soundcloud-host { opacity: 1; pointer-events: auto; top: calc((100vh - min(86vh, 640px)) / 2 + 46px); bottom: auto; width: min(432px, calc(100vw - 52px)); max-height: 100px; }
-.soundcloud-mobile .rd { height: min(86vh, 640px); box-sizing: border-box; }
-.soundcloud-mobile .rd-widget-space { display: grid; place-items: center; flex: none; height: 100px; color: #64748b; background: #0a0f19; border-radius: 10px; font-size: 11px; }
-.soundcloud-mobile .rd-content { overflow-y: auto; }
-@media (max-height: 450px) { .soundcloud-widget { height: 86px; } .soundcloud-mobile.radio-panel-open .soundcloud-host { max-height: 86px; } .soundcloud-mobile .rd-widget-space { height: 86px; } }
+.soundcloud-host { position: fixed; left: var(--sc-left, 0px); top: var(--sc-top, 0px); width: var(--sc-width, 0px); height: var(--sc-height, 0px); overflow-y: auto; z-index: 80; opacity: 0; pointer-events: none; }
+.radio-panel-open .soundcloud-host { opacity: 1; pointer-events: auto; }
+.soundcloud-widget { display: block; width: 100%; height: 100px; border: 0; border-radius: 10px; background: #fff; }
+.rd-widget-space { display: grid; place-items: center; flex: none; height: 100px; color: #64748b; background: #0a0f19; border-radius: 10px; font-size: 11px; }
+.rd-content { display: flex; flex-direction: column; gap: 8px; min-height: 0; flex: 1; overflow-y: auto; }
+.rd { height: min(86vh, 640px); box-sizing: border-box; }
+.rd-embedded { position: static; inset: auto; background: none; padding: 0; flex: 1; min-height: 0; }
+.rd-embedded .rd { width: 100%; height: min(55vh, 440px); box-shadow: none; border-radius: 8px; }
+@media (max-height: 450px) { .soundcloud-widget, .rd-widget-space { height: 86px; } }
 
 /* гардероб в инвентаре */
 .ward { margin: 6px 0 10px; }

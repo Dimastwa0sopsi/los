@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { T, M, Batcher } from './geom';
 import { VEHICLES, type VSpec, type Tuning, defaultTuning, hasSubwooferTrunk } from './data';
 import { mat } from './textures';
-import { trunkMotionPose } from './trunkAnimation';
+import { trunkMotionKind, trunkMotionPose } from './trunkAnimation';
 
 interface Item { mat: string; tpl: THREE.BufferGeometry; m: THREE.Matrix4 }
 export interface Part { name: string; items: Item[]; detachable: boolean; attached: boolean; center: THREE.Vector3 }
@@ -689,8 +689,17 @@ export class VehicleModel {
         for (let i = 0; i < 4; i++) this.box('c:#facc15', 0, 1.24 + 1.3, bz - boxL / 2 + 0.6 + i * (boxL - 1.2) / 3, W + 0.04, 2.55, 0.06);
       } else {
         const boxCol = v === 'reefer' ? 'c:#f8fafc' : s.body === 'semi' ? 'c:#e5e7eb' : 'c:#9ca3af';
-        this.box(boxCol, 0, 1.0 + (H + 0.2 - 1.0) / 2, bz, W, H + 0.2 - 1.0, boxL);
-        if (s.body === 'semi') this.box(PAINT, 0, 2.2, bz, W + 0.02, 0.5, boxL - 1);
+        // Hollow cargo body with separate rear shutter; the original solid block
+        // would obscure both the opening and anything placed inside.
+        const floor = 1.0, roof = H + 0.2, height = roof - floor, wall = 0.12;
+        this.box(boxCol, 0, floor + wall / 2, bz, W, wall, boxL);
+        this.box(boxCol, 0, roof - wall / 2, bz, W, wall, boxL);
+        for (const sx of [-1, 1]) this.box(boxCol, sx * (W - wall) / 2, (floor + roof) / 2, bz, wall, height, boxL);
+        this.box(boxCol, 0, (floor + roof) / 2, bz + boxL / 2 - wall / 2, W, height, wall);
+        this.part('cargoDoor');
+        this.box(boxCol, 0, (floor + roof) / 2, -L / 2 + 0.04, W - wall * 2, height - wall * 2, 0.08);
+        this.part('cargoTrim', false);
+        if (s.body === 'semi') for (const sx of [-1, 1]) this.box(PAINT, sx * (W + 0.02) / 2, 2.2, bz, 0.04, 0.5, boxL - 1);
         if (v === 'reefer') { this.box('c:#334155', 0, 2.4, bz + boxL / 2 + 0.25, W * 0.7, 1.2, 0.5); this.box('glow:#38bdf8', 0, 2.4, bz + boxL / 2 + 0.51, W * 0.4, 0.1, 0.01); }
       }
       for (const sx of [1, -1]) this.box('glow:#f59e0b', sx * (W / 2 + 0.01), 1.1, bz, 0.02, 0.06, boxL * 0.9);
@@ -1033,17 +1042,21 @@ export class VehicleModel {
     if (k === 'TRIM') return 'c:#222';
     return k;
   }
-  /** Enable only for the separately modelled sedan/sport lid. A solid chassis
-   * remains underneath: a real cargo opening still needs body reconstruction. */
+  /** Sedan lids and cargo shutters are separately modelled. The sedan chassis
+   * remains solid beneath its lid; the cargo body is hollow. */
   setExperimentalTrunkAnimation(enabled: boolean): boolean {
-    const supported = this.spec.body === 'sedan' || this.spec.body === 'sport';
+    const supported = this.spec.body === 'sedan' || this.spec.body === 'sport' || trunkMotionKind(this.spec.body, this.spec.variant) === 'rollup';
     const next = enabled && supported;
     if (next !== this.trunkAnimationEnabled) { this.trunkAnimationEnabled = next; this.rebuild(); }
     return next;
   }
   setExperimentalTrunkElapsed(seconds: number) {
     this.trunkElapsed = Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
-    if (this.trunkPivot) this.trunkPivot.rotation.x = trunkMotionPose('hinged', this.trunkElapsed).lidAngle;
+    if (this.trunkPivot) {
+      const kind = trunkMotionKind(this.spec.body, this.spec.variant);
+      if (kind === 'hinged') this.trunkPivot.rotation.x = trunkMotionPose(kind, this.trunkElapsed).lidAngle;
+      else if (kind === 'rollup') this.trunkPivot.position.y = this.trunkPivot.userData.closedY + this.trunkPivot.userData.lift * trunkMotionPose(kind, this.trunkElapsed).lidLift;
+    }
   }
   private clearTrunkPivot() {
     if (!this.trunkPivot) return;
@@ -1056,13 +1069,15 @@ export class VehicleModel {
     this.clearTrunkPivot();
     const b = new Batcher();
     for (const p of this.parts) if (p.attached) {
-      if (this.trunkAnimationEnabled && p.name === 'trunk' && p.items.length) {
+      if (this.trunkAnimationEnabled && (p.name === 'trunk' || p.name === 'cargoDoor') && p.items.length) {
         const e = p.items[0].m.elements;
-        const pivot = new THREE.Vector3(e[12], e[13], e[14] + Math.abs(e[10]) / 2);
+        const isDoor = p.name === 'cargoDoor';
+        const pivot = new THREE.Vector3(e[12], e[13], e[14] + (isDoor ? 0 : Math.abs(e[10]) / 2));
         const offset = new THREE.Matrix4().makeTranslation(-pivot.x, -pivot.y, -pivot.z);
         const lidBatch = new Batcher();
         for (const it of p.items) lidBatch.add(this.resolveMat(it.mat), it.tpl, offset.clone().multiply(it.m));
         const group = new THREE.Group(); group.name = 'experimental-trunk-pivot'; group.position.copy(pivot);
+        group.userData.closedY = pivot.y; group.userData.lift = isDoor ? Math.abs(e[5]) : 0;
         for (const mesh of lidBatch.build({ cast: true })) group.add(mesh);
         this.body.add(group); this.trunkPivot = group;
         this.setExperimentalTrunkElapsed(this.trunkElapsed);

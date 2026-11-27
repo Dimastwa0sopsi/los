@@ -1,7 +1,7 @@
 export type Speaker = { id:string; name:string; price:number; power:number; placement:'desktop'|'floor'; color:string; height:number; drivers:number; amplifier:boolean };
 /** Volume differs by equipment. SoundCloud's iframe does not expose audio for equalization. */
 export const SPEAKERS:Speaker[] = [
-  {id:'speaker_1',name:'LS Mini',price:1000,power:.7,placement:'desktop',color:'#252932',height:.22,drivers:1,amplifier:false},
+  {id:'speaker_1',name:'LS Mini',price:1000,power:.4,placement:'desktop',color:'#252932',height:.22,drivers:1,amplifier:false},
   {id:'speaker_2',name:'LS Compact',price:2000,power:.7,placement:'desktop',color:'#e5e7eb',height:.25,drivers:1,amplifier:false},
   {id:'speaker_3',name:'LS Stereo',price:4000,power:.7,placement:'desktop',color:'#654639',height:.27,drivers:2,amplifier:false},
   {id:'speaker_4',name:'LS Pulse',price:6500,power:.7,placement:'desktop',color:'#31345c',height:.30,drivers:2,amplifier:false},

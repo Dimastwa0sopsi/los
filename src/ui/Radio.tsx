@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import type {Game} from '../game/game';
 import type {RadioStation} from '../game/radio';
 import {normalizeRadioFavorites, RADIO_FAVORITES_KEY, RADIO_FAVORITES_LIMIT} from '../game/radioFavorites';
@@ -6,7 +6,7 @@ import {normalizeRadioFavorites, RADIO_FAVORITES_KEY, RADIO_FAVORITES_LIMIT} fro
 function loadFavorites():RadioStation[]{
   try{return normalizeRadioFavorites(JSON.parse(localStorage.getItem(RADIO_FAVORITES_KEY) || '[]'));}catch{return [];}
 }
-export function RadioPanel({g,close,listenOnly=false}:{g:Game;close:()=>void;listenOnly?:boolean}) {
+export function RadioPanel({g,close,listenOnly=false,embedded=false}:{g:Game;close:()=>void;listenOnly?:boolean;embedded?:boolean}) {
   const radio=g.radio;
   const [url,setUrl]=useState('');
   const [vol,setVol]=useState(Math.round(radio.volume*100));
@@ -14,7 +14,17 @@ export function RadioPanel({g,close,listenOnly=false}:{g:Game;close:()=>void;lis
   const [favorites,setFavorites]=useState<RadioStation[]>(loadFavorites);
   const [message,setMessage]=useState('');
   const [,tick]=useState(0);
-  useEffect(()=>{radio.onChange=()=>tick(x=>x+1);document.body.classList.add('radio-panel-open');return()=>{radio.onChange=null;document.body.classList.remove('radio-panel-open');};},[radio]);
+  const widgetSpace=useRef<HTMLDivElement>(null);
+  useEffect(()=>{
+    const slot=widgetSpace.current;
+    if(!slot)return;
+    const position=()=>{const r=slot.getBoundingClientRect(); const style=document.documentElement.style; style.setProperty('--sc-left',`${r.left}px`);style.setProperty('--sc-top',`${r.top}px`);style.setProperty('--sc-width',`${r.width}px`);style.setProperty('--sc-height',`${r.height}px`);};
+    radio.onChange=()=>tick(x=>x+1);
+    position();document.body.classList.add('radio-panel-open');
+    const observer=typeof ResizeObserver==='undefined'?null:new ResizeObserver(position);observer?.observe(slot);
+    window.addEventListener('resize',position);window.addEventListener('scroll',position,true);
+    return()=>{observer?.disconnect();window.removeEventListener('resize',position);window.removeEventListener('scroll',position,true);radio.onChange=null;document.body.classList.remove('radio-panel-open');};
+  },[radio]);
   const st=radio.state();
   const persist=(next:RadioStation[])=>{
     try{localStorage.setItem(RADIO_FAVORITES_KEY,JSON.stringify(next));setFavorites(next);setMessage('');}
@@ -28,9 +38,9 @@ export function RadioPanel({g,close,listenOnly=false}:{g:Game;close:()=>void;lis
   };
   const playFavorite=(s:RadioStation)=>{radio.list=[...favorites];if(radio.station?.url===s.url&&radio.playing)radio.pause();else if(radio.station?.url===s.url)radio.resume();else radio.play(s);};
   const stop=(e:React.KeyboardEvent)=>e.stopPropagation();
-  return <div className="rd-back" onPointerDown={e=>e.stopPropagation()}><div className="rd">
+  return <div className={embedded ? 'rd-back rd-embedded' : 'rd-back'} onPointerDown={e=>e.stopPropagation()}><div className="rd">
     <div className="rd-top"><b>🎵 Музыка</b><span className={`rd-dot ${st.playing?'on':''}`}/><span className="rd-now">{listenOnly?'Радио рядом':st.station?.name || 'трек не выбран'}</span><button className="rd-x" onClick={close} aria-label="Закрыть">✕</button></div>
-    <div className="rd-widget-space">Плеер SoundCloud появится здесь</div>
+    <div className="rd-widget-space" ref={widgetSpace}>Плеер SoundCloud появится здесь</div>
     <div className="rd-content">
       {listenOnly ? <p className="rd-foot">Здесь видны плееры музыки рядом. Если звук не начался, нажмите ▶ в плеере. Включить свою музыку можно в машине или на домашнем компьютере.</p> : <>
         <div className="rd-ctl"><button className="ui-btn sm" onClick={()=>radio.next(-1)}>⏮</button><button className="ui-btn sm main" onClick={()=>radio.toggle()}>{st.playing?'⏸':'▶'}</button><button className="ui-btn sm" onClick={()=>radio.next(1)}>⏭</button><button className="ui-btn sm ghost" onClick={()=>radio.stop()}>■</button><button className="ui-btn sm" disabled={!st.station} onClick={()=>st.station&&toggleFavorite(st.station)}>{st.station&&favorites.some(f=>f.url===st.station!.url)?'❤️ В избранном':'🤍 В избранное'}</button></div>

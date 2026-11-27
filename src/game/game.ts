@@ -36,7 +36,7 @@ import { carRadioVolume, radioGain, soundCloudUrl, type RadioPlace } from './rad
 import { RemoteRadios } from './remoteRadio';
 import {speakerById, speakerVolume} from './speakers';
 import {hasSubwooferTrunk} from './data';
-import { stepTrunkMotion, TRUNK_OPEN_SECONDS } from './trunkAnimation';
+import { stepTrunkMotion, TRUNK_OPEN_SECONDS, trunkMotionKind, type TrunkMotionKind } from './trunkAnimation';
 import {disposeHomeSpeaker, makeHomeSpeaker} from './speakerModel';
 import { setSoundCloudMobile } from './soundCloudWidget';
 import { allMaterials, disposeTextures, mat, GFX, getTex } from './textures';
@@ -160,7 +160,7 @@ export class Game {
   private socialSent: { to: number; until: number } | null = null;
   private plateHold: { vehicle: Vehicle; side: 'front' | 'back'; time: number } | null = null;
   private plateHoldDone = false;
-  private testTrunks = new Map<Vehicle, { elapsed: number; opening: boolean }>();
+  private testTrunks = new Map<Vehicle, { elapsed: number; opening: boolean; kind: TrunkMotionKind }>();
   seatbelt = false; private beltHold = 0; private beltTriggered = false; private beltInputGeneration = 0;
   speedCameras: SpeedCamera[] = []; private cameraSeen = new Set<string>();
   furnitureSeat: { seat: InteriorSeat; fromX: number; fromZ: number } | null = null;
@@ -763,15 +763,16 @@ export class Game {
       net.sendRadio({...place,url:station.url,position,outside,inside,playing:true});
     });
   }
-  openComputerRadio() {
+  selectComputerRadioSource(): boolean {
     const id=this.state.location?.b, building=id===undefined ? undefined : this.L.buildings[id];
-    if (!this.interior || !building) { this.toast('📻 Откройте домашний компьютер'); return; }
+    if (!this.interior || !building) { this.toast('📻 Откройте домашний компьютер'); return false; }
     if (this.radioSource?.kind !== 'computer' || this.radioSource.place.buildingId !== id || this.radioSource.homeId !== this.homeId()) {
       this.radio.stop();
       this.radioSource={kind:'computer',homeId:this.homeId(),place:{kind:'computer',x:this.px,z:this.pz,exteriorX:building.door.x,exteriorZ:building.door.z,buildingId:building.id}};
     }
-    this.openPanel({type:'radio'});
+    return true;
   }
+  openComputerRadio() { if (this.selectComputerRadioSource()) this.openPanel({type:'radio'}); }
   openPanel(p: Panel) { if (this.economyLabPaused) return; this.beltHold = 0; this.beltTriggered = false; this.panel = p; this.input?.releaseAll(); if (this.input) this.input.enabled = false; this.input?.unlock(); this.cb.onPanel(p); this.sound.click(); }
   closePanel() {
     this.panel = null; this.lookOrbit = 0; if (this.input) { this.input.enabled = true; this.input.releaseAll(); } this.cb.onPanel(null);
@@ -825,7 +826,7 @@ export class Game {
     this.hamster?.animate(performance.now() / 1000);
     for (const [v, animation] of this.testTrunks) {
       if (!this.vehicles.includes(v)) { this.testTrunks.delete(v); continue; }
-      animation.elapsed = stepTrunkMotion('hinged', animation.elapsed, animation.opening, dt);
+      animation.elapsed = stepTrunkMotion(animation.kind, animation.elapsed, animation.opening, dt);
       v.model.setExperimentalTrunkElapsed(animation.elapsed);
     }
     if (this.radioSource) {
@@ -4031,12 +4032,13 @@ export class Game {
       .map(car => { const f = car.forward(); return { car, distance: Math.hypot(this.px - (car.x - f.x * car.spec.len / 2), this.pz - (car.z - f.z * car.spec.len / 2)) }; })
       .filter(x => x.distance < 2.5).sort((a,b) => a.distance - b.distance)[0]?.car;
     if (!v) { this.toast('Подойдите сзади к своей неподвижной машине'); return; }
-    if (!v.model.setExperimentalTrunkAnimation(true)) { this.toast('Тест крышки пока доступен только для седанов и спорткаров'); return; }
+    const kind = trunkMotionKind(v.spec.body, v.spec.variant);
+    if (!kind || !v.model.setExperimentalTrunkAnimation(true)) { this.toast('Тест пока доступен для седанов, спорткаров и закрытых грузовиков'); return; }
     if (!v.model.body.getObjectByName('experimental-trunk-pivot')) { this.toast('Крышка отсутствует — сначала отремонтируйте машину'); return; }
     const previous = this.testTrunks.get(v);
-    const animation = previous ?? { elapsed: 0, opening: false };
+    const animation = previous ?? { elapsed: 0, opening: false, kind };
     animation.opening = !animation.opening;
-    animation.elapsed = Math.min(animation.elapsed, TRUNK_OPEN_SECONDS.hinged);
+    animation.elapsed = Math.min(animation.elapsed, TRUNK_OPEN_SECONDS[kind]);
     this.testTrunks.set(v, animation);
     this.toast(animation.opening ? 'Тест: крышка открывается. Хранение вещей ещё не работает' : 'Тест: крышка закрывается');
   }

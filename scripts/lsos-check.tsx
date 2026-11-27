@@ -4,7 +4,7 @@ import {renderToStaticMarkup} from 'react-dom/server';
 import {PcPanel} from '../src/ui/Work';
 const g:any={getState:()=>({officeDone:0,inventory:{},properties:[]}),homeSpeaker:()=>null};
 const home=renderToStaticMarkup(<PcPanel g={g} mode="home" close={()=>{}}/>);
-assert(home.includes('lsos-taskbar'));assert(home.includes('LSos'));assert(home.includes('Музыка'));assert(home.includes('Колонки'));assert(home.includes('Пуск'));
+assert(home.includes('lsos-taskbar'));assert(home.includes('LSos'));assert(home.includes('Музыка'));assert(home.includes('Настройки'));assert(home.includes('Приложения'));assert(home.includes('Поддержка'));assert(home.includes('Пуск'));
 const office=renderToStaticMarkup(<PcPanel g={g} mode="office" close={()=>{}}/>);
 assert(office.includes('Задачи CRM'));assert(!office.includes('lsos-taskbar'));
 console.log('✓ LSos: домашний рабочий стол, кнопка Пуск, музыка и колонки; офисная работа сохранена');

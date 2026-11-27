@@ -15,7 +15,7 @@ type Scr = 'rules' | 'store' | 'tg' | 'gallery' | 'vzhuh' | 'food' | 'coffee' | 
 const TITLES: Record<Scr, string> = { rules: '📜 Правила игры', store: 'LosSt — магазин приложений', tg: 'Телеграм', gallery: 'Галерея', vzhuh: 'Вжух Самокаты', food: 'Вкусно Доставка', coffee: 'Кофейня «Зерно»', pizza: 'Пиццерия «Сыр»', pharm: 'Аптека 24', limited: 'LIMITED Drop', quest: 'Сюжет', home: '', map: 'Карта и GPS', taxi: 'Такси', homes: 'Недвижимость', cars: 'Мой транспорт', bazaar: 'Автобазар', jobs: 'Работа', biz: 'Бизнес', bank: 'Банк', inv: 'Инвентарь', players: 'Игроки онлайн', support: 'Поддержка', promo: 'Промокод', settings: 'Настройки', profile: 'Профиль', estate: 'Имущество', all: 'Все сервисы', tasks: 'Задания дня', ach: 'Достижения', danger: '⚠️ Опасная зона' };
 interface P { g: Game; go: (s: Scr) => void; close: () => void }
 
-export function Tablet({ g, close, initial }: { g: Game; close: () => void; initial?: string }) {
+export function Tablet({ g, close, initial, embedded = false }: { g: Game; close: () => void; initial?: string; embedded?: boolean }) {
   const [scr, setScr] = useState<Scr>((initial as Scr) in TITLES ? (initial as Scr) : 'home');
   const [, tick] = useState(0);
   useEffect(() => { const t = setInterval(() => tick((x) => x + 1), 700); return () => clearInterval(t); }, []);
@@ -23,7 +23,7 @@ export function Tablet({ g, close, initial }: { g: Game; close: () => void; init
   const hh = Math.floor(s.gameTime / 60), mm = Math.floor(s.gameTime % 60);
   const go = (x: Scr) => { g.sound.click(); setScr(x); };
   return (
-    <div className="tb-back" onPointerDown={(e) => { e.stopPropagation(); if (e.target === e.currentTarget) close(); }}>
+    <div className={embedded ? 'tb-back tb-embedded' : 'tb-back'} onPointerDown={(e) => { e.stopPropagation(); if (!embedded && e.target === e.currentTarget) close(); }}>
       <div className="tb tb2">
         <div className="tb2-bar">
           <span className="tb2-clock">{String(hh).padStart(2, '0')}:{String(mm).padStart(2, '0')}</span>
