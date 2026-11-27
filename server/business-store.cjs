@@ -78,7 +78,7 @@ function createBusinessStore(db, catalogue) {
       else db.prepare('INSERT INTO business_registry VALUES (?,?,?)').run(id,actor,CAPACITY);
       save(account);
       return { id, owner:actor, stock:CAPACITY, revision:account.row.revision+1 };
-    }))();
+    })).immediate();
   }
   function buyItem(name, revision, id, item, quantity, requestId) {
     const actor = actorKey(name);

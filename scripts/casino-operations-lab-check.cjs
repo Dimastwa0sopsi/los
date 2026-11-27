@@ -1,0 +1,22 @@
+'use strict';
+const assert=require('node:assert/strict'),Database=require('better-sqlite3');
+const {createAccountStore}=require('../server/account-store.cjs');
+const {createCasinoOperationsLab}=require('../server/casino-operations-lab.cjs');
+(async()=>{
+ const db=new Database(':memory:'),accounts=createAccountStore(db);
+ assert((await accounts.register('alice','password-for-testing')).ok);
+ assert(accounts.save('alice',{money:10000,inventory:{}},0).ok);
+ let allowed=true,draws=0;const c=createCasinoOperationsLab(db,accounts,()=>allowed,()=>{draws++;return 0;});
+ const id='roulette-request-00001',payload={bet:1000,choice:'green'};
+ let r=c.execute('alice',1,id,'casino_roulette',payload);assert(r.ok);assert.equal(r.result.payout,36000);assert.equal(r.state.money,45000);
+ r=c.execute('alice',1,id,'casino_roulette',payload);assert(r.ok&&r.replay);assert.equal(draws,1);
+ assert.equal(c.execute('alice',1,id,'casino_roulette',{bet:2000,choice:'red'}).error,'request_reused');
+ assert.equal(c.execute('alice',2,'roulette-bad-000000001','casino_roulette',{bet:NaN,choice:'red'}).error,'invalid');
+ allowed=false;assert.equal(c.execute('alice',2,'purchase-no-000000000','casino_buy',{item:'durman'}).error,'not_authorized');allowed=true;
+ r=c.execute('alice',2,'purchase-yes-00000000','casino_buy',{item:'durman'});assert(r.ok);assert.equal(r.state.money,44800);assert.equal(r.state.inventory.durman,1);
+ assert.equal(c.execute('alice',3,'purchase-bad-00000000','casino_buy',{item:'__proto__'}).error,'invalid');
+ r=c.recover('alice',1,id,'casino_roulette',payload);assert.equal(r.outcome,'committed');assert.equal(r.revision,3);assert.equal(r.state.money,44800);
+ const cancelId='cancel-request-0000001';r=c.recover('alice',3,cancelId,'casino_buy',{item:'cigarettes'});assert.equal(r.outcome,'cancelled');
+ assert.equal(c.execute('alice',3,cancelId,'casino_buy',{item:'cigarettes'}).error,'request_cancelled');
+ db.close();console.log('✓ лаборатория казино: ставки, серверные цены, повторы, восстановление и отказ по доступу');
+})().catch(e=>{console.error(e);process.exitCode=1;});

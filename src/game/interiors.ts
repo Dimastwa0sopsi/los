@@ -184,11 +184,11 @@ export class IB {
 
   }
   /** базовая комната с входной группой на юге (z = d/2) */
-  room(w: number, d: number, h: number, floorMk: string, wallMk: string, exitLabel = 'Выйти на улицу', style: EntrStyle = 'glass') {
+  room(w: number, d: number, h: number, floorMk: string, wallMk: string, exitLabel = 'Выйти на улицу', style: EntrStyle = 'glass', ceiling = '#f4f4f0') {
     // Не рисуем стеклянные боковые окна у входа; публичные двери остаются глухими.
     if (style === 'glass') style = 'metal';
     this.floor(-w / 2, -d / 2, w / 2, d / 2, floorMk);
-    this.ceil(-w / 2, -d / 2, w / 2, d / 2, h);
+    this.ceil(-w / 2, -d / 2, w / 2, d / 2, h, ceiling);
     this.wall(-w / 2, -d / 2, w / 2, -d / 2, h, wallMk);
     this.wall(-w / 2, -d / 2, -w / 2, d / 2, h, wallMk);
     this.wall(w / 2, -d / 2, w / 2, d / 2, h, wallMk);
@@ -267,14 +267,21 @@ export class IB {
     for (const s of [-1, 1]) this.f('c:' + c, x + (along ? s * (w / 2 - 0.1) : 0), 0.3, z + (along ? 0 : s * (w / 2 - 0.1)), 0.16, 0.35, 0.86, false, ry);
     for (let i = 0; i < Math.max(1, Math.floor(w / 0.9)); i++) this.f('c:#e2e8f0', x + (along ? -w / 2 + 0.5 + i * 0.9 : 0), 0.46, z + (along ? 0 : -w / 2 + 0.5 + i * 0.9), along ? 0.4 : 0.55, 0.12, along ? 0.55 : 0.4, false, ry);
   }
-  tv(x: number, z: number, w: number, ry: number) {
-    this.f('c:#0a0a0a', x, 1.0, z, Math.abs(Math.sin(ry)) > 0.5 ? 0.06 : w, w * 0.56, Math.abs(Math.sin(ry)) > 0.5 ? w : 0.06, false);
+  tv(x: number, z: number, w: number, ry: number, shelf = false) {
+    const sideways = Math.abs(Math.sin(ry)) > 0.5;
+    if (shelf) {
+      // Низкая полка с полостями; экран стоит на ней, а не висит в воздухе.
+      const sw = w + 0.5, sd = 0.5;
+      this.f('c:#38231e', x, 0, z, sideways ? sd : sw, 0.84, sideways ? sw : sd, true);
+      this.f('c:#705045', x, 0.84, z, sideways ? sd + 0.08 : sw + 0.08, 0.08, sideways ? sw + 0.08 : sd + 0.08, false);
+      this.f('c:#111827', x, 0.92, z, sideways ? 0.24 : 0.45, 0.08, sideways ? 0.45 : 0.24, false);
+    } else this.f('c:#292524', x, 0, z, 0.5, 0.6, 0.35, true);
+    this.f('c:#0a0a0a', x, 1.0, z, sideways ? 0.06 : w, w * 0.56, sideways ? w : 0.06, false);
     const screen = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.1, w * 0.5), new THREE.MeshBasicMaterial({color:'#111827'}));
     screen.name='home-tv-screen';screen.rotation.y=ry;
     screen.position.set(this.ox+x+Math.sin(ry)*0.055, 1.03+w*0.25, this.oz+z+Math.cos(ry)*0.055);
     this.group.add(screen);this.homeTv=new HomeTv(screen);
     this.act(x+Math.sin(ry)*0.85,z+Math.cos(ry)*0.85,1.25,'Телевизор','home_tv');
-    this.f('c:#292524', x, 0, z, 0.5, 0.6, 0.35, true);
   }
   /** рабочее место с ПК: ry=0 — пользователь сидит со стороны +z */
   pc(x: number, z: number, ry: number, action: string, label: string, person = false) {
@@ -1347,8 +1354,18 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
       const left = -W / 2, right = W / 2, back = -D / 2, front = D / 2;
       const divider = -1.8, bathX = right - 3.3, bathZ = back + 3.5;
       const wall = village ? WALLS.wood : WALLS.beige;
-      ib.room(W, D, H, 'tex:parquet', village ? WALLS.panel : WALLS.paper,
-        house ? 'Выйти на крыльцо' : 'Выйти в подъезд', 'wood');
+      ib.room(W, D, H, 'tex:parquet', house ? WALLS.panel : WALLS.paper,
+        house ? 'Выйти на крыльцо' : 'Выйти в подъезд', 'wood', house ? '#252920' : '#f4f4f0');
+      if (house) {
+        // Тёмные деревянные рейки и вставки в полу, как на референсе.
+        for (let x = left + .22; x < bathX - .18; x += .28)
+          ib.f('c:#47271c', x, 0.12, back + .115, .045, H - .24, .035, false);
+        for (let z = bathZ + .25; z < front - .2; z += .28)
+          ib.f('c:#47271c', right - .115, .12, z, .035, H - .24, .045, false);
+        for (let z = back + .8; z < front - .7; z += 1.6)
+          for (let x = left + .9; x < right - .7; x += 2.4)
+            ib.f('c:#241b19', x, .002, z, .38, .006, .28, false);
+      }
 
       // Слева отдельная спальня; широкий дверной проём ведёт из прихожей.
       ib.wall(divider, back, divider, 1.8, H, wall, [[0.45, 1.5]]);
@@ -1386,10 +1403,10 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
       ib.table(0.0, -1.5, 2, village ? '#92400e' : '#a8a29e');
       ib.rug(0, -1.5, 2.4, 2.3, village ? '#b98c6b' : '#d6d3d1');
       // Гостиная справа: диван смотрит к телевизору, центральный путь свободен.
-      ib.sofa(right - 1.25, 1.35, 2.2, -Math.PI / 2, village ? '#8b5e4a' : '#64748b');
+      ib.sofa(right - 1.25, 1.35, 2.2, -Math.PI / 2, house ? '#40251f' : '#64748b');
       for (const z of [0.85, 1.85]) ib.seat(right - 1.25, z, -Math.PI / 2, 'sofa', 'диван');
-      ib.tv(right - 3.25, 1.35, 1.35, Math.PI / 2);
-      ib.rug(right - 2.25, 1.35, 2.5, 2.7, village ? '#a16207' : '#94a3b8');
+      ib.tv(right - 3.25, 1.35, 1.35, Math.PI / 2, house);
+      ib.rug(right - 2.25, 1.35, 2.5, 2.7, house ? '#87664c' : '#94a3b8');
       ib.plant(right - 0.55, front - 0.7);
       // Обновлённая домашняя мебель: фасады, ручки, детали и мягкий текстиль.
       for (let i = 0; i < 3; i++) {
@@ -1404,6 +1421,21 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
       ib.f('c:#78350f', -1.4, 1.3, front - 0.16, 0.8, 0.08, 0.07, false); // крючки
       for (const dx of [-0.25, 0, 0.25]) ib.f('chrome', -1.4 + dx, 1.18, front - 0.12, 0.05, 0.12, 0.05, false);
       if (house) {
+        // Низкий журнальный столик и настенные полки с книгами и растением.
+        const tx = right - 2.15, tz = front - 1.65;
+        ib.f('c:#35211d', tx, 0.36, tz, 1.15, 0.08, 0.7, true);
+        for (const dx of [-.45,.45]) for (const dz of [-.23,.23]) ib.f('c:#35211d', tx+dx, 0, tz+dz, .08, .36, .08, false);
+        ib.f('c:#ddd2bb', tx, .44, tz, .42, .04, .3, false);
+        ib.f('c:#171717', tx+.4, .44, tz+.16, .12, .04, .22, false);
+        ib.f('c:#eee6d6', tx-.35, .44, tz-.12, .18, .14, .18, false);
+        ib.f('c:#327349', tx-.35, .58, tz-.12, .16, .18, .16, false);
+        // Торшер у дивана: только геометрия, освещение остаётся у потолочных ламп.
+        ib.f('c:#262321', right-.48, 0, front-2.7, .32, .05, .32, false);
+        ib.f('c:#262321', right-.48, .05, front-2.7, .06, 1.45, .06, false);
+        ib.f('glow:#ffe2ab', right-.48, 1.48, front-2.7, .44, .4, .35, false);
+        ib.f('c:#4b2d22', right-.16, 1.85, front-2.1, .25, .08, 1.3, false);
+        for (let i=0;i<4;i++) ib.f(i%2 ? 'c:#e5ddc9' : 'c:#b69b7a', right-.17, 1.93, front-2.5+i*.16, .18, .28, .1, false);
+        ib.painting(right-.13, 2.05, -.5, -Math.PI/2, '#9d765a');
         // Люк не создаёт коллайдера: через него можно спуститься и вернуться.
         ib.f('c:#5b3a1e', 0.1, 0.005, 2.0, 1.0, 0.02, 1.0, false);
         ib.f('chrome', 0.45, 0.03, 2.0, 0.12, 0.03, 0.04, false);

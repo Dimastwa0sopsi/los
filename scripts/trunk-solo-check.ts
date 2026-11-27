@@ -1,0 +1,14 @@
+import {strict as assert} from 'node:assert';
+import {newState,migrate} from '../src/game/state';
+import {defaultTuning} from '../src/game/data';
+import {transferTrunkSolo} from '../src/game/trunkSolo';
+import {SAVE_KEY} from '../src/game/config';
+const state=newState('m',{x:0,z:0,a:0});state.inventory={water:35};
+const car={uid:'owner-car',type:'titan',color:'#fff',tuning:defaultTuning(),condition:1,mileage:0,year:2026,fuel:100,pos:null,missing:[],paid:0};state.vehicles=[car];
+const allow=new Set(['water']);let saved='';const store={setItem:(key:string,v:string)=>{assert.equal(key,SAVE_KEY);saved=v;}};
+assert(transferTrunkSolo(state,'owner-car','water',20,'put',allow,store).ok);assert.equal(state.vehicles[0],car);assert.equal(state.inventory.water,15);assert.equal(state.vehicles[0].trunk!.water,20);
+const reloaded=migrate(JSON.parse(saved))!;assert.equal(reloaded.inventory.water,15);assert.equal(reloaded.vehicles[0].trunk!.water,20);
+let before=JSON.stringify(state);assert.equal(transferTrunkSolo(state,'owner-car','water',11,'put',allow,store).ok,false);assert.equal(JSON.stringify(state),before);
+assert.equal(transferTrunkSolo(state,'other','water',1,'put',allow,store).ok,false);assert.equal(transferTrunkSolo(state,'owner-car','water',1,'take',allow,{setItem(){throw Error('quota');}}).ok,false);assert.equal(JSON.stringify(state),before);
+assert(transferTrunkSolo(state,'owner-car','water',20,'take',allow,store).ok);assert.equal(state.inventory.water,35);assert.deepEqual(state.vehicles[0].trunk,{});
+console.log('✓ одиночный багажник лаборатория: целостность, лимит 30, отсутствие машины, отказ сохранения и восстановление');

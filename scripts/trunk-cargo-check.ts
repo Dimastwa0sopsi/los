@@ -17,5 +17,5 @@ for(const spec of supported){
   detached.mesh.traverse((o:any)=>{if(o.isMesh)o.geometry.dispose();});
   model.repairParts();assert(model.body.getObjectByName('experimental-trunk-pivot'));model.dispose();
 }
-for(const spec of Object.values(VEHICLES).filter(s=>s.body==='semi'&&(s.variant==='flat'||s.variant==='tank'))){const model=new VehicleModel(spec.id);assert(!model.setExperimentalTrunkAnimation(true));model.dispose();}
-console.log('✓ закрытые грузовики: полый кузов, подъём двери, перестройка и ремонт; цистерны исключены');
+for(const spec of Object.values(VEHICLES).filter(s=>s.body==='semi'&&(s.variant==='flat'||s.variant==='tank'))){const model=new VehicleModel(spec.id);assert(model.setExperimentalTrunkAnimation(true));const lid=model.body.getObjectByName('experimental-trunk-pivot');assert(lid);model.setExperimentalTrunkElapsed(TRUNK_OPEN_SECONDS.hinged);assert(lid.rotation.x>1);model.dispose();}
+console.log('✓ грузовики: ворота закрытых кузовов и отдельный ящик на цистернах и платформах');

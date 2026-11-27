@@ -38,7 +38,12 @@ import { carRadioVolume, radioGain, soundCloudUrl, type RadioPlace } from './rad
 import { RemoteRadios } from './remoteRadio';
 import {speakerById, speakerVolume} from './speakers';
 import {hasSubwooferTrunk} from './data';
-import { stepTrunkMotion, TRUNK_OPEN_SECONDS, trunkMotionKind, type TrunkMotionKind } from './trunkAnimation';
+import { stepTrunkMotion, TRUNK_OPEN_SECONDS, trunkMotionKind, trunkMotionPose, type TrunkMotionKind } from './trunkAnimation';
+import { parseParkedInscribed, MAX_PARKED_INSCRIBED, type ParkedInscribedVehicle } from './parkedInscribedVehicles';
+import { applyFishingVisual } from './fishingVisual';
+import { transferTrunkSolo } from './trunkSolo';
+import { trunkCount } from './trunk';
+import { validVehicleSideText } from './vehicleSideText';
 import {disposeHomeSpeaker, makeHomeSpeaker} from './speakerModel';
 import { setSoundCloudMobile } from './soundCloudWidget';
 import { allMaterials, disposeTextures, mat, GFX, getTex } from './textures';
@@ -67,7 +72,7 @@ export interface Remote { plate: string; crouch: boolean; listings: Vehicle[]; l
 export type Panel =
   | { type: 'context'; choices: { label: string; run: () => void }[] }
   | { type: 'shop'; kind: ShopKind; title: string; items: string[] } | { type: 'kiosk'; id: number } | { type: 'market'; sellUid?: string }
-  | { type: 'cityhall' } | { type: 'auction' } | { type: 'tuning'; uid: string } | { type: 'clothes' } | { type: 'barber' } | { type: 'hospital' } | { type: 'police'; title: string }
+  | { type: 'cityhall' } | { type: 'auction' } | { type: 'tuning'; uid: string } | { type: 'trunk'; uid: string } | { type: 'clothes' } | { type: 'barber' } | { type: 'hospital' } | { type: 'police'; title: string }
   | { type: 'property'; b: number; unit: number } | { type: 'garage'; id: number } | { type: 'vadmin'; village: string } | { type: 'factory' } | { type: 'bank' }
   | { type: 'pc'; mode: 'office' | 'home' } | { type: 'officehr' } | { type: 'livestock' } | { type: 'dealer'; scooter?: boolean } | { type: 'trucker' } | { type: 'emotes'; dance?: boolean } | { type: 'passport' } | { type: 'trade' } | { type: 'tradeInvite' } | { type: 'plant'; key: string; basement: boolean } | { type: 'quest' } | { type: 'editor'; fresh: boolean } | { type: 'listing'; uid: string; slot: number } | { type: 'info'; title: string; text: string } | { type: 'map'; mode: 'waypoint' | 'taxi' | 'autopilot' } | { type: 'phone'; tab?: string } | { type: 'onlineJoin' } | { type: 'inventory' } | { type: 'promo' } | { type: 'settings' } | { type: 'help'; tab?: string } | { type: 'farm' } | { type: 'radio'; listenOnly?: boolean } | { type: 'bar'; name?: string; casino?: boolean } | { type: 'ozgim' } | { type: 'casino'; name?: string } | { type: 'roulette'; name?: string } | { type: 'svc'; kind: SvcKind } | { type: 'ads' };
 /** городские услуги: мойка, шиномонтаж, доставка, парковка, автомат, ломбард, садок, стоянка, запчасти */
@@ -161,6 +166,7 @@ export class Game {
   private plateHold: { vehicle: Vehicle; side: 'front' | 'back'; time: number } | null = null;
   private plateHoldDone = false;
   private testTrunks = new Map<Vehicle, { elapsed: number; opening: boolean; kind: TrunkMotionKind }>();
+  private trunkHand: { vehicle: Vehicle; started: number; kind: TrunkMotionKind } | null = null;
   seatbelt = false; private beltHold = 0; private beltTriggered = false; private beltInputGeneration = 0;
   speedCameras: SpeedCamera[] = []; private cameraSeen = new Set<string>();
   furnitureSeat: { seat: InteriorSeat; fromX: number; fromZ: number } | null = null;
@@ -294,6 +300,7 @@ export class Game {
   emote: { id: string; t0: number } | null = null;
   camMode: { mode: 'selfie' | 'rear' } | null = null; flashT = 0;
   private npcCars = new Map<string, { v: Vehicle; tx: number; tz: number; ta: number; ts: number; t: number }>();
+  private parkedInscribed = new Map<number, Map<string, Vehicle>>();
   private smoke: { s: THREE.Sprite; life: number; vx: number; vz: number }[] = []; private smokeMat = new THREE.SpriteMaterial({ color: 0xd4d4d8, transparent: true, opacity: 0.5, depthWrite: false }); private tireSmokeT = 0;
   private engineSmokeT = 0; private engineSmokeN = 0;
   /** прижим к стене (Q): нормаль стены и блокировка после прыжка */
@@ -775,6 +782,11 @@ export class Game {
   openComputerRadio() { if (this.selectComputerRadioSource()) this.openPanel({type:'radio'}); }
   openPanel(p: Panel) { if (this.economyLabPaused) return; this.beltHold = 0; this.beltTriggered = false; this.panel = p; this.input?.releaseAll(); if (this.input) this.input.enabled = false; this.input?.unlock(); this.cb.onPanel(p); this.sound.click(); }
   closePanel() {
+    if (this.panel?.type === 'trunk') {
+      const uid = this.panel.uid;
+      const car = this.vehicles.find(v => v.owned?.uid === uid);
+      const anim = car && this.testTrunks.get(car); if (anim) anim.opening = false;
+    }
     this.panel = null; this.lookOrbit = 0; if (this.input) { this.input.enabled = true; this.input.releaseAll(); } this.cb.onPanel(null);
   }
   toast(t: string) { this.cb.onToast(t); }
@@ -1078,6 +1090,7 @@ export class Game {
     if (w !== 'fists' && !WEAPONS[w]) return;
     if (w !== 'fists' && !this.state.inventory[w]) { this.toast(`Нет оружия «${WEAPONS[w].name}» — купите в оружейном магазине`); return; }
     if (w === this.weapon) return;
+    if (this.fishT >= 0) { this.fishT = -1; this.toast('Рыбалка прервана'); }
     this.weapon = w; this.combat.reset();
     this.player.setItem(this.inVeh && !this.passenger && w === 'fists' ? 'none' : w);
     if (w !== 'fists' && WEAPONS[w].melee) this.toast(`🔪 ${WEAPONS[w].name} · холодное оружие`);
@@ -1262,6 +1275,18 @@ export class Game {
     }
     ch.root.position.set(this.px, this.py + this.dip, this.pz); ch.root.rotation.set(0, this.pa, 0); ch.root.scale.setScalar(1);
     ch.pose(pose, performance.now() / 1000, phase, lean, move);
+    if (this.fishT >= 0 && ch.item === 'rod' && !inWater && !cp && !this.carrying) {
+      applyFishingVisual(ch, true);
+    }
+    if (this.trunkHand) {
+      const hand = this.trunkHand, elapsed = (performance.now() - hand.started) / 1000;
+      const v = hand.vehicle, f = v.forward();
+      if (elapsed >= TRUNK_OPEN_SECONDS[hand.kind] || !this.vehicles.includes(v) || Math.abs(v.speed) >= .3 || Math.hypot(this.px - (v.x - f.x * v.spec.len / 2), this.pz - (v.z - f.z * v.spec.len / 2)) >= 2.5 || mag > .05 || inWater || this.carrying || !!cp) this.trunkHand = null;
+      else {
+        const reach = trunkMotionPose(hand.kind, elapsed).armReach;
+        ch.shR.rotation.x = -1.5 * reach; ch.elR.rotation.x = -.5 * reach;
+      }
+    }
     if (this.hamsterAction && Date.now() - this.hamsterAction.start < HAMSTER_PET_MS && !inWater) {
       ch.torso.rotation.x = .34;
       ch.shR.rotation.x = -1.15 + Math.sin(Date.now()/120) * .12;
@@ -2102,8 +2127,10 @@ export class Game {
   castRod() {
     if ((this.state.inventory.rod ?? 0) < 1 && (this.state.inventory.rod_pro ?? 0) < 1) { this.toast('Нужна удочка — продаётся в «Поплавке» на пляже'); return; }
     if (this.fishT >= 0) { this.toast(`Поплавок на воде… ещё ${Math.ceil(this.fishT)} с`); return; }
+    if (this.inVeh || this.rideRemote || this.rideOn || this.interior || !this.nearWater()) { this.toast('Для рыбалки встаньте пешком у воды'); return; }
     this.fishT = 2.5 + Math.random() * 5;
-    this.toast('🎣 Заброс — следите за поплавком');
+    this.player.setItem('rod');
+    this.toast('🎣 Заброс — ждите поклёвки');
   }
   /** улов: возвращает текст результата (используется и в подсказке) */
   fishState() { return this.fishT; }
@@ -2207,11 +2234,13 @@ export class Game {
     }
     // рыбалка: поклёвка
     if (this.fishT >= 0) {
+      const hasRod = (this.state.inventory.rod ?? 0) > 0 || (this.state.inventory.rod_pro ?? 0) > 0;
+      const interrupted = !hasRod || !!(this.interior || this.inVeh || this.rideRemote || this.rideOn) || this.player.item !== 'rod' || !this.nearWater();
       this.fishT -= dt;
-      if (this.fishT <= 0) {
+      if (interrupted || this.fishT <= 0) {
         this.fishT = -1;
-        const near = !this.interior && this.nearWater();
-        if (!near) { this.toast('Снасть вытащена: вы ушли от воды'); }
+        if (this.player.item === 'rod') this.player.setItem(this.inVeh ? 'none' : this.weapon);
+        if (interrupted) { this.toast('Рыбалка прервана'); }
         else if (Math.random() < 0.78) {
           const inv = this.state.inventory;
           inv.fish = (inv.fish ?? 0) + 1;
@@ -2587,6 +2616,12 @@ export class Game {
       return best;
     }
     if (this.rideOn) return { text: `E — сойти (${this.rideOn.name})`, keys: ['E'], act: () => this.leaveRide() };
+    const trunkCar = this.nearbyTrunkVehicle();
+    if (trunkCar) {
+      const anim = this.testTrunks.get(trunkCar);
+      const opened = anim?.opening && anim.elapsed >= TRUNK_OPEN_SECONDS[anim.kind];
+      return { text: this.online ? 'E — тест крышки багажника' : opened ? 'E — вещи в багажнике' : 'E — открыть багажник', keys: ['E'], act: () => this.interactTrunk(trunkCar) };
+    }
     if (this.hamster?.group.visible && !this.hamsterAction && (this.online || Date.now() >= (this.state.hamsterHiddenUntil ?? 0)) && Math.hypot(this.hamster.group.position.x-px,this.hamster.group.position.z-pz)<1.5)
       return {text:'E — погладить хомяка 🐹',keys:['E'],act:()=>this.petHamster()};
     // аттракционы парка «Ракета»
@@ -3470,6 +3505,7 @@ export class Game {
   }
   sellVehicle(uidv: string) {
     const v = this.vehicles.find((x) => x.owned?.uid === uidv); const o = this.state.vehicles.find((x) => x.uid === uidv); if (!o) return;
+    if (this.trunkHasContents(uidv)) { this.toast('Сначала заберите вещи из багажника'); return; }
     if (v && !this.L.marketLot.some((m) => Math.hypot(m.x - v.x, m.z - v.z) < 40)) { this.toast('Пригоните машину на площадку авторынка'); return; }
     const price = sellPrice(o, this.marketPeriod());
     if (v && this.inVeh === v) this.exitVehicle(true);
@@ -3495,7 +3531,7 @@ export class Game {
     const v = this.vehicles.find((x) => x.owned?.uid === uidv);
     const o = this.state.vehicles.find((x) => x.uid === uidv);
     if (!o || !v) { this.toast('Машина недоступна — сначала вызовите её'); return false; }
-    if (t.subwoofer && !o.tuning.subwoofer && !hasSubwooferTrunk(v.spec.body)) { this.toast('Сабвуфер ставится в багажник машины'); return false; }
+    if (t.subwoofer && !o.tuning.subwoofer && !hasSubwooferTrunk(v.spec.body, v.spec.variant)) { this.toast('Сабвуфер ставится в багажник машины'); return false; }
     const next = { ...t, plate: o.tuning.plate, turbo: Math.max(o.tuning.turbo, t.turbo), engine: Math.max(o.tuning.engine, t.engine) };
     const cost = this.tuningCost(o.tuning, next);
     if (cost > 0 && !this.pay(cost)) return false;
@@ -3517,9 +3553,11 @@ export class Game {
     if (l.top !== old.top || l.topColor !== old.topColor) cost += TOPS.find((x) => x.id === l.top)?.price ?? 0;
     if (l.bottom !== old.bottom || l.bottomColor !== old.bottomColor) cost += BOTTOMS.find((x) => x.id === l.bottom)?.price ?? 0;
     if (l.shoes !== old.shoes) cost += 40;
-    if (!cost) { if (l.skin !== old.skin) { this.state.look = { ...l }; this.player.setLook(this.state.look); this.toast('Готово'); } else this.toast('Без изменений'); return; }
-    if (!this.pay(cost)) { this.revertLook(); return; }
-    this.state.look = { ...l }; this.player.setLook(this.state.look); this.addWardrobe(l.top); this.addWardrobe(l.bottom); this.toast(`Готово! Списано $${cost}`); this.save();
+    const changed = Object.keys(l).some(k => l[k as keyof Look] !== old[k as keyof Look]);
+    if (!changed) { this.toast('Без изменений'); return true; }
+    if (cost && !this.pay(cost)) return false;
+    this.state.look = { ...l }; this.player.setLook(this.state.look); this.addWardrobe(l.top); this.addWardrobe(l.bottom); this.toast(cost ? `Готово! Списано $${cost}` : 'Изменения сохранены'); this.save();
+    return true;
   }
   heal() { if (this.state.health >= 100) { this.toast('Вы здоровы'); return; } if (!this.pay(200)) return; this.state.health = 100; this.toast('Лечение завершено'); }
   changeGender() {
@@ -3640,6 +3678,7 @@ export class Game {
     return `Игровой ПТС · ${spec?.name ?? o.type} · ID: ${o.uid} · владелец: ${this.state.nick || 'Игрок'} · год: ${o.year} · цвет: ${o.tuning.paint ?? o.color} · госномер: ${plate} (${plates}) · пробег: ${Math.round(o.mileage / 1000)} км · состояние: ${Math.round(o.condition * 100)}%`;
   }
   toggleFirstPerson() {
+    if (this.inVeh || this.rideRemote || this.rideOn) { this.toast('В транспорте доступна камера от третьего лица'); return; }
     this.firstPerson = !this.firstPerson;
     this.toast(this.firstPerson ? '🎥 Вид от первого лица' : '🎥 Вид от третьего лица');
   }
@@ -4021,34 +4060,75 @@ export class Game {
       for (const o of [-2.3, 0, 2.3]) this.plantMesh(g, bed.x + (alongZ ? 0 : o), 0.37, bed.z + (alongZ ? o : 0), pl[key].crop, pr);
     }
   }
-  setVehicleSideText(raw: string) {
-    if(this.online){this.toast('Надписи пока доступны только в одиночной игре');return;}
-    if(this.interior || this.inVeh){this.toast('Выйдите и подойдите к своему автобусу или грузовику');return;}
-    const v=this.vehicles.filter(car=>car.owned && this.state.vehicles.includes(car.owned) && car.model.group.visible && Math.abs(car.speed)<0.3 && ['bus','truck','semi'].includes(car.spec.body))
-      .map(car=>({car,d:Math.hypot(this.px-car.x,this.pz-car.z)})).filter(x=>x.d<x.car.spec.len/2+2).sort((a,b)=>a.d-b.d)[0]?.car;
-    if(!v?.owned){this.toast('Подойдите к своему неподвижному автобусу или грузовику');return;}
+  setVehicleSideText(uid: string, raw: string): boolean {
+    if(this.online && (!this.net?.ready || this.economyLabPaused)){this.toast('Подключитесь к серверу и дождитесь сохранения');return false;}
+    const owned=this.state.vehicles.find(o=>o.uid===uid);
+    const v=this.vehicles.find(car=>car.owned===owned && car.owned?.uid===uid);
+    const atService=!!v && this.L.buildings.some(b=>b.kind==='service' && Math.hypot(b.door.x-v.x,b.door.z-v.z)<15);
+    if(this.interior || this.panel?.type!=='tuning' || this.panel.uid!==uid || !v || !owned || !v.model.group.visible || Math.abs(v.speed)>=0.3 || !atService || !['bus','truck','semi'].includes(v.spec.body)) {
+      this.toast('Надпись доступна для своего неподвижного автобуса или грузовика у автосервиса');return false;
+    }
     const text=raw.replace(/\s+/g,' ').trim();const problem=checkChat(text);
-    if(text.length>48 || problem){this.toast(problem || 'Максимум 48 символов');return;}
-    const old=v.owned.sideText;v.owned.sideText=text;
-    try {localStorage.setItem(SAVE_KEY,JSON.stringify(this.state));}catch{v.owned.sideText=old;this.toast('Не удалось сохранить надпись');return;}
-    v.model.setSideText(text);this.toast(text?'Надпись установлена':'Надпись удалена');
+    if(text.length>48 || problem){this.toast(problem || 'Максимум 48 символов');return false;}
+    const old=owned.sideText;owned.sideText=text;
+    if(this.online){this.save();}
+    else {try {localStorage.setItem(SAVE_KEY,JSON.stringify(this.state));}catch{owned.sideText=old;this.toast('Не удалось сохранить надпись');return false;}}
+    v.model.setSideText(text);this.toast(this.online ? 'Надпись изменена; сохранение отправлено на сервер' : text?'Надпись установлена':'Надпись удалена');return true;
   }
-  /** Visual-only test. Does not move or store any items or synchronize online. */
-  testTrunkCommand() {
-    if (this.inVeh || this.interior) { this.toast('Выйдите из машины и подойдите к её задней части'); return; }
-    const v = this.vehicles.filter(car => car.owned && this.state.vehicles.some(o => o.uid === car.owned?.uid) && car.model.group.visible && Math.abs(car.speed) < 0.3)
+  private nearbyTrunkVehicle(): Vehicle | undefined {
+    if (this.inVeh || this.interior || this.rideRemote || this.rideOn) return undefined;
+    return this.vehicles.filter(car => car.owned && this.state.vehicles.some(o => o.uid === car.owned?.uid) && !this.listingOfUid(car.owned.uid) && car.model.group.visible && Math.abs(car.speed) < 0.3 && trunkMotionKind(car.spec.body, car.spec.variant) !== null)
       .map(car => { const f = car.forward(); return { car, distance: Math.hypot(this.px - (car.x - f.x * car.spec.len / 2), this.pz - (car.z - f.z * car.spec.len / 2)) }; })
       .filter(x => x.distance < 2.5).sort((a,b) => a.distance - b.distance)[0]?.car;
+  }
+  private interactTrunk(v: Vehicle) {
+    if (this.nearbyTrunkVehicle() !== v) { this.toast('Подойдите сзади к своей неподвижной машине'); return; }
+    if (this.online) { this.testTrunkCommand(); return; }
+    if (this.listingOfUid(v.owned!.uid)) { this.toast('Сначала снимите машину с продажи'); return; }
+    const anim = this.testTrunks.get(v);
+    if (!anim || !anim.opening) { this.testTrunkCommand(); return; }
+    if (anim.elapsed < TRUNK_OPEN_SECONDS[anim.kind]) { this.toast('Подождите, пока багажник откроется'); return; }
+    this.openPanel({type:'trunk',uid:v.owned!.uid});
+  }
+  transferSoloTrunk(uid: string, id: string, amount: number, direction: 'put' | 'take'): boolean {
+    const car = this.nearbyTrunkVehicle();
+    const anim = car && this.testTrunks.get(car);
+    if (this.online || this.economyLabPaused || this.panel?.type !== 'trunk' || this.panel.uid !== uid || !car || car.owned?.uid !== uid || this.listingOfUid(uid) || !anim?.opening || anim.elapsed < TRUNK_OPEN_SECONDS[anim.kind] || !car.model.body.getObjectByName('experimental-trunk-pivot')) {
+      this.toast('Багажник недоступен'); return false;
+    }
+    // Оружие, маска и патроны пока исключены: у них есть состояние экипировки.
+    const allowed = new Set(Object.keys(ITEMS).filter(k => !ITEMS[k].weapon && !ITEMS[k].ammo && k !== 'mask'));
+    if (direction === 'take') for (const key of Object.keys(car.owned.trunk ?? {})) allowed.add(key);
+    let result: ReturnType<typeof transferTrunkSolo>;
+    try { result = transferTrunkSolo(this.state,uid,id,amount,direction,allowed,localStorage); }
+    catch { this.toast('Не удалось сохранить — вещи не перемещены'); return false; }
+    if (!result.ok) {
+      const errors: Record<string,string> = {storage:'Не удалось сохранить — вещи не перемещены',full:'Багажник заполнен',not_enough:'Недостаточно предметов',invalid:'Предмет недоступен',overflow:'Слишком много предметов',vehicle:'Машина недоступна'};
+      this.toast(errors[result.error] ?? 'Не удалось переместить предмет'); return false;
+    }
+    this.toast(direction === 'put' ? 'Вещи положены в багажник' : 'Вещи забраны'); return true;
+  }
+  private trunkHasContents(uid: string): boolean {
+    const trunk = this.state.vehicles.find(v => v.uid === uid)?.trunk;
+    return trunk !== undefined && trunkCount(trunk) !== 0;
+  }
+  /** Visual test also remains available online, without storage or synchronization. */
+  testTrunkCommand() {
+    const v = this.nearbyTrunkVehicle();
     if (!v) { this.toast('Подойдите сзади к своей неподвижной машине'); return; }
     const kind = trunkMotionKind(v.spec.body, v.spec.variant);
-    if (!kind || !v.model.setExperimentalTrunkAnimation(true)) { this.toast('Тест пока доступен для седанов, спорткаров и закрытых грузовиков'); return; }
+    if (!kind || !v.model.setExperimentalTrunkAnimation(true)) { this.toast('На этом транспорте багажник недоступен'); return; }
     if (!v.model.body.getObjectByName('experimental-trunk-pivot')) { this.toast('Крышка отсутствует — сначала отремонтируйте машину'); return; }
     const previous = this.testTrunks.get(v);
     const animation = previous ?? { elapsed: 0, opening: false, kind };
     animation.opening = !animation.opening;
     animation.elapsed = Math.min(animation.elapsed, TRUNK_OPEN_SECONDS[kind]);
     this.testTrunks.set(v, animation);
-    this.toast(animation.opening ? 'Тест: крышка открывается. Хранение вещей ещё не работает' : 'Тест: крышка закрывается');
+    if (animation.opening && animation.elapsed === 0) {
+      this.pa = Math.atan2(v.x - this.px, v.z - this.pz);
+      this.trunkHand = { vehicle: v, started: performance.now(), kind };
+    } else this.trunkHand = null;
+    this.toast(animation.opening ? (this.online ? 'Тест: крышка открывается. Онлайн-хранение ещё не работает' : 'Багажник открывается. После открытия нажмите E ещё раз') : 'Багажник закрывается');
   }
   // ================= ЧАТ И КОМАНДЫ =================
   chatLog(): ChatMsg[] { return this.net?.chat ?? this.localChat; }
@@ -4419,6 +4499,7 @@ export class Game {
     const w = this.playerWorldPos();
     const o = this.inVeh?.owned && !arg ? this.inVeh.owned : this.pickIndex(cars, arg, (c) => { const v = this.vehicles.find((x) => x.owned?.uid === c.uid); return v ? Math.hypot(v.x - w.x, v.z - w.z) : 1e9; }, (c, i) => `${i + 1}) ${VEHICLES[c.type].name}`, '/sellcar');
     if (!o) return;
+    if (this.trunkHasContents(o.uid)) { this.toast('Сначала заберите вещи из багажника'); return; }
     const v = this.vehicles.find((x) => x.owned?.uid === o.uid);
     const price = Math.round(carValue(o.type, o.year, o.mileage, o.condition) * 0.6);
     if (v) { if (this.inVeh === v) this.exitVehicle(true); this.removeVehicle(v); }
@@ -4759,6 +4840,7 @@ export class Game {
     return null;
   }
   listCar(uid: string, slot: number, price: number) {
+    if (this.trunkHasContents(uid)) { this.toast('Сначала заберите вещи из багажника'); return; }
     const v = this.vehicles.find((x) => x.owned?.uid === uid); const sl = this.L.bazaarSlots[slot];
     if (!v || !sl) return;
     const busy = this.slotBusy(slot); if (busy && busy !== 'Вы') { this.toast(`Место занято (${busy})`); return; }
@@ -4774,6 +4856,7 @@ export class Game {
   private sellListed(uid: string, price: number, buyer: string) {
     const o = this.state.vehicles.find((x) => x.uid === uid); const v = this.vehicles.find((x) => x.owned?.uid === uid);
     if (!o) return null;
+    if (this.trunkHasContents(uid)) { this.toast('Продажа отменена: заберите вещи из багажника'); return null; }
     if (v) { if (this.inVeh === v) this.exitVehicle(true); this.removeVehicle(v); }
     this.state.vehicles = this.state.vehicles.filter((x) => x.uid !== uid);
     this.state.listings = (this.state.listings ?? []).filter((l) => l.uid !== uid);
@@ -5156,8 +5239,18 @@ export class Game {
         i: this.interiorKey(), hp: Math.round(this.state.health),
       };
       if (this.rideRemote) st.r = this.rideRemote.id;
+      if(v?.owned && !this.passenger && ['bus','truck','semi'].includes(v.spec.body)) st.vt=validVehicleSideText(v.owned.sideText) ? v.owned.sideText : '';
+      const parked: ParkedInscribedVehicle[] = [];
+      for (const car of this.vehicles) {
+        if (parked.length >= MAX_PARKED_INSCRIBED) break;
+        const o = car.owned;
+        if (!o || car === v || !this.state.vehicles.includes(o) || !['bus','truck','semi'].includes(car.spec.body) || !validVehicleSideText(o.sideText) || !o.sideText) continue;
+        const color = '#' + new THREE.Color(car.model.tuning.paint ?? car.model.color).getHexString();
+        parked.push([o.uid,car.spec.id,color,r2(car.x),r2(car.y),r2(car.z),r2(car.heading),o.sideText]);
+      }
+      st.vp = parseParkedInscribed(parked);
       if (v) { st.lean = r2(v.lean); st.wh = r2(v.wheelie); st.steer = r2(v.steer); st.slip = r2(v.slip); st.lt = v.model.lightsOn ? 1 : 0; st.pn = v.model.tuning.plate ?? ''; st.pf = v.model.tuning.plateFront === false ? 0 : 1; st.pb = v.model.tuning.plateBack === false ? 0 : 1; }
-      if (!host) { st.p = this.lying ? 'lie' : this.fallT > 0 ? 'fall' : this.netPose.p; st.k = this.netPose.k; st.pt = this.netPose.pt; st.w = Math.max(0, WEAPON_ORDER.indexOf(this.weapon)); }
+      if (!host) { st.p = this.lying ? 'lie' : this.fallT > 0 ? 'fall' : this.netPose.p; st.k = this.netPose.k; st.pt = this.netPose.pt; st.w = Math.max(0, WEAPON_ORDER.indexOf(this.weapon)); if (this.fishT >= 0 && this.player.item === 'rod') st.fish = 1; }
       if (this.crouch && !host) st.cr = 1;
       if (v?.owned?.locked && !this.passenger) st.lk = 1;
       if (v && v.spec.service === 'taxi' && !this.passenger) st.tx = 1;
@@ -5186,7 +5279,24 @@ export class Game {
     this.updateRemotes(dt);
     this.voice.tick(dt, net.id, [...this.remotes.values()].map(r => { const distance=Math.hypot(r.x-this.px,r.z-this.pz); return {id:r.id,near:r.ikey===this.interiorKey() && distance<40,distance}; }));
   }
+  private updateParkedInscribed(owner: number, raw: unknown) {
+    const snapshots = parseParkedInscribed(raw);
+    let cars = this.parkedInscribed.get(owner);
+    if (!cars) { cars = new Map(); this.parkedInscribed.set(owner, cars); }
+    const seen = new Set<string>();
+    for (const [id,type,color,x,y,z,a,text] of snapshots) {
+      seen.add(id);
+      let car = cars.get(id);
+      if (car && (car.spec.id !== type || car.model.color !== color)) { this.removeVehicle(car); cars.delete(id); car = undefined; }
+      if (!car) { car = new Vehicle(type, 'remote', color); this.addVehicle(car); cars.set(id,car); }
+      car.place(x,z,a,y); car.model.setSideText(text);
+      car.model.group.visible = !this.interior && Math.abs(x-this.px)+Math.abs(z-this.pz)<this.drawDist();
+    }
+    for (const [id,car] of cars) if (!seen.has(id)) { this.removeVehicle(car); cars.delete(id); }
+    if (!cars.size) this.parkedInscribed.delete(owner);
+  }
   private disposeRemote(r: Remote) {
+    this.updateParkedInscribed(r.id, []);
     for (const lv of r.listings) this.removeVehicle(lv); r.listings = [];
     this.peds.removeOwner(r.id); this.removeCarPuppets(r.id);
     if (this.player.root.parent && r.veh && this.player.root.parent === r.veh.model.body) { this.scene.add(this.player.root); this.player.root.scale.setScalar(1); }
@@ -5227,6 +5337,7 @@ export class Game {
       const st = p.st && now - p.stT < 15000 ? p.st : null;
       const tx = st ? st.x : p.x, tz = st ? st.z : p.y;
       if (!isFinite(tx) || !isFinite(tz)) continue;
+      this.updateParkedInscribed(p.id, st?.vp ?? []);
       const display = p.nick ?? p.name;
       if (!r) {
         const char = new Character(randomLook()); this.scene.add(char.root);
@@ -5277,6 +5388,7 @@ export class Game {
       const ridingSeat = st?.seat ?? 0;
       if (R.veh) {
         const nv = R.veh; const ox = nv.x, oz = nv.z;
+        if(R.driving && ['bus','truck','semi'].includes(nv.spec.body)) nv.model.setSideText(validVehicleSideText(st?.vt) ? st.vt : '');
         // водитель за рулём → машина у игрока; вышел → машина остаётся стоять там, где её оставили
         if (R.driving) { nv.x = R.x; nv.z = R.z; nv.y = R.y; nv.heading = R.a; }
         nv.lean = st?.lean ?? 0; nv.wheelie = st?.wh ?? 0; nv.speed = R.driving ? R.spd : 0;
@@ -5331,7 +5443,9 @@ export class Game {
       // Reparenting during vehicle removal may already have moved it to the
       // scene while leaving the smaller seat scale behind.
       R.char.root.scale.setScalar(1);
-      const w = st?.w ?? 0; if (w !== R.weapon) { R.weapon = w; R.char.setItem(WEAPON_ORDER[w] ?? 'none'); }
+      const w = st?.w ?? 0;
+      const item = st?.fish === 1 ? 'rod' : WEAPON_ORDER[w] ?? 'none';
+      if (w !== R.weapon || R.char.item !== item) { R.weapon = w; R.char.setItem(item); }
       R.char.root.position.set(R.x, R.y, R.z); R.char.root.rotation.set(0, R.a, 0);
       const sp = Math.abs(R.spd);
       R.phase += dt * (sp > 4 ? 11 : 6.5) * Math.min(1, sp / 2);
@@ -5340,6 +5454,7 @@ export class Game {
       let ph = legPose ? R.phase : st?.k ?? 0;
       if (R.flinch > 0 && pose !== 'knock' && pose !== 'fall') { pose = 'flinch'; ph = 1 - R.flinch / 0.35; }
       R.char.pose(pose, now / 1000, ph, st?.pt ?? 0, sp > 0.3 ? 1 : 0);
+      applyFishingVisual(R.char, st?.fish === 1 && pose !== 'swim' && pose !== 'tread');
       if (pose === 'tread' || pose === 'swim') R.char.blob.visible = false;
       R.char.root.visible = R.visible;
       R.tag.position.set(R.x, R.y + 2.35, R.z); R.tag.visible = R.visible;
@@ -5542,35 +5657,20 @@ export class Game {
   }
   private updateCamera(dt: number) {
     if (this.viewOffsetOn && this.panel?.type !== 'editor') { this.camera.clearViewOffset(); this.viewOffsetOn = false; }
-    if (this.firstPerson && !this.camMode && this.panel?.type !== 'editor') {
-      const v = this.inVeh;
-      let px = this.px, py = this.py, pz = this.pz, yaw = this.camYaw;
-      let eyeY = (this.crouch ? 1.06 : 1.62) + this.dip;
-      if (v) {
-        // камера садится на место водителя (или пассажира) — видно руль, торпедо и сиденья
-        const seat = this.passenger ? (v.model.seats[1] ?? v.model.passenger) : v.model.driver;
-        const a = v.heading, ca = Math.cos(a), sa = Math.sin(a);
-        px = v.x + seat.x * ca + seat.z * sa;
-        pz = v.z - seat.x * sa + seat.z * ca;
-        py = v.y;
-        eyeY = Math.min(seat.y + 0.68, v.spec.hei - 0.16);
-        // оглядываться в салоне можно, но не назад сквозь себя
-        yaw = v.heading + clamp(angleDiff(this.camYaw, v.heading), -1.35, 1.35);
-      }
+    if (this.firstPerson && this.fishT < 0 && !this.inVeh && !this.rideRemote && !this.rideOn && !this.camMode && this.panel?.type !== 'editor') {
+      const px = this.px, py = this.py, pz = this.pz, yaw = this.camYaw;
+      const eyeY = (this.crouch ? 1.06 : 1.62) + this.dip;
       const pitch = clamp(this.camPitch * 0.9, -0.8, 0.9);
       const cp = Math.cos(pitch);
       const dx = Math.sin(yaw) * cp, dz = Math.cos(yaw) * cp;
-      this.camera.position.set(px + dx * (v ? 0.02 : 0.12), py + eyeY, pz + dz * (v ? 0.02 : 0.12));
+      this.camera.position.set(px + dx * 0.12, py + eyeY, pz + dz * 0.12);
       this.camera.lookAt(px + dx * 12, py + eyeY - Math.sin(pitch) * 12, pz + dz * 12);
       this.player.root.visible = false;
-      if (v) v.model.group.visible = true;
-      const fov = v ? 74 : 66;
-      if (Math.abs(this.camera.fov - fov) > 0.05) { this.camera.fov = fov; this.camera.updateProjectionMatrix(); }
-      if (v) this.applySpeedSway(0.7);
+      if (Math.abs(this.camera.fov - 66) > 0.05) { this.camera.fov = 66; this.camera.updateProjectionMatrix(); }
       this.followSky(dt);
       return;
     }
-    if (!this.firstPerson) this.player.root.visible = true;
+    if (!this.firstPerson || this.fishT >= 0 || this.inVeh || this.rideRemote || this.rideOn) this.player.root.visible = true;
     if (this.camMode && !this.inVeh) {
       const head = new THREE.Vector3(this.px, this.py + 1.62, this.pz);
       if (this.camMode.mode === 'selfie') {
@@ -5739,7 +5839,7 @@ export class Game {
         const spd = Math.max(6, Math.abs(this.inVeh?.speed ?? 0) * 3.6);
         return { dist: Math.round(dist), eta: Math.max(1, Math.round((dist / (spd / 3.6)) / 6) / 10), min: Math.round((this.nav?.t ?? 0) / 60), done: Math.round(this.nav?.dist ?? 0) };
       })(),
-      drift: this.inVeh ? Math.round(this.inVeh.driftScore) : 0, driftAssist: this.driftAssist, firstPerson: this.firstPerson,
+      drift: this.inVeh ? Math.round(this.inVeh.driftScore) : 0, driftAssist: this.driftAssist, firstPerson: this.firstPerson && !this.inVeh && !this.rideRemote && !this.rideOn,
       chat: this.online && this.net ? this.net.chat.filter((c) => Date.now() - c.t < 15000).slice(-5).map((c) => ({ name: c.name, text: c.text, color: c.color })) : [],
     });
   }

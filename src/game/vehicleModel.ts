@@ -127,6 +127,7 @@ export class VehicleModel {
   private plateTexture: THREE.Texture | null = null;
   private sideTextMeshes: THREE.Mesh[] = [];
   private sideTextTexture: THREE.Texture | null = null;
+  sideText = '';
   headGlow: string[] = [];
   spec: VSpec; color: string; tuning: Tuning;
   private cur!: Part;
@@ -628,7 +629,16 @@ export class VehicleModel {
     if (s.body === 'bus') {
       // Кузов с настоящими проёмами: стекло не лежит на сплошной стене кузова.
       const belt = H * 0.49, roof = H * 0.88;
-      this.box(PAINT, 0, (0.4 + belt) / 2, 0, W, belt - 0.4, L);
+      // Задний нижний отсек отделён от основного кузова и имеет крышку.
+      const bayDepth = 0.32, bayW = W * 0.6, hatchBottom = 0.64, hatchTop = Math.min(belt - 0.1, 1.32), rearZ = -L / 2 + bayDepth / 2;
+      this.box(PAINT, 0, (0.4 + belt) / 2, bayDepth / 2, W, belt - 0.4, L - bayDepth);
+      for (const sx of [-1,1]) this.box(PAINT, sx * (W + bayW) / 4, (0.4 + belt) / 2, rearZ, (W-bayW)/2, belt-0.4, bayDepth);
+      this.box(PAINT, 0, (0.4+hatchBottom)/2, rearZ, bayW, hatchBottom-.4, bayDepth);
+      this.box(PAINT, 0, (hatchTop+belt)/2, rearZ, bayW, belt-hatchTop, bayDepth);
+      this.box('c:#232326', 0, (hatchBottom+hatchTop)/2, -L/2+bayDepth-.025, bayW-.06, hatchTop-hatchBottom-.04, .04);
+      this.part('reardoor');
+      this.box(PAINT, 0, (hatchBottom+hatchTop)/2, -L/2+.02, bayW-.04, hatchTop-hatchBottom-.02, .06);
+      this.part('chassis', false);
       this.box(PAINT, 0, (roof + H) / 2, 0, W, H - roof, L);
       this.box(PAINT, 0, (belt + roof) / 2, -L / 2 + 0.18, W, roof - belt, 0.36);
       for (const sx of [1, -1]) {
@@ -703,6 +713,16 @@ export class VehicleModel {
         this.part('cargoTrim', false);
         if (s.body === 'semi') for (const sx of [-1, 1]) this.box(PAINT, sx * (W + 0.02) / 2, 2.2, bz, 0.04, 0.5, boxL - 1);
         if (v === 'reefer') { this.box('c:#334155', 0, 2.4, bz + boxL / 2 + 0.25, W * 0.7, 1.2, 0.5); this.box('glow:#38bdf8', 0, 2.4, bz + boxL / 2 + 0.51, W * 0.4, 0.1, 0.01); }
+      }
+      if (v === 'tank' || v === 'flat') {
+        // У цистерны и платформы нет задних ворот: отдельный наружный ящик.
+        const z = -L / 2 - .31, width = W * .66, depth = .58, bottom = 1.12;
+        this.part('toolbox', false);
+        this.box('c:#34383c', 0, bottom, z, width, .08, depth);
+        for (const sx of [-1,1]) this.box('c:#34383c', sx*(width/2-.04), bottom+.25, z, .08, .5, depth);
+        this.box('c:#34383c', 0, bottom+.25, z-depth/2+.04, width, .5, .08);
+        this.box('c:#34383c', 0, bottom+.25, z+depth/2-.04, width, .5, .08);
+        this.part('trunk'); this.box('c:#4b5156', 0, bottom+.54, z, width+.04, .08, depth+.04);
       }
       for (const sx of [1, -1]) this.box('glow:#f59e0b', sx * (W / 2 + 0.01), 1.1, bz, 0.02, 0.06, boxL * 0.9);
     }
@@ -1047,7 +1067,7 @@ export class VehicleModel {
   /** Sedan lids and cargo shutters are separately modelled. The sedan chassis
    * remains solid beneath its lid; the cargo body is hollow. */
   setExperimentalTrunkAnimation(enabled: boolean): boolean {
-    const supported = this.spec.body === 'sedan' || this.spec.body === 'sport' || trunkMotionKind(this.spec.body, this.spec.variant) === 'rollup';
+    const supported = trunkMotionKind(this.spec.body, this.spec.variant) !== null;
     const next = enabled && supported;
     if (next !== this.trunkAnimationEnabled) { this.trunkAnimationEnabled = next; this.rebuild(); }
     return next;
@@ -1056,7 +1076,7 @@ export class VehicleModel {
     this.trunkElapsed = Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
     if (this.trunkPivot) {
       const kind = trunkMotionKind(this.spec.body, this.spec.variant);
-      if (kind === 'hinged') this.trunkPivot.rotation.x = trunkMotionPose(kind, this.trunkElapsed).lidAngle;
+      if (kind === 'hinged') this.trunkPivot.rotation.x = trunkMotionPose(kind, this.trunkElapsed).lidAngle * (this.spec.body === 'pickup' ? -1 : 1);
       else if (kind === 'rollup') this.trunkPivot.position.y = this.trunkPivot.userData.closedY + this.trunkPivot.userData.lift * trunkMotionPose(kind, this.trunkElapsed).lidLift;
     }
   }
@@ -1071,10 +1091,11 @@ export class VehicleModel {
     this.clearTrunkPivot();
     const b = new Batcher();
     for (const p of this.parts) if (p.attached) {
-      if (this.trunkAnimationEnabled && (p.name === 'trunk' || p.name === 'cargoDoor') && p.items.length) {
+      if (this.trunkAnimationEnabled && ['trunk','cargoDoor','reardoor','tailgate'].includes(p.name) && p.items.length) {
         const e = p.items[0].m.elements;
         const isDoor = p.name === 'cargoDoor';
-        const pivot = new THREE.Vector3(e[12], e[13], e[14] + (isDoor ? 0 : Math.abs(e[10]) / 2));
+        const vertical = p.name === 'reardoor' || p.name === 'tailgate';
+        const pivot = new THREE.Vector3(e[12], e[13] + (vertical ? (p.name === 'tailgate' ? -1 : 1) * Math.abs(e[5]) / 2 : 0), e[14] + (isDoor || vertical ? 0 : Math.abs(e[10]) / 2));
         const offset = new THREE.Matrix4().makeTranslation(-pivot.x, -pivot.y, -pivot.z);
         const lidBatch = new Batcher();
         for (const it of p.items) lidBatch.add(this.resolveMat(it.mat), it.tpl, offset.clone().multiply(it.m));
@@ -1150,6 +1171,8 @@ export class VehicleModel {
     if (front) this.frontPlate = make(true); if (back) this.plate = make(false);
   }
   setSideText(text: string) {
+    if (text === this.sideText) return;
+    this.sideText=text;
     for(const m of this.sideTextMeshes){m.removeFromParent();m.geometry.dispose();(m.material as THREE.Material).dispose();}
     this.sideTextMeshes=[];this.sideTextTexture?.dispose();this.sideTextTexture=null;
     if(!text || !['bus','truck','semi'].includes(this.spec.body))return;
@@ -1174,13 +1197,14 @@ export class VehicleModel {
   }
   private syncSubwooferModel() {
     if(this.subwooferModel){this.subwooferModel.traverse(o=>{const m=o as THREE.Mesh;if(m.isMesh)m.geometry.dispose();});this.subwooferModel.removeFromParent();this.subwooferModel=null;}
-    if(!this.tuning.subwoofer || !hasSubwooferTrunk(this.spec.body))return;
+    if(!this.tuning.subwoofer || !hasSubwooferTrunk(this.spec.body, this.spec.variant))return;
     const s=this.spec, box=new THREE.Group();box.name='trunk-subwoofer';
     const width=Math.min(.65,s.wid*.4), depth=Math.min(.38,s.len*.085), height=.28;
     const casing=new THREE.Mesh(new THREE.BoxGeometry(width,height,depth),mat('c:#24262b'));casing.position.y=height/2;box.add(casing);
     const cone=new THREE.Mesh(new THREE.CylinderGeometry(width*.22,width*.22,.016,20),mat('c:#6b7280'));
     cone.position.set(0,height+.009,0);box.add(cone);
-    box.position.set(0,Math.max(.32,s.hei*.25),-s.len*.37);this.body.add(box);this.subwooferModel=box;
+    const cargo = s.body === 'truck' || s.body === 'semi';
+    box.position.set(0, cargo ? 1.12 : Math.max(.32,s.hei*.25), cargo ? -s.len / 2 + .5 : -s.len*.37);this.body.add(box);this.subwooferModel=box;
   }
   applyTuning(t: Tuning) {
     const rimsChanged = t.rims !== this.tuning.rims;

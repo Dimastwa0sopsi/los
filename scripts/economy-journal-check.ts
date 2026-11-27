@@ -12,6 +12,9 @@ assert(!new EconomyJournal(storage,'wss://user:secret@example.test/game','Тес
 assert(!j.clear('request-0000000000000002'),'чужой результат не очищает запись');
 assert(j.clear(id)&&j.read().ok,'точный результат разрешает очистку');
 assert(!j.write({...request,payload:{...request.payload,secret:'password'}}),'нельзя сохранить посторонние поля');
+const trunk={requestId:'trunk-request-0000000001',revision:4,action:'trunk',payload:{uid:'car-1',item:'water',amount:2,direction:'put'}};
+assert(j.write(trunk),'журнал сохраняет запрос багажника до отправки');const recovered=again.read();assert(recovered.ok && recovered.request?.action==='trunk','багажник восстанавливается после перезапуска');assert(j.clear(trunk.requestId),'квитанция разрешает очистку');
+for(const payload of [{...trunk.payload,item:'__proto__'},{...trunk.payload,amount:0},{...trunk.payload,direction:'drop'},{...trunk.payload,secret:'password'}])assert(!j.write({...trunk,payload}),'недопустимый перенос не записывается');
 const inaccessible={...storage,setItem:()=>{throw Error('quota');}};assert(!new EconomyJournal(inaccessible,'wss://example.test/game','Тест').write(request),'ошибка хранилища блокирует отправку');
 assert(j.write(request),'новая запись');const key=[...map.keys()][0];map.set(key,'{broken');const bad=j.read();assert(!bad.ok && !j.write(request),'повреждённая запись не удаляется и блокирует новую операцию');
 console.log('✓ журнал запросов: до отправки, перезапуск, аккаунт/сервер, повреждение и отказ хранилища');

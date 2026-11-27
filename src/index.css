@@ -1277,3 +1277,50 @@ button.tb-card:hover { background: rgba(255,255,255,.09); } button.tb-card:activ
 .limited-store .limited-card b { color:#fff; } .limited-store .limited-card small { color:#ddd4ec; line-height:1.35; }
 .limited-store .limited-card .limited-status { color:#bff8df; margin-top:5px; }
 .limited-store .limited-card .ui-btn { flex:none; }
+
+/* LOS Garage: отдельная компоновка мастерской */
+.workshop { color:#e7edf1; }
+.workshop-hero { background:linear-gradient(115deg,#14202b 0%,#172b32 70%,#25453e 100%); border:1px solid #38514f; border-left:4px solid #d7ef74; border-radius:12px; padding:18px 20px; }
+.workshop-hero small,.workshop-repair small,.workshop-checkout small,.workshop-balance small { color:#a7c3bd; letter-spacing:.14em; }
+.workshop-hero h2 { font-size:24px; letter-spacing:-.03em; }
+.workshop-balance b,.workshop-checkout b { color:#d7ef74; }
+.workshop-layout { grid-template-columns:minmax(250px, .9fr) minmax(0, 1.4fr); gap:18px; }
+.workshop-section-title { display:flex; justify-content:space-between; gap:8px; color:#8ea6a7; font-size:10px; font-weight:800; letter-spacing:.1em; margin:0 0 9px; }
+.workshop-car .car-preview { background:radial-gradient(ellipse at 50% 45%,#344e50,#16232a 70%); border:1px solid #3b5452; }
+.workshop-repair,.workshop-presets { border:1px solid #35494b; background:#172529; border-radius:12px; }
+.workshop-presets summary { cursor:pointer; font-weight:750; }.workshop-presets summary small { font-weight:400; color:#a0b6b4; }
+.workshop-tabs { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+.workshop-tab { display:flex; align-items:center; gap:6px; min-height:44px; padding:8px; color:#c3d1d0; background:#18272b; border:1px solid #34494a; border-radius:9px; font-size:12px; font-weight:700; text-align:left; cursor:pointer; }
+.workshop-tab span { font-size:17px; }.workshop-tab:hover { border-color:#789895; }.workshop-tab.on { color:#182020; background:#d7ef74; border-color:#d7ef74; }
+.workshop-tab:focus-visible,.workshop-item:focus-visible { outline:3px solid #d7ef74; outline-offset:2px; }
+.workshop-catalog-head { display:flex; justify-content:space-between; align-items:end; margin:16px 0 9px; }
+.workshop-catalog-head small { color:#89a19f; font-size:10px; letter-spacing:.1em; font-weight:700; }.workshop-catalog-head h3 { font-size:18px; font-weight:800; margin:1px 0 0; }.workshop-catalog-head > span { color:#9db0ad; font-size:11px; }
+.workshop-items { max-height:250px; grid-template-columns:repeat(auto-fill,minmax(135px,1fr)); }
+.workshop-item { background:#1a292c; border-color:#344a49; min-height:90px; }.workshop-item.on { border-color:#d7ef74; background:#33443a; }.workshop-item .ti-ico { font-size:21px; }.workshop-item .ti-price { color:#c5dc8d; opacity:1; }
+.workshop-checkout { background:#23352f; border:1px solid #415b4b; }.workshop-footnote { color:#9db0ad; font-size:11px; margin:8px 0; }
+@media(max-width:780px) { .workshop-layout { grid-template-columns:1fr; }.workshop-hero { padding:14px; }.workshop-hero h2 { font-size:20px; }.workshop-balance b { font-size:16px; } }
+@media(max-width:420px) { .workshop-tabs { grid-template-columns:repeat(2,minmax(0,1fr)); }.workshop-section-title { font-size:9px; }.workshop-items { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+
+/* Магазин одежды и парикмахерская: примерочная */
+.look-studio { color:#f4edf0; }
+.look-studio-header { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:18px 20px; margin-bottom:16px; background:linear-gradient(110deg,#35242d,#543438 65%,#6a4941); border:1px solid #74524f; border-left:4px solid #f3cba1; border-radius:12px; }
+.look-studio-header small,.look-studio-label,.look-studio-selected small { color:#d6b7ad; font-size:10px; font-weight:800; letter-spacing:.12em; }
+.look-studio-header h2 { font-size:23px; font-weight:800; letter-spacing:-.03em; margin:2px 0; }.look-studio-header p { color:#ddc9c4; font-size:12px; }
+.look-studio-balance { text-align:right; flex-shrink:0; }.look-studio-balance small { display:block; }.look-studio-balance b { color:#f3cba1; font-size:19px; }
+.look-studio .lp-wrap { grid-template-columns:minmax(230px,.9fr) minmax(0,1.4fr); gap:18px; }.look-studio .lp-side { position:static; }
+.look-studio-label { display:flex; justify-content:space-between; gap:8px; margin-bottom:2px; }.look-studio-label span { opacity:.7; }
+.look-studio-selected { display:flex; flex-direction:column; gap:2px; background:#291f25; border:1px solid #594048; padding:10px 12px; border-radius:10px; }.look-studio-selected span { font-size:12px; color:#c8b4b5; }
+.look-studio .lp-price { background:#38272c; border:1px solid #70524e; flex-wrap:wrap; padding:12px; }.look-studio .lp-price b { color:#f3cba1; }.look-studio-actions { display:flex; gap:6px; flex-wrap:wrap; }
+.look-studio-message { font-size:12px; color:#ffd3b0; }.look-studio .lp-tabs { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+.look-studio .lp-tabs button { min-height:42px; text-align:left; border-radius:9px; padding:8px; background:#2a2025; border:1px solid #584149; }.look-studio .lp-tabs button.on { color:#2e2223; background:#f3cba1; border-color:#f3cba1; }
+.look-studio-section { display:flex; justify-content:space-between; align-items:end; margin:10px 0 0; }.look-studio-section h3 { font-size:18px; font-weight:800; }.look-studio-section span { font-size:11px; color:#c6aca9; }
+.look-studio .lp-body { max-height:380px; }.look-studio .lp-body h4 { color:#d3b7af; }.look-studio .lp-grid { grid-template-columns:repeat(auto-fill,minmax(135px,1fr)); }
+.look-studio .lp-item { min-height:65px; padding:10px; background:#2b2025; border-color:#584149; }.look-studio .lp-item.on { background:#543b39; border-color:#f3cba1; }.look-studio .lp-item.on em { color:#f3cba1; }
+.look-studio button:focus-visible { outline:3px solid #f3cba1; outline-offset:2px; }.look-studio .lp-swatches button { width:32px; height:32px; }.look-studio .lp-swatches button.on { box-shadow:0 0 0 2px #f3cba1; }
+@media(max-width:780px) { .look-studio .lp-wrap { grid-template-columns:1fr; }.look-studio-header { padding:14px; }.look-studio-header h2 { font-size:20px; } }
+@media(max-width:420px) { .look-studio .lp-tabs { grid-template-columns:repeat(2,minmax(0,1fr)); }.look-studio .lp-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+
+.trunk-columns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+.trunk-columns section { min-width:0; background:rgba(255,255,255,.035); border:1px solid var(--line2); border-radius:12px; padding:10px; }
+.trunk-columns h3 { font-weight:800; margin-bottom:8px; }.trunk-columns .lg-list { max-height:300px; overflow-y:auto; }
+@media(max-width:640px) { .trunk-columns { grid-template-columns:1fr; }.trunk-columns .lg-list { max-height:180px; } }

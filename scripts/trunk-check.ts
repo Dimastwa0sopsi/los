@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import {transferTrunk, trunkCount, TRUNK_CAPACITY} from '../src/game/trunk';
+const allowed = new Set(['water','bread']);
+const inventory = {water:31,bread:2}, trunk = {bread:1};
+const before = JSON.stringify([inventory,trunk]);
+const full = transferTrunk(inventory,trunk,'water',30,'put',allowed);
+assert.deepEqual(full,{ok:false,error:'full'}); assert.equal(JSON.stringify([inventory,trunk]),before);
+const put = transferTrunk(inventory,trunk,'water',29,'put',allowed);
+assert(put.ok); assert.equal(trunkCount(put.trunk),TRUNK_CAPACITY); assert.deepEqual(put.inventory,{water:2,bread:2});
+assert.deepEqual(transferTrunk(put.inventory,put.trunk,'bread',1,'put',allowed),{ok:false,error:'full'});
+const take=transferTrunk(put.inventory,put.trunk,'water',29,'take',allowed);
+assert(take.ok); assert.deepEqual(take.inventory,inventory); assert.deepEqual(take.trunk,trunk);
+assert.deepEqual(transferTrunk(inventory,trunk,'water',32,'put',allowed),{ok:false,error:'not_enough'});
+assert.deepEqual(transferTrunk(inventory,trunk,'water',0,'put',allowed),{ok:false,error:'invalid'});
+assert.deepEqual(transferTrunk(inventory,trunk,'__proto__',1,'put',new Set(['__proto__'])),{ok:false,error:'invalid'});
+assert.equal(trunkCount({water:31}),null); assert.equal(trunkCount({water:-1}),null);
+assert.deepEqual(transferTrunk({water:2147483647},{water:1},'water',1,'take',allowed),{ok:false,error:'overflow'});
+console.log('✓ прототип багажника: 30 предметов, перемещение, лимиты, защита от повреждённых данных');

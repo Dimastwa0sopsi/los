@@ -117,8 +117,7 @@ export const COMMANDS: Cmd[] = [
   } },
 
   // ---------- транспорт ----------
-  { name: 'trunk', cat: 'car', desc: 'тест крышки: у задней части своего седана, спорткара или закрытого грузовика', run: (g) => g.testTrunkCommand() },
-  { name: 'cartext', args: '[текст]', cat: 'car', desc: 'надпись на своём автобусе или грузовике; без текста — убрать (одиночная игра)', run: (g,a) => g.setVehicleSideText(a) },
+  { name: 'trunk', cat: 'car', desc: 'открыть или закрыть крышку у задней части своего автомобиля', run: (g) => g.testTrunkCommand() },
   { name: 'sellcar', args: '[номер]', cat: 'car', desc: 'сдать машину в трейд-ин (60%)', run: (g, a) => g.sellCarCmd(a) },
   { name: 'mycars', cat: 'car', desc: 'список машин с состоянием', run: (g) => {
     const c = g.getState().vehicles;

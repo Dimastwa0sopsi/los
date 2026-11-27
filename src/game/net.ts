@@ -98,6 +98,11 @@ export interface RemoteState {
   l?: [string, string, string, string, string, string, string, string, string]; // gender, skin, hair, hairColor, top, topColor, bottom, bottomColor, shoes
   lean?: number; wh?: number; lt?: number; steer?: number; slip?: number;
   pn?: string; pf?: number; pb?: number;
+  /** Local owner's inscription on the driven vehicle; cosmetic, not an ownership proof. */
+  vt?: string;
+  /** Cosmetic snapshots of the owner's parked inscribed buses/trucks while connected. */
+  vp?: import('./parkedInscribedVehicles').ParkedInscribedVehicle[];
+  fish?: 1;                                      // только визуальная удочка, не улов
   cr?: number;                                    // присед
   lk?: number;                                    // машина заперта
   em?: number;                                    // время начала эмоции

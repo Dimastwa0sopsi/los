@@ -1,0 +1,15 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {createHamsterWorldLab,PET_MS,RUN_MS,HIDE_MS}=require('../server/hamster-world-lab.cjs');
+assert.throws(()=>createHamsterWorldLab([]));
+const w=createHamsterWorldLab([{x:10,z:5},{x:30,z:20}]);
+const first=w.snapshot(100);assert.deepEqual(first,{seq:1,phase:'idle',x:10,z:5,serverTime:100});
+assert.equal(w.pet('alice',{x:99,z:99},100).error,'too_far');
+const start=w.pet('alice',{x:9,z:5},100);assert(start.ok);assert.equal(start.world.phase,'pet');
+assert.deepEqual(w.snapshot(100),start.world);assert.equal(w.pet('bob',{x:10,z:5},101).error,'busy');
+const run=w.snapshot(100+PET_MS+RUN_MS/2);assert.equal(run.phase,'running');assert.equal(run.x,11);
+const hidden=w.snapshot(100+PET_MS+RUN_MS);assert.equal(hidden.phase,'hidden');assert.equal(hidden.x,12);
+assert.equal(w.snapshot(100+PET_MS+RUN_MS+HIDE_MS-1).phase,'hidden');
+const again=w.snapshot(100+PET_MS+RUN_MS+HIDE_MS);assert.equal(again.phase,'idle');assert.equal(again.x,30);assert(again.seq>start.world.seq);
+assert.deepEqual(w.snapshot(again.serverTime),again);
+console.log('✓ лаборатория общего хомяка: одинаковая фаза для клиентов, близость, побег, 2 минуты, возвращение');

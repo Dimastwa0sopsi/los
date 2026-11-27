@@ -10,7 +10,8 @@ const original=document.createElement.bind(document);
  const v:any={src:'',muted:false,playing:false,paused:false,removed:false,onerror:null,play(){this.playing=true;return Promise.resolve();},pause(){this.paused=true;},load(){},removeAttribute(){this.removed=true;},addEventListener(){},removeEventListener(){}};videos.push(v);return v;
 };
 for(const kind of ['apt_eco','apt_mid','apt_lux','house_city','house_village'] as const){
- const i=buildInterior(kind);assert(i.homeTv);assert(i.group.getObjectByName('home-tv-screen'));const sofa=i.seats.find(s=>s.kind==='sofa')!;
+ const i=buildInterior(kind);assert(i.homeTv);const screen=i.group.getObjectByName('home-tv-screen');assert(screen);const sofa=i.seats.find(s=>s.kind==='sofa')!;
+ if(kind.startsWith('house_')) assert(i.colliders.some(c=>screen.position.x>c.x0 && screen.position.x<c.x1 && screen.position.z>c.z0 && screen.position.z<c.z1 && c.y0===0 && Math.abs(c.y1-.84)<.001),'телевизор должен стоять на полке');
  const act=i.acts.find(a=>a.action==='home_tv');assert(act);
  const g=Object.create(Game.prototype) as any;Object.assign(g,{L:{buildings:[{}]},state:{location:{b:0}},interior:i,px:sofa.x,pz:sofa.z,furnitureSeat:null,lying:false,rideOn:null,fallT:0,remotes:new Map(),interiorKey:()=>'',toast:()=>{}});
  const before=videos.length;g.toggleFurnitureSeat();assert.equal(videos.length,before);g.toggleFurnitureSeat();

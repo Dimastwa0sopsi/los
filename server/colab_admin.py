@@ -95,11 +95,13 @@ except Exception:                                         # noqa: BLE001
     pass
 
 
-def _request(url, body=None, timeout=15):
-    """→ (код, данные). Никаких исключений наружу: 0 = сеть не ответила."""
+def _request(url, body=None, timeout=15, admin=False):
+    """→ (код, данные). Токен админки передаём заголовком, а не в URL."""
+    headers = {'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1'}
+    if admin:
+        headers['X-Admin-Token'] = ADMIN_TOKEN
     req = urllib.request.Request(
-        url, method='POST' if body is not None else 'GET',
-        headers={'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1'})
+        url, method='POST' if body is not None else 'GET', headers=headers)
     data = json.dumps(body).encode() if body is not None else None
     try:
         with urllib.request.urlopen(req, data=data, timeout=timeout) as r:
@@ -117,8 +119,8 @@ def _request(url, body=None, timeout=15):
 def api(path, body=None, timeout=15):
     if not BASE:
         return {'ok': False, 'error': 'Адрес сервера не задан'}
-    url = f'{BASE}{path}{"&" if "?" in path else "?"}token={ADMIN_TOKEN}'
-    code, data = _request(url, body, timeout)
+    url = f'{BASE}{path}'
+    code, data = _request(url, body, timeout, admin=True)
     if isinstance(data, dict):
         return data
     if code in (401, 403):
@@ -216,7 +218,7 @@ def refresh_conn(deep=False):
         CONN.update(ok=False, code=0, pub=0, why={'level': 'down', 'title': 'Адрес сервера не задан',
                                                   'hints': ['Вставьте адрес сверху и нажмите «Подключиться».']})
         return None
-    code, data = _request(f'{BASE}/admin/state?token={ADMIN_TOKEN}', None, 10)
+    code, data = _request(f'{BASE}/admin/state', None, 10, admin=True)
     state = data if isinstance(data, dict) and data.get('ok') else None
     pub, pub_body = (public_version() if (deep or not state) else (CONN['pub'], CONN['pub_body']))
     eff = code if state else (code if code and code != 200 else 0)

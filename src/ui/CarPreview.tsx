@@ -7,7 +7,7 @@ import { VEHICLES, type Tuning } from '../game/data';
  * 3D-показ машины в автосервисе: отдельная мини-сцена, вращение мышью/пальцем,
  * живое обновление при выборе тюнинга.
  */
-export function CarPreview({ type, color, tuning, height = 220 }: { type: string; color: string; tuning: Tuning; height?: number }) {
+export function CarPreview({ type, color, tuning, sideText = '', height = 220 }: { type: string; color: string; tuning: Tuning; sideText?: string; height?: number }) {
   const host = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -85,6 +85,8 @@ export function CarPreview({ type, color, tuning, height = 220 }: { type: string
     s.model.applyTuning({ ...tuning });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(tuning), ready]);
+
+  useEffect(() => { state.current?.model.setSideText(sideText); }, [sideText, ready, type, color, height]);
 
   return (
     <div className="car-preview">

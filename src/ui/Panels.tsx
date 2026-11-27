@@ -14,6 +14,8 @@ import { HelpPanel } from './Help';
 import { AdsPanel } from './AdsPanel';
 import { AuctionPanel } from './AuctionPanel';
 import { CASINO_ITEMS, ROULETTE_MIN, ROULETTE_MAX, type RouletteBet } from '../game/roulette';
+import { validVehicleSideText } from '../game/vehicleSideText';
+import { TRUNK_CAPACITY, trunkCount } from '../game/trunk';
 
 const $ = (n: number) => '$' + Math.round(n).toLocaleString('ru');
 
@@ -189,6 +191,7 @@ export function GamePanel({ g, panel, close }: { g: Game; panel: Panel; close: (
     case 'info': return <Modal title={panel.title} onClose={close}><p>{panel.text}</p></Modal>;
     case 'phone': return <Tablet g={g} close={close} initial={panel.tab} />;
     case 'inventory': return <Modal title="🎒 Инвентарь" onClose={close} wide><InventoryGrid g={g} /></Modal>;
+    case 'trunk': return <TrunkPanel g={g} uid={panel.uid} close={close} />;
     case 'bar': return <BarMenu g={g} close={close} name={panel.name} casino={panel.casino} />;
     case 'roulette': return <RoulettePanel g={g} close={close} />;
     case 'ozgim': return <Ozgim g={g} close={close} />;
@@ -199,6 +202,22 @@ export function GamePanel({ g, panel, close }: { g: Game; panel: Panel; close: (
     case 'ads': return <AdsPanel g={g} close={close} />;
     default: return null;
   }
+}
+
+function TrunkPanel({g,uid,close}:{g:Game;uid:string;close:()=>void}) {
+  const [,tick] = useState(0);
+  const state = g.getState(), car = state.vehicles.find(v => v.uid === uid);
+  const trunk = car?.trunk ?? {}, used = trunkCount(trunk);
+  const inventory = Object.entries(state.inventory).filter(([id,n]) => n > 0 && ITEMS[id] && !ITEMS[id].weapon && !ITEMS[id].ammo && id !== 'mask');
+  const stored = Object.entries(trunk).filter(([,n]) => Number.isSafeInteger(n) && n > 0);
+  const move = (id:string, count:number, direction:'put'|'take') => { g.transferSoloTrunk(uid,id,count,direction); tick(x=>x+1); };
+  const list = (items:[string,number][],direction:'put'|'take') => items.length ? items.map(([id,n]) => <div className="lg-row" key={id}><span className="lg-ico">{ITEMS[id]?.icon ?? '📦'}</span><div className="flex-1"><b>{ITEMS[id]?.name ?? id}</b><small>Количество: {n}</small></div><button className="lg-btn sm" onClick={()=>move(id,1,direction)} aria-label={`${direction === 'put' ? 'Положить' : 'Забрать'} один: ${ITEMS[id]?.name ?? id}`}>1</button><button className="lg-btn sm" onClick={()=>move(id,n,direction)}>Все</button></div>) : <p className="opacity-70">Пусто</p>;
+  return <Modal title="📦 Багажник" onClose={close} wide>
+    <p className="lg-money-line">Одиночная игра · занято: <b>{used === null ? 'ошибка данных' : `${used} / ${TRUNK_CAPACITY}`}</b></p>
+    <p className="text-xs opacity-70 mb-3">Оружие, патроны и надетые маски пока нельзя положить. Перед продажей машины заберите вещи.</p>
+    <div className="trunk-columns"><section><h3>🎒 Инвентарь · положить</h3><div className="lg-list">{list(inventory,'put')}</div></section><section><h3>📦 Багажник · забрать</h3><div className="lg-list">{list(stored,'take')}</div></section></div>
+    <button className="lg-btn mt-3" onClick={close}>Закрыть багажник</button>
+  </Modal>;
 }
 
 function RoulettePanel({g,close}:{g:Game;close:()=>void}) {
@@ -444,6 +463,7 @@ function TuningPanel({ g, uid, close }: { g: Game; uid: string; close: () => voi
   const [t, setT] = useState<Tuning>({ ...o.tuning });
   const [cat, setCat] = useState<TuneCat>('body');
   const [msg, setMsg] = useState('');
+  const [sideText, setSideText] = useState(o.sideText ?? '');
   const [, f] = useState(0);
   useEffect(() => { g.previewTuning(uid, t); }, [t, g, uid]);
   useEffect(() => () => g.revertTuning(uid), [g, uid]);
@@ -454,31 +474,42 @@ function TuningPanel({ g, uid, close }: { g: Game; uid: string; close: () => voi
   const Opt = ({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) => <button className={`lg-chip ${on ? 'on' : ''}`} onClick={onClick}>{children}</button>;
   const seenPatches = new Set<string>();
   const items = TUNE_CATALOG.filter(it => {
-    if (it.cat !== cat || Object.keys(it.patch).length === 0 || it.patch.kit || (it.id === 'subwoofer' && !hasSubwooferTrunk(VEHICLES[o.type].body))) return false;
+    if (it.cat !== cat || Object.keys(it.patch).length === 0 || it.patch.kit || (it.id === 'subwoofer' && !hasSubwooferTrunk(VEHICLES[o.type].body, VEHICLES[o.type].variant))) return false;
     const key = JSON.stringify(it.patch); if (seenPatches.has(key)) return false; seenPatches.add(key); return true;
   });
   const unavailable = !v;
   const repairPrice = Math.round(rc * (Date.now() < (g.getState().insuredUntil ?? 0) ? 0.5 : 1));
-  return (<Modal title="🔧 Мастерская" onClose={() => { g.revertTuning(uid); close(); }} wide>
+  const changed = Object.keys(t).some(k => t[k as keyof Tuning] !== o.tuning[k as keyof Tuning]);
+  return (<Modal title="🔧 Автосервис" onClose={() => { g.revertTuning(uid); close(); }} wide>
     <div className="workshop">
       <div className="workshop-hero">
-        <div><small>АВТОСЕРВИС / МАШИНА</small><h2>{VEHICLES[o.type].name}</h2><p>Настройте машину и посмотрите результат до оплаты.</p></div>
+        <div><small>LOS GARAGE / МАСТЕРСКАЯ</small><h2>{VEHICLES[o.type].name}</h2><p>Ремонт, внешний вид и улучшения в одном месте.</p></div>
         <div className="workshop-balance"><small>ВАШ БАЛАНС</small><b>{$(g.getState().money)}</b></div>
       </div>
       {unavailable && <p className="workshop-warning">Вызовите машину поблизости, чтобы выполнить работы.</p>}
       <div className="workshop-layout">
       <div className="workshop-car">
-        <CarPreview type={o.type} color={t.paint ?? o.color} tuning={t} />
+        <div className="workshop-section-title"><span>01 / ВАШ АВТОМОБИЛЬ</span><span>3D ПРЕДПРОСМОТР</span></div>
+        <CarPreview type={o.type} color={t.paint ?? o.color} tuning={t} sideText={validVehicleSideText(sideText.replace(/\s+/g,' ').trim()) ? sideText.replace(/\s+/g,' ').trim() : ''} />
         <div className="workshop-repair"><div><small>СОСТОЯНИЕ</small><b>{Math.round(o.condition * 100)}%</b><span>Отсутствует деталей: {v ? v.model.missingParts().length + v.model.missingWheels() : '—'}</span></div><button className="lg-btn sm" disabled={unavailable} onClick={() => { g.repairVehicle(uid); f((x) => x + 1); }}>Ремонт · {$(repairPrice)}</button></div>
         {msg && <p className="text-xs mt-1" style={{ color: '#a5b4fc' }}>{msg}</p>}
       </div>
       <div className="workshop-controls">
-        <div className="workshop-presets"><b>Готовые образы</b><div className="flex flex-wrap gap-1 mt-1">
+        {['bus','truck','semi'].includes(VEHICLES[o.type].body) && <div className="workshop-presets">
+          <b>Надпись на борту</b><p className="text-xs opacity-70">До 48 символов. Ссылки и @ запрещены. Применяется отдельно от тюнинга.</p>
+          <input aria-label="Надпись на транспорте" className="lg-input" maxLength={48} value={sideText} onChange={e=>setSideText(e.target.value)} placeholder="Текст на автобусе или грузовике" />
+          <div className="flex flex-wrap gap-2 mt-2"><button className="lg-btn" disabled={unavailable} onClick={()=>{if(g.setVehicleSideText(uid,sideText)){setSideText(sideText.replace(/\s+/g,' ').trim());setMsg(g.online ? 'Надпись изменена; сохранение отправлено на сервер' : 'Надпись установлена');f(x=>x+1);}else setMsg('Надпись не установлена: проверьте текст и расположение машины');}}>Установить надпись</button>
+          <button className="lg-btn" disabled={unavailable} onClick={()=>{if(g.setVehicleSideText(uid,'')){setSideText('');setMsg('Надпись удалена');f(x=>x+1);}}}>Убрать</button></div>
+          {g.online && <p className="text-xs opacity-70">Другие игроки видят надписи на вашей машине за рулём и максимум на 12 припаркованных автобусах и грузовиках, пока вы в сети. После отключения владельца припаркованные машины исчезают.</p>}
+        </div>}
+        <details className="workshop-presets"><summary>Готовые образы <small>· быстрый выбор</small></summary><div className="flex flex-wrap gap-1 mt-2">
           <button className="lg-chip" onClick={() => { setT(p => ({ ...p, rims: 3, spoiler: true, clearance: -1 })); setMsg('Спортивный вид — предпросмотр'); }}>🏁 Спорт</button>
           <button className="lg-chip" onClick={() => { setT(p => ({ ...p, chrome: true, rims: 0, tint: 1 })); setMsg('Классический вид — предпросмотр'); }}>✨ Классика</button>
           <button className="lg-chip" onClick={() => { setT(p => ({ ...p, rims: 1, clearance: 2, neon: null })); setMsg('Для бездорожья — предпросмотр'); }}>🌲 Бездорожье</button>
-        </div></div>
-        <div className="workshop-tabs">{TUNE_CATS.map((c) => <button key={c.id} className={`lg-chip ${cat === c.id ? 'on' : ''}`} onClick={() => setCat(c.id)}>{c.icon} {c.name}</button>)}</div>
+        </div></details>
+        <div className="workshop-section-title"><span>02 / КАТАЛОГ РАБОТ</span><span>ВЫБЕРИТЕ КАТЕГОРИЮ</span></div>
+        <div className="workshop-tabs" role="group" aria-label="Категории тюнинга">{TUNE_CATS.map((c) => <button key={c.id} aria-pressed={cat === c.id} className={`workshop-tab ${cat === c.id ? 'on' : ''}`} onClick={() => setCat(c.id)}><span>{c.icon}</span>{c.name}</button>)}</div>
+        <div className="workshop-catalog-head"><div><small>ВЫБРАННЫЙ РАЗДЕЛ</small><h3>{TUNE_CATS.find(c => c.id === cat)?.name}</h3></div><span>{items.length} вариантов</span></div>
         <div className="workshop-items">
           {items.map((it) => (
             <button key={it.id} disabled={(it.patch.turbo !== undefined && it.patch.turbo < o.tuning.turbo) || (it.patch.engine !== undefined && it.patch.engine < o.tuning.engine)} className={`workshop-item ${Object.entries(it.patch).every(([k, val]) => t[k as keyof Tuning] === val) ? 'on' : ''}`}
@@ -489,15 +520,15 @@ function TuningPanel({ g, uid, close }: { g: Game; uid: string; close: () => voi
             </button>
           ))}
         </div>
-        <Row label={`Покраска (${$(TUNE_PRICES.paint)})`}>{PAINT_COLORS.map((c) => <button key={c} className={`lg-swatch ${t.paint === c ? 'on' : ''}`} style={{ background: c }} title={`Краска ${c}`} aria-label={`Краска ${c}`} onClick={() => setT({ ...t, paint: c })} />)}</Row>
-        <Row label={`Тонировка (${$(TUNE_PRICES.tint)})`}>{[0, 1, 2, 3].map((n) => <Opt key={n} on={t.tint === n} onClick={() => setT({ ...t, tint: n })}>{['Нет', '30%', '60%', '90%'][n]}</Opt>)}</Row>
-        <Row label={`Турбина (${$(TUNE_PRICES.turbo)}/ст.)`}>{[0, 1, 2, 3].map((n) => <Opt key={n} on={t.turbo === n} onClick={() => setT({ ...t, turbo: Math.max(o.tuning.turbo, n) })}>{n ? 'Ст.' + n : 'Сток'}</Opt>)}</Row>
-        <Row label={`Двигатель (${$(TUNE_PRICES.engine)}/ст.)`}>{[0, 1, 2, 3].map((n) => <Opt key={n} on={t.engine === n} onClick={() => setT({ ...t, engine: Math.max(o.tuning.engine, n) })}>{n ? 'Ст.' + n : 'Сток'}</Opt>)}</Row>
-        <Row label={`Клиренс (${$(TUNE_PRICES.clearance)})`}>{[-2, -1, 0, 1, 2].map((n) => <Opt key={n} on={t.clearance === n} onClick={() => setT({ ...t, clearance: n })}>{n > 0 ? '+' + n : n}</Opt>)}</Row>
-        <Row label={`Неон (${$(TUNE_PRICES.neon)})`}><Opt on={!t.neon} onClick={() => setT({ ...t, neon: null })}>Нет</Opt>{NEON_COLORS.map((c) => <button key={c} className={`lg-swatch ${t.neon === c ? 'on' : ''}`} style={{ background: c }} title={`Неон ${c}`} aria-label={`Неон ${c}`} onClick={() => setT({ ...t, neon: c })} />)}</Row>
-        <Row label={`Фары (${$(TUNE_PRICES.lights)})`}>{LIGHT_COLORS.map((c) => <button key={c} className={`lg-swatch ${!t.rainbow && t.lights === c ? 'on' : ''}`} style={{ background: c }} title={`Фары ${c}`} aria-label={`Фары ${c}`} onClick={() => setT({ ...t, lights: c, rainbow: false })} />)}<Opt on={!!t.rainbow} onClick={() => setT({ ...t, rainbow: !t.rainbow })}>🌈 радужные ($12 000)</Opt></Row>
-        <div className="workshop-checkout"><div className="flex-1"><small>К ОПЛАТЕ</small><b>{$(cost)}</b></div><button className="lg-btn" onClick={() => setT({ ...o.tuning })}>Сброс</button><button className="lg-btn lg-btn-main" disabled={unavailable} onClick={() => { const ok = g.applyTuning(uid, t); setMsg(ok ? 'Установлено и сохранено' : 'Не удалось установить: проверьте баланс и машину'); f((x) => x + 1); }}>Установить</button></div>
-        <p className="text-xs opacity-70 mt-1">Фары включаются клавишей H. Радужные фары переливаются всеми цветами. Изменения сохраняются.</p>
+        {cat === 'body' && <Row label={`Покраска (${$(TUNE_PRICES.paint)})`}>{PAINT_COLORS.map((c) => <button key={c} className={`lg-swatch ${t.paint === c ? 'on' : ''}`} style={{ background: c }} title={`Краска ${c}`} aria-label={`Краска ${c}`} onClick={() => setT({ ...t, paint: c })} />)}</Row>}
+        {cat === 'lights' && <Row label={`Тонировка (${$(TUNE_PRICES.tint)})`}>{[0, 1, 2, 3].map((n) => <Opt key={n} on={t.tint === n} onClick={() => setT({ ...t, tint: n })}>{['Нет', '30%', '60%', '90%'][n]}</Opt>)}</Row>}
+        {cat === 'perf' && <Row label={`Турбина (${$(TUNE_PRICES.turbo)}/ст.)`}>{[0, 1, 2, 3].map((n) => <Opt key={n} on={t.turbo === n} onClick={() => setT({ ...t, turbo: Math.max(o.tuning.turbo, n) })}>{n ? 'Ст.' + n : 'Сток'}</Opt>)}</Row>}
+        {cat === 'perf' && <Row label={`Двигатель (${$(TUNE_PRICES.engine)}/ст.)`}>{[0, 1, 2, 3].map((n) => <Opt key={n} on={t.engine === n} onClick={() => setT({ ...t, engine: Math.max(o.tuning.engine, n) })}>{n ? 'Ст.' + n : 'Сток'}</Opt>)}</Row>}
+        {cat === 'body' && <Row label={`Клиренс (${$(TUNE_PRICES.clearance)})`}>{[-2, -1, 0, 1, 2].map((n) => <Opt key={n} on={t.clearance === n} onClick={() => setT({ ...t, clearance: n })}>{n > 0 ? '+' + n : n}</Opt>)}</Row>}
+        {cat === 'neon' && <Row label={`Неон (${$(TUNE_PRICES.neon)})`}><Opt on={!t.neon} onClick={() => setT({ ...t, neon: null })}>Нет</Opt>{NEON_COLORS.map((c) => <button key={c} className={`lg-swatch ${t.neon === c ? 'on' : ''}`} style={{ background: c }} title={`Неон ${c}`} aria-label={`Неон ${c}`} onClick={() => setT({ ...t, neon: c })} />)}</Row>}
+        {cat === 'lights' && <Row label={`Фары (${$(TUNE_PRICES.lights)})`}>{LIGHT_COLORS.map((c) => <button key={c} className={`lg-swatch ${!t.rainbow && t.lights === c ? 'on' : ''}`} style={{ background: c }} title={`Фары ${c}`} aria-label={`Фары ${c}`} onClick={() => setT({ ...t, lights: c, rainbow: false })} />)}<Opt on={!!t.rainbow} onClick={() => setT({ ...t, rainbow: !t.rainbow })}>🌈 радужные ($12 000)</Opt></Row>}
+        <div className="workshop-checkout"><div className="flex-1"><small>{changed ? 'ИТОГО ЗА ИЗМЕНЕНИЯ' : 'НЕТ ИЗМЕНЕНИЙ'}</small><b>{$(cost)}</b></div><button className="lg-btn" disabled={!changed} onClick={() => { setT({ ...o.tuning }); setMsg('Предпросмотр сброшен'); }}>Сброс</button><button className="lg-btn lg-btn-main" disabled={unavailable || !changed} onClick={() => { const ok = g.applyTuning(uid, t); setMsg(ok ? 'Установлено и сохранено' : 'Не удалось установить: проверьте баланс и машину'); f((x) => x + 1); }}>Установить</button></div>
+        <p className="workshop-footnote">Выбор — это предпросмотр. Оплата только после установки. Фары включаются клавишей H.</p>
       </div>
       </div>
     </div>
@@ -507,6 +538,7 @@ function TuningPanel({ g, uid, close }: { g: Game; uid: string; close: () => voi
 function LookPanel({ g, close, mode }: { g: Game; close: () => void; mode: 'clothes' | 'barber' }) {
   const s = g.getState();
   const [l, setL] = useState<Look>({ ...s.look });
+  const [lookMessage, setLookMessage] = useState('');
   const [tab, setTab] = useState<'top' | 'outer' | 'dress' | 'bottom' | 'shoes' | 'color' | 'face' | 'hair'>(mode === 'barber' ? 'hair' : 'top');
   useEffect(() => { g.previewLook(l); }, [l, g]);
   const set = (p: Partial<Look>) => setL((o) => ({ ...o, ...p }));
@@ -521,7 +553,7 @@ function LookPanel({ g, close, mode }: { g: Game; close: () => void; mode: 'clot
   })();
   const Item = ({ id, name, p }: { id: string; name: string; p: number }) => (
     <button className={`lp-item ${l.top === id || l.bottom === id ? 'on' : ''}`} onClick={() => set(TOPS.some((t) => t.id === id) ? { top: id } : { bottom: id })}>
-      <span>{name}</span><em>{l.top === id || l.bottom === id ? 'надето' : `$${p}`}</em>
+      <span>{name}</span><em>{l.top === id || l.bottom === id ? 'Выбрано' : `$${p}`}</em>
     </button>
   );
   const Sw = ({ k, list }: { k: keyof Look; list: string[] }) => (
@@ -537,16 +569,23 @@ function LookPanel({ g, close, mode }: { g: Game; close: () => void; mode: 'clot
     : [['top', '👕 Верх'], ['outer', '🧥 Верхняя'], ...(l.gender === 'f' ? [['dress', '👗 Платья'] as [typeof tab, string]] : []), ['bottom', '👖 Низ'], ['shoes', '👟 Обувь'], ['color', '🎨 Цвет'], ['face', '🙂 Лицо']];
   return (
     <Modal title={mode === 'clothes' ? '👕 Магазин одежды «Мода»' : '✂️ Парикмахерская «Стиль»'} onClose={() => { g.revertLook(); close(); }} wide>
+      <div className={`look-studio ${mode === 'barber' ? 'is-barber' : ''}`}>
+      <header className="look-studio-header"><div><small>{mode === 'barber' ? 'LOS / БЬЮТИ-СТУДИЯ' : 'LOS / ГАРДЕРОБ'}</small><h2>{mode === 'barber' ? 'Ваш новый образ' : 'Соберите свой образ'}</h2><p>Примеряйте и меняйте детали до оплаты.</p></div><div className="look-studio-balance"><small>БАЛАНС</small><b>{$(s.money)}</b></div></header>
       <div className="lp-wrap">
         <div className="lp-side">
+          <div className="look-studio-label">01 / ПРИМЕРКА <span>3D</span></div>
           <LookPreview look={l} height={320} />
+          <div className="look-studio-selected"><small>ВЫБРАННЫЙ ОБРАЗ</small><b>{TOPS.find(t => t.id === l.top)?.name ?? l.top}</b><span>{BOTTOMS.find(b => b.id === l.bottom)?.name ?? l.bottom}</span></div>
           <div className="lp-price">
             <div><small>К оплате</small><b>{price ? $(price) : 'бесплатно'}</b></div>
-            <button className="lg-btn lg-btn-main" onClick={() => { g.buyLook(l); close(); }}>✔ Купить и надеть</button>
+            <div className="look-studio-actions"><button className="lg-btn" onClick={() => { setL({ ...s.look }); setLookMessage('Образ сброшен'); }}>Сброс</button><button className="lg-btn lg-btn-main" onClick={() => { if (g.buyLook(l)) close(); else setLookMessage('Не удалось сохранить образ: проверьте баланс'); }}>Применить</button></div>
           </div>
+          {lookMessage && <p className="look-studio-message" role="status">{lookMessage}</p>}
         </div>
         <div className="lp-shop">
-          <div className="lp-tabs">{tabs.map(([k, n]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{n}</button>)}</div>
+          <div className="look-studio-label">02 / КАТАЛОГ <span>ВЫБЕРИТЕ РАЗДЕЛ</span></div>
+          <div className="lp-tabs" role="group" aria-label="Разделы образа">{tabs.map(([k, n]) => <button key={k} aria-pressed={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{n}</button>)}</div>
+          <div className="look-studio-section"><h3>{tabs.find(([k]) => k === tab)?.[1]}</h3><span>Выберите вариант</span></div>
           <div className="lp-body">
             {tab === 'hair' && <>
               <h4>Причёска</h4><Chips k="hair" opts={HAIR_STYLES} />
@@ -592,6 +631,7 @@ function LookPanel({ g, close, mode }: { g: Game; close: () => void; mode: 'clot
             </>}
           </div>
         </div>
+      </div>
       </div>
     </Modal>
   );

@@ -208,6 +208,11 @@ def make_server(state_alive=True):
         url = req.full_url if hasattr(req, 'full_url') else str(req)
         calls.append(url + ('|' + data.decode() if data else ''))
         path = url.split('?')[0]
+        if '/admin/' in path:
+            assert 'token=' not in url, 'admin token must not appear in the URL'
+            assert req.get_header('X-admin-token'), 'admin request must include the token header'
+        elif path.endswith('/version'):
+            assert not req.get_header('X-admin-token'), 'public request must not contain the admin token'
         if not state_alive:
             return FakeResp(404, '<html>ngrok</html>')
         if path.endswith('/admin/state'):

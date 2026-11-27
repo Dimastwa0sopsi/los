@@ -1,6 +1,7 @@
 // Транспорт: сущность, физика игрока (передачи, станты, вертолёт), ИИ-водитель по дорожному графу
 import * as THREE from 'three';
 import { VehicleModel } from './vehicleModel';
+import { validVehicleSideText } from './vehicleSideText';
 import type { VSpec } from './data';
 import { randomPlate } from './data';
 import type { WorldLayout } from './worldgen';
@@ -43,7 +44,7 @@ export class Vehicle {
   constructor(type: string, role: VRole, color?: string, owned?: OwnedVehicle) {
     this.model = new VehicleModel(type, color ?? owned?.color, owned?.tuning);
     this.spec = this.model.spec; this.role = role;
-    if (owned) { this.owned = owned; this.condition = owned.condition; this.fuel = owned.fuel; this.mileage = owned.mileage; delete owned.dirt; if (owned.missing.length) this.model.setMissing(owned.missing); if (typeof owned.sideText === 'string') this.model.setSideText(owned.sideText.slice(0,48)); }
+    if (owned) { this.owned = owned; this.condition = owned.condition; this.fuel = owned.fuel; this.mileage = owned.mileage; delete owned.dirt; if (owned.missing.length) this.model.setMissing(owned.missing); if (validVehicleSideText(owned.sideText)) this.model.setSideText(owned.sideText); }
     // номерной знак: у всех машин, у которых он физически есть
     if (this.model.tuning.plate === undefined && this.spec.body !== 'moto' && this.spec.body !== 'scooter' && this.spec.body !== 'heli' && this.spec.body !== 'combine' && this.spec.body !== 'quad') {
       this.model.tuning.plate = randomPlate();

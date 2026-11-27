@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {previewVehicleRefund} from '../src/game/vehicleRefundPreview';
+const cars=[{uid:'a',type:'old',paid:23000},{uid:'b',type:'keep',paid:1000}];
+const original=JSON.stringify(cars);
+assert.deepEqual(previewVehicleRefund(500,cars,new Set(['keep'])),{ok:true,refund:23000,balance:23500,removed:['a'],kept:['b']});
+assert.equal(JSON.stringify(cars),original);
+assert.deepEqual(previewVehicleRefund(0,[{uid:'a',type:'old',paid:-1}],new Set()),{ok:false,error:'missing_price'});
+assert.deepEqual(previewVehicleRefund(0,[{uid:'a',type:'old',paid:50,trunk:{water:1}}],new Set()),{ok:false,error:'trunk_not_empty'});
+assert.deepEqual(previewVehicleRefund(0,[cars[0],cars[0]],new Set()),{ok:false,error:'invalid_state'});
+assert.deepEqual(previewVehicleRefund(2147483640,[{uid:'a',type:'old',paid:20}],new Set()),{ok:false,error:'money_limit'});
+console.log('✓ пробный расчёт возврата: без изменений сохранения, проверка стоимости, багажника и переполнения');
