@@ -125,6 +125,8 @@ export class VehicleModel {
   frontPlate: THREE.Mesh | null = null;
   plateKey = '';
   private plateTexture: THREE.Texture | null = null;
+  private sideTextMeshes: THREE.Mesh[] = [];
+  private sideTextTexture: THREE.Texture | null = null;
   headGlow: string[] = [];
   spec: VSpec; color: string; tuning: Tuning;
   private cur!: Part;
@@ -1147,6 +1149,19 @@ export class VehicleModel {
     };
     if (front) this.frontPlate = make(true); if (back) this.plate = make(false);
   }
+  setSideText(text: string) {
+    for(const m of this.sideTextMeshes){m.removeFromParent();m.geometry.dispose();(m.material as THREE.Material).dispose();}
+    this.sideTextMeshes=[];this.sideTextTexture?.dispose();this.sideTextTexture=null;
+    if(!text || !['bus','truck','semi'].includes(this.spec.body))return;
+    const canvas=document.createElement('canvas');canvas.width=2048;canvas.height=256;
+    const ctx=canvas.getContext('2d');if(!ctx)return;
+    ctx.clearRect(0,0,canvas.width,canvas.height);ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.font='bold 150px system-ui, sans-serif';ctx.lineWidth=12;ctx.strokeStyle='#111827';ctx.fillStyle='#ffffff';
+    ctx.strokeText(text,1024,128,1920);ctx.fillText(text,1024,128,1920);
+    const tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=4;this.sideTextTexture=tex;
+    for(const side of [-1,1]){const m=new THREE.Mesh(new THREE.PlaneGeometry(Math.min(this.spec.len*.62,5.5),.55),new THREE.MeshBasicMaterial({map:tex,transparent:true,depthWrite:false}));
+      m.name='vehicle-side-text';m.position.set(side*(this.spec.wid/2+.04),this.spec.hei*.35,-this.spec.len*.1);m.rotation.y=side*Math.PI/2;this.body.add(m);this.sideTextMeshes.push(m);}
+  }
   /** перелив радужных фар (вызывается каждый кадр) */
   updateRainbow(t: number) {
     if (!this.tuning.rainbow) return;
@@ -1258,5 +1273,5 @@ export class VehicleModel {
     for (const w of this.frontWheels) w.rotation.y = -steer * 0.5;
     if (this.steerHandle) this.steerHandle.rotation.z = -steer;
   }
-  dispose() { this.clearTrunkPivot(); for (const m of this.meshes) m.geometry.dispose(); if(this.subwooferModel){this.subwooferModel.traverse(o=>{const m=o as THREE.Mesh;if(m.isMesh)m.geometry.dispose();});this.subwooferModel.removeFromParent();this.subwooferModel=null;} for (const p of [this.plate, this.frontPlate]) if (p) { p.geometry.dispose(); (p.material as THREE.Material).dispose(); } this.plateTexture?.dispose(); this.group.parent?.remove(this.group); }
+  dispose() { this.setSideText(''); this.clearTrunkPivot(); for (const m of this.meshes) m.geometry.dispose(); if(this.subwooferModel){this.subwooferModel.traverse(o=>{const m=o as THREE.Mesh;if(m.isMesh)m.geometry.dispose();});this.subwooferModel.removeFromParent();this.subwooferModel=null;} for (const p of [this.plate, this.frontPlate]) if (p) { p.geometry.dispose(); (p.material as THREE.Material).dispose(); } this.plateTexture?.dispose(); this.group.parent?.remove(this.group); }
 }

@@ -13,6 +13,7 @@ import { hasSubwooferTrunk } from '../game/data';
 import { HelpPanel } from './Help';
 import { AdsPanel } from './AdsPanel';
 import { AuctionPanel } from './AuctionPanel';
+import { CASINO_ITEMS, ROULETTE_MIN, ROULETTE_MAX, type RouletteBet } from '../game/roulette';
 
 const $ = (n: number) => '$' + Math.round(n).toLocaleString('ru');
 
@@ -188,7 +189,8 @@ export function GamePanel({ g, panel, close }: { g: Game; panel: Panel; close: (
     case 'info': return <Modal title={panel.title} onClose={close}><p>{panel.text}</p></Modal>;
     case 'phone': return <Tablet g={g} close={close} initial={panel.tab} />;
     case 'inventory': return <Modal title="🎒 Инвентарь" onClose={close} wide><InventoryGrid g={g} /></Modal>;
-    case 'bar': return <BarMenu g={g} close={close} name={panel.name} />;
+    case 'bar': return <BarMenu g={g} close={close} name={panel.name} casino={panel.casino} />;
+    case 'roulette': return <RoulettePanel g={g} close={close} />;
     case 'ozgim': return <Ozgim g={g} close={close} />;
     case 'casino': return <CasinoPanel g={g} close={close} name={panel.name} />;
     case 'help': return <HelpPanel close={close} startTab={(panel.tab as 'start') ?? 'start'} mobile={!!g.mobile} />;
@@ -199,15 +201,30 @@ export function GamePanel({ g, panel, close }: { g: Game; panel: Panel; close: (
   }
 }
 
-function BarMenu({ g, close, name }: { g: Game; close: () => void; name?: string }) {
+function RoulettePanel({g,close}:{g:Game;close:()=>void}) {
+  const [bet,setBet]=useState('1000'); const [choice,setChoice]=useState<RouletteBet>('red');
+  const [result,setResult]=useState(''); const [,tick]=useState(0);
+  const colors={red:'красное',black:'чёрное',green:'зелёное'};
+  return <Modal title="🎡 Рулетка" onClose={close}>
+    <p>Европейская рулетка: числа 0–36. Красное и чёрное платят 2× ставки, зелёный 0 — 36× (включая ставку).</p>
+    <p>Баланс: {$(g.getState().money)}. Ставка от {$(ROULETTE_MIN)} до {$(ROULETTE_MAX)}.</p>
+    <input aria-label="Ставка" type="number" min={ROULETTE_MIN} max={ROULETTE_MAX} step="1" value={bet} onChange={e=>setBet(e.target.value)} />
+    <div className="flex gap-2 mt-3">{(['red','black','green'] as const).map(c=><button key={c} className={'lg-btn '+(choice===c?'lg-btn-main':'')} onClick={()=>setChoice(c)}>{colors[c]}</button>)}</div>
+    <button className="lg-btn lg-btn-main mt-3" onClick={()=>{const r=g.casinoRoulette(Number(bet),choice);setResult(r.ok?`Выпало ${r.number} (${colors[r.color]}). Выплата ${$(r.payout)}.`:({online:'Рулетка пока доступна только в одиночной игре.',location:'Нужно находиться в казино.',funds:'Недостаточно денег.',invalid:'Введите целую ставку в допустимых пределах.',storage:'Не удалось сохранить результат.',random:'Не удалось провести розыгрыш.'}[r.error] ?? 'Не удалось провести розыгрыш.'));tick(x=>x+1);}}>Крутить</button>
+    <p aria-live="polite">{result}</p>
+  </Modal>;
+}
+
+function BarMenu({ g, close, name, casino }: { g: Game; close: () => void; name?: string; casino?: boolean }) {
   const [tab, setTab] = useState<'drinks' | 'shift'>('drinks');
+  const [, refresh] = useState(0);
   const s = g.getState();
   const onShift = g.job?.type === 'shift';
   const buzz = (g as unknown as { buzzT: number }).buzzT;
   return (<Modal title={`🍸 ${name || 'Бар'}`} onClose={close} wide>
     <div className="lp-tabs">
       <button className={tab === 'drinks' ? 'on' : ''} onClick={() => setTab('drinks')}>🍹 Напитки</button>
-      <button className={tab === 'shift' ? 'on' : ''} onClick={() => setTab('shift')}>💼 Подработка</button>
+      {!casino && <button className={tab === 'shift' ? 'on' : ''} onClick={() => setTab('shift')}>💼 Подработка</button>}
     </div>
     {tab === 'drinks' && <>
       <p className="lg-money-line">Ваши деньги: <b>{$(s.money)}</b>{buzz > 0 && <span className="ml-2 opacity-70">🍺 выпивка выветрится через {Math.ceil(buzz)} с</span>}</p>
@@ -218,10 +235,11 @@ function BarMenu({ g, close, name }: { g: Game; close: () => void; name?: string
           <button className="lg-btn sm" onClick={() => { g.drink(d.id); }}>{$(d.price)}</button>
         </div>))}
       </div>
-      <div className="flex gap-2 mt-3">
+      {casino && <div className="lg-list">{(['durman','cigarettes'] as const).map(id=><div className="lg-row" key={id}><div className="flex-1"><b>{ITEMS[id].name}</b><small>Игровой предмет · покупка только в одиночной игре</small></div><button className="lg-btn sm" onClick={()=>{g.casinoBuyItem(id);refresh(x=>x+1);}}>{$(CASINO_ITEMS[id])}</button></div>)}</div>}
+      {!casino && <div className="flex gap-2 mt-3">
         <button className="lg-btn" onClick={() => { g.toggleDisco(); }}>🪩 {g.discoOn ? 'Выключить' : 'Включить'} диско-свет</button>
         <button className="lg-btn" onClick={() => { g.danceHere(); close(); }}>💃 Пойти танцевать</button>
-      </div>
+      </div>}
       <p className="text-xs opacity-70 mt-2">Крепкое спиртное слегка качает руль. За руль после бара лучше не садиться.</p>
     </>}
     {tab === 'shift' && <>

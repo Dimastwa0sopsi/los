@@ -4,7 +4,7 @@ import { canDrive, issueDocument, type DocumentKind } from './documents';
 import { generateSpeedCameras, cameraDetects, cameraFine, type SpeedCamera } from './speedCameras';
 // Игровой движок «Лос-Город»: цикл, игрок, транспорт, интерьеры, работа, полиция, такси, автопилот
 import * as THREE from 'three';
-import { CITY_SIZE, CHUNK, clamp, angleDiff, RNG, type Settings, resolveMobile, LANE_OFF, saveSettings, qualityPreset } from './config';
+import { CITY_SIZE, CHUNK, SAVE_KEY, clamp, angleDiff, RNG, type Settings, resolveMobile, LANE_OFF, saveSettings, qualityPreset } from './config';
 import { generateLayout, nearestRoadPoint, astar, type WorldLayout, type Building } from './worldgen';
 import { NetClient, genderColor, type RemoteState, type NetEvent, type Listing, type ChatMsg, type ServerPlayer } from './net';
 import { sendTicket } from './support';
@@ -30,7 +30,9 @@ import { AdsSystem, AD_TAGS, type AdTag } from './ads';
 import { checkText, checkChat } from './moderation';
 import { eyeSees, recognitionEye, POLICE_EYE, PED_EYE, type Eye } from './police';
 import { Radio } from './radio';
-import { hamsterSpot, makeHamster } from './hamster';
+import { hamsterSpot, isHamsterSpot, makeHamster } from './hamster';
+import { petHamsterSolo, HAMSTER_PET_MS, HAMSTER_RUN_MS } from './hamsterReward';
+import { CASINO_ITEMS, randomRouletteNumber, spinRouletteSolo, type RouletteBet } from './roulette';
 import { nextImmersion } from './vehicleSinking';
 import { carRadioVolume, radioGain, soundCloudUrl, type RadioPlace } from './radioSpatial';
 import { RemoteRadios } from './remoteRadio';
@@ -49,8 +51,6 @@ export interface HudState {
   vehicle: null | { name: string; kmh: number; gear: string; rpm: number; fuel: number; autopilot: boolean; heli: boolean; alt: number; moto: boolean; lights: boolean; canAuto: boolean; manual: boolean; passenger: boolean; cruise: number; canHydro: boolean; hydro: number; hydroMax: boolean; belt: boolean; beltAvailable: boolean; diag: { flat: number; missing: number; glass: number; glassMax: number; parts: number; cond: number } };
   /** погоня: сколько полицейских машин с мигалками рядом и как далеко ближайшая */
   chase: null | { n: number; dist: number };
-  /** уличная гонка: чекпоинт, сколько осталось секунд, приз и дистанция до следующей точки */
-  race: null | { idx: number; total: number; left: number; limit: number; prize: number; dist: number };
   prompt: string | null; promptKeys: string[]; location: string; job: string | null; taxi: string | null; inside: boolean; weapon: string; ammo: number;
   lying: boolean; fps: number; intro: boolean; carrying: boolean; destination: boolean;
   online: null | { status: string; players: number; id: number | null; nick: string }; chat: { name: string; text: string; color: string }[];
@@ -69,7 +69,7 @@ export type Panel =
   | { type: 'shop'; kind: ShopKind; title: string; items: string[] } | { type: 'kiosk'; id: number } | { type: 'market'; sellUid?: string }
   | { type: 'cityhall' } | { type: 'auction' } | { type: 'tuning'; uid: string } | { type: 'clothes' } | { type: 'barber' } | { type: 'hospital' } | { type: 'police'; title: string }
   | { type: 'property'; b: number; unit: number } | { type: 'garage'; id: number } | { type: 'vadmin'; village: string } | { type: 'factory' } | { type: 'bank' }
-  | { type: 'pc'; mode: 'office' | 'home' } | { type: 'officehr' } | { type: 'livestock' } | { type: 'dealer'; scooter?: boolean } | { type: 'trucker' } | { type: 'emotes'; dance?: boolean } | { type: 'passport' } | { type: 'trade' } | { type: 'tradeInvite' } | { type: 'plant'; key: string; basement: boolean } | { type: 'quest' } | { type: 'editor'; fresh: boolean } | { type: 'listing'; uid: string; slot: number } | { type: 'info'; title: string; text: string } | { type: 'map'; mode: 'waypoint' | 'taxi' | 'autopilot' } | { type: 'phone'; tab?: string } | { type: 'onlineJoin' } | { type: 'inventory' } | { type: 'promo' } | { type: 'settings' } | { type: 'help'; tab?: string } | { type: 'farm' } | { type: 'radio'; listenOnly?: boolean } | { type: 'bar'; name?: string } | { type: 'ozgim' } | { type: 'casino'; name?: string } | { type: 'svc'; kind: SvcKind } | { type: 'ads' };
+  | { type: 'pc'; mode: 'office' | 'home' } | { type: 'officehr' } | { type: 'livestock' } | { type: 'dealer'; scooter?: boolean } | { type: 'trucker' } | { type: 'emotes'; dance?: boolean } | { type: 'passport' } | { type: 'trade' } | { type: 'tradeInvite' } | { type: 'plant'; key: string; basement: boolean } | { type: 'quest' } | { type: 'editor'; fresh: boolean } | { type: 'listing'; uid: string; slot: number } | { type: 'info'; title: string; text: string } | { type: 'map'; mode: 'waypoint' | 'taxi' | 'autopilot' } | { type: 'phone'; tab?: string } | { type: 'onlineJoin' } | { type: 'inventory' } | { type: 'promo' } | { type: 'settings' } | { type: 'help'; tab?: string } | { type: 'farm' } | { type: 'radio'; listenOnly?: boolean } | { type: 'bar'; name?: string; casino?: boolean } | { type: 'ozgim' } | { type: 'casino'; name?: string } | { type: 'roulette'; name?: string } | { type: 'svc'; kind: SvcKind } | { type: 'ads' };
 /** городские услуги: мойка, шиномонтаж, доставка, парковка, автомат, ломбард, садок, стоянка, запчасти */
 export type SvcKind = 'wash' | 'tire' | 'food' | 'park' | 'slot' | 'pawn' | 'fish' | 'impound' | 'parts' | 'charge';
 interface Prompt { text: string; keys: string[]; act: () => void; r?: () => void; l?: () => void }
@@ -207,14 +207,11 @@ export class Game {
   nav: { t: number; dist: number } | null = null;
   /** круиз-контроль: целевая скорость (м/с), 0 — выключен */
   cruise = 0;
-  /** уличная гонка по чекпоинтам */
-  race: { cp: { x: number; z: number }[]; idx: number; t: number; limit: number; prize: number; legs: number } | null = null;
   /** достижения: проверяются сами, при открытии показываем тост */
   readonly ACH: { id: string; icon: string; name: string; desc: string; ok: () => boolean }[] = [
     { id: 'car', icon: '🚗', name: 'Первое авто', desc: 'Обзавестись любым транспортом', ok: () => this.state.vehicles.length > 0 },
     { id: 'cars3', icon: '🏚', name: 'Автопарк', desc: 'Три машины в гараже', ok: () => this.state.vehicles.length >= 3 },
     { id: 'home', icon: '🏠', name: 'Своё жильё', desc: 'Купить квартиру или дом', ok: () => this.state.properties.length > 0 },
-    { id: 'racer', icon: '🏁', name: 'Уличный гонщик', desc: 'Выиграть гонку по чекпоинтам', ok: () => (this.state.raceBest ?? 0) > 0 },
     { id: 'rich', icon: '💰', name: 'Толстосум', desc: 'Накопить $100 000', ok: () => this.state.money >= 100000 },
     { id: 'traveler', icon: '🛣', name: 'Путешественник', desc: 'Проехать 100 км суммарно', ok: () => this.state.vehicles.reduce((a, v) => a + v.mileage, 0) >= 100 },
     { id: 'veteran', icon: '🎖', name: 'Ветеран города', desc: 'От играть 2 часа', ok: () => this.state.playTime >= 7200 },
@@ -227,11 +224,9 @@ export class Game {
     { id: 'drive', icon: '🛣', name: 'Проедь 2 км за рулём', need: 2, prize: 900, val: (t) => t.drive },
     { id: 'earn', icon: '💰', name: 'Заработай $1 200', need: 1200, prize: 800, val: (t) => t.earn },
     { id: 'crime', icon: '🚨', name: 'Получи звезду розыска', need: 1, prize: 600, val: (t) => t.crime },
-    { id: 'race', icon: '🏁', name: 'Выиграй уличную гонку', need: 1, prize: 1500, val: (t) => t.race },
   ];
   private achT = 0;
   private lastMoneySeen = 0;
-  get raceBest() { return this.state.raceBest ?? 0; }
   private daily() {
     const d = new Date().toISOString().slice(0, 10);
     let t = this.state.today;
@@ -287,6 +282,7 @@ export class Game {
   voice = new NearbyVoice((id,signal)=>this.net?.sendVoice(id,signal), text=>this.toast(text));
   toggleVoice() {
     if (this.voice.micOn || this.voice.starting) { this.voice.stopMicrophone(); return; }
+    if (!this.settings.voiceEnabled) { this.toast('Включите голос рядом в настройках звука'); return; }
     if (!this.online || !this.net?.ready) { this.toast('Голос доступен только в онлайне'); return; }
     if (!this.net.voiceSupported) { this.toast('Для голосового чата необходимо обновить сервер'); return; }
     void this.voice.start();
@@ -323,6 +319,9 @@ export class Game {
   private trafficGoal = 20; private resizeObs: (() => void) | null = null;
   private tmpV = new THREE.Vector3();
   private hamster: ReturnType<typeof makeHamster> | null = null;
+  private hamsterAction: { start:number; x:number; z:number; dx:number; dz:number } | null = null;
+  private hamsterWaiting = false;
+  private onlineHamsterReady = false;
   constructor(private container: HTMLElement, settings: Settings, cb: GameCallbacks) {
     this.cb = cb; this.settings = { ...settings }; this.mobile = resolveMobile(settings); setSoundCloudMobile(this.mobile);
   }
@@ -361,12 +360,12 @@ export class Game {
     if (this.disposed) return;
     this.scene.add(this.W.root);
     const hamsterLocation = hamsterSpot(this.L, this.col);
-    if (hamsterLocation) {
-      this.hamster = makeHamster();
-      this.hamster.group.position.set(hamsterLocation.x, 0, hamsterLocation.z);
-      this.hamster.group.rotation.y = Math.random() * Math.PI * 2;
-      this.W.root.add(this.hamster.group);
-    }
+    this.hamster = makeHamster();
+    if (hamsterLocation) this.hamster.group.position.set(hamsterLocation.x, 0, hamsterLocation.z);
+    this.hamster.group.visible = !!hamsterLocation;
+    this.hamsterWaiting = !hamsterLocation;
+    this.hamster.group.rotation.y = Math.random() * Math.PI * 2;
+    this.W.root.add(this.hamster.group);
     P(0.95, 'Жители и транспорт');
     this.setupScene();
     // состояние
@@ -496,6 +495,7 @@ export class Game {
     this.settings = { ...s }; this.mobile = resolveMobile(s); setSoundCloudMobile(this.mobile);
     if (this.input) { this.input.wantLock = !this.mobile; this.input.touchMode = this.mobile; }
     this.applyRenderSettings(); this.sound.setVolume(s.volume, s.muted); this.voice.setVolume(s.voiceVolume);
+    if (!s.voiceEnabled && this.voice.active) this.voice.stop();
     this.trafficGoal = Math.round(s.traffic * (this.mobile ? 28 : 50));
     void shadowsChanged;
   }
@@ -823,7 +823,7 @@ export class Game {
   }
   private updateWorldSystems(dt: number) {
     const inside = !!this.interior;
-    this.hamster?.animate(performance.now() / 1000);
+    this.updateHamster(Date.now());
     for (const [v, animation] of this.testTrunks) {
       if (!this.vehicles.includes(v)) { this.testTrunks.delete(v); continue; }
       animation.elapsed = stepTrunkMotion(animation.kind, animation.elapsed, animation.opening, dt);
@@ -885,7 +885,6 @@ export class Game {
     this.updateRobbery(dt);
     this.updateJobs(dt);
     this.updateMine(dt);
-    this.updateRace(dt);
     if (this.online) this.updateNet(dt);
     // погода вокруг камеры (в помещениях дождя нет)
     if (this.interior) this.weather.group.visible = false;
@@ -1017,7 +1016,6 @@ export class Game {
         if (I.vPressed('gearDown')) { if (this.settings.transmission === 'manual') v.gear = Math.max(0, v.gear - 1); else v.autoMode = 'N'; this.sound.gear(); }
       }
       if (I.pressed(K.lights) || I.vPressed('lights')) { v.model.setLights(!v.model.lightsOn); v.lightsUserOff = !v.model.lightsOn; }
-      if (I.vPressed('race')) this.startRace();
       if (I.pressed(K.horn) || I.vPressed('horn')) {
         this.sound.horn();
         this.peds.panic(v.x, v.z, 22);
@@ -1264,6 +1262,11 @@ export class Game {
     }
     ch.root.position.set(this.px, this.py + this.dip, this.pz); ch.root.rotation.set(0, this.pa, 0); ch.root.scale.setScalar(1);
     ch.pose(pose, performance.now() / 1000, phase, lean, move);
+    if (this.hamsterAction && Date.now() - this.hamsterAction.start < HAMSTER_PET_MS && !inWater) {
+      ch.torso.rotation.x = .34;
+      ch.shR.rotation.x = -1.15 + Math.sin(Date.now()/120) * .12;
+      ch.elR.rotation.x = -.45;
+    }
     this.netPose = { p: pose, k: Math.round(phase * 100) / 100, pt: Math.round(lean * 100) / 100 };
   }
   /** встать спиной к ближайшей стене (Q) */
@@ -2433,12 +2436,10 @@ export class Game {
     const v = this.inVeh;
     if (!v) { this.beltHold = 0; this.beltTriggered = false; return; }
     if (this.beltInputGeneration !== this.input.releaseGeneration) { this.beltInputGeneration = this.input.releaseGeneration; this.beltHold = 0; this.beltTriggered = false; }
-    if (this.input.down(K.race)) {
+    if (this.input.down(K.seatbelt)) {
       this.beltHold += dt;
       if (this.beltHold >= 1 && !this.beltTriggered) { this.beltTriggered = true; this.toggleSeatbelt(); }
     } else {
-      // Короткое нажатие K остаётся запуском гонки, удержание — ремень.
-      if (this.beltHold > 0 && !this.beltTriggered && !this.passenger) this.startRace();
       this.beltHold = 0; this.beltTriggered = false;
     }
   }
@@ -2482,6 +2483,57 @@ export class Game {
     if (v.owned) { v.owned.tuning = { ...v.owned.tuning, [near.side === 'front' ? 'plateFront' : 'plateBack']: false }; this.save(); }
     this.plateHoldDone = true; this.plateHold = null;
     this.toast(`Номер ${near.side === 'front' ? 'спереди' : 'сзади'} снят`);
+  }
+  private applyOnlineHamsterSpawn(value: unknown) {
+    this.onlineHamsterReady = false;
+    if (!this.hamster) return;
+    this.hamster.group.visible = false;
+    if (!this.online || !value || typeof value !== 'object') return;
+    const spot = value as {version?:unknown;x?:unknown;z?:unknown};
+    if (spot.version !== 1 || typeof spot.x !== 'number' || typeof spot.z !== 'number' || !isHamsterSpot(this.L,this.col,spot.x,spot.z)) return;
+    this.hamsterAction = null; this.hamsterWaiting = false;
+    this.hamster.group.position.set(spot.x,0,spot.z); this.hamster.group.rotation.y=0;
+    this.onlineHamsterReady = true;
+  }
+  private updateHamster(now: number) {
+    const hamster = this.hamster;
+    if (!hamster || !this.state) return;
+    const h = hamster.group, action = this.hamsterAction;
+    if (this.online) { h.visible = this.onlineHamsterReady && !!this.net?.ready; if(h.visible) hamster.animate(now/1000); return; }
+    hamster.animate(now / 1000, !!action && now - action.start >= HAMSTER_PET_MS && now - action.start < HAMSTER_PET_MS + HAMSTER_RUN_MS);
+    if (action) {
+      const elapsed = Math.max(0, now - action.start);
+      if (elapsed < HAMSTER_PET_MS) return;
+      if (elapsed < HAMSTER_PET_MS + HAMSTER_RUN_MS) {
+        const t = (elapsed - HAMSTER_PET_MS) / HAMSTER_RUN_MS;
+        h.position.set(action.x + action.dx * t * 2, Math.abs(Math.sin(t * Math.PI * 5)) * .07, action.z + action.dz * t * 2);
+        h.rotation.y = Math.atan2(action.dx, action.dz);
+        return;
+      }
+      this.hamsterAction = null;
+    }
+    const until = this.online ? 0 : this.state.hamsterHiddenUntil ?? 0;
+    if (Number.isFinite(until) && now < until) { h.visible = false; this.hamsterWaiting = true; return; }
+    if (this.hamsterWaiting) {
+      const spot = hamsterSpot(this.L, this.col);
+      if (!spot) { h.visible = false; return; }
+      h.position.set(spot.x, 0, spot.z);
+      this.hamsterWaiting = false;
+    }
+    h.visible = true;
+  }
+  private petHamster() {
+    const h = this.hamster?.group;
+    if (!h || !h.visible || this.hamsterAction || this.interior || this.inVeh || this.rideRemote || Math.hypot(h.position.x-this.px,h.position.z-this.pz)>1.6) return;
+    if (this.online) { this.toast('🐹 Онлайн-награда пока недоступна: требуется безопасное сохранение на сервере'); return; }
+    const now = Date.now();
+    let result: ReturnType<typeof petHamsterSolo>;
+    try { result = petHamsterSolo(this.state, localStorage, now); } catch { result = {ok:false}; }
+    if (!result.ok) { this.toast('Не удалось сохранить награду. Проверьте доступ к сохранениям'); return; }
+    const dx = h.position.x - this.px, dz = h.position.z - this.pz, len = Math.hypot(dx,dz) || 1;
+    this.hamsterAction = {start:now,x:h.position.x,z:h.position.z,dx:len === 1 && dx === 0 && dz === 0 ? 1 : dx/len,dz:dz/len};
+    this.pa = Math.atan2(dx,dz);
+    this.toast(result.reward ? '🐹 Вы погладили хомяка! +$10 000 (один раз)' : '🐹 Вы снова погладили хомяка. Награда уже получена');
   }
   private updatePrompt() {
     this.prompt = this.findPrompt();
@@ -2535,6 +2587,8 @@ export class Game {
       return best;
     }
     if (this.rideOn) return { text: `E — сойти (${this.rideOn.name})`, keys: ['E'], act: () => this.leaveRide() };
+    if (this.hamster?.group.visible && !this.hamsterAction && (this.online || Date.now() >= (this.state.hamsterHiddenUntil ?? 0)) && Math.hypot(this.hamster.group.position.x-px,this.hamster.group.position.z-pz)<1.5)
+      return {text:'E — погладить хомяка 🐹',keys:['E'],act:()=>this.petHamster()};
     // аттракционы парка «Ракета»
     {
       const rd = this.nearestRide(3.6);
@@ -2709,6 +2763,10 @@ export class Game {
   private actPrompt(action: string, label: string): Prompt {
     const b = this.L.buildings[this.state.location?.b ?? 0];
     if (action === 'exit') return { text: 'E — ' + label, keys: ['E'], act: () => this.exitInterior() };
+    if (action === 'home_tv') return {text: this.interior?.homeTv?.isOn ? 'E — выключить телевизор' : 'E — включить телевизор', keys:['E'], act:()=>{
+      const tv=this.interior?.homeTv;if(!tv)return;
+      if(tv.isOn) {tv.stop();this.toast('Телевизор выключен');} else tv.start(text=>this.toast(text));
+    }};
     if (action === 'counter') {
       if (this.interiorKind === 'bar') {
         return { text: 'E — меню напитков · R — смена бармена (5 гостей)', keys: ['E', 'R'],
@@ -2752,6 +2810,8 @@ export class Game {
     if (action === 'mine_down') return { text: 'E — Спуститься в забой · L — наверх', keys: ['E', 'L'], act: () => this.mineLift(true), l: () => this.mineLift(false) };
     if (action === 'mine') return { text: 'E — ' + label, keys: ['E'], act: () => this.mineSwing() };
     if (action === 'gamble') return { text: 'E — ' + label, keys: ['E'], act: () => this.openPanel({ type: 'casino', name: b.name }) };
+    if (action === 'roulette') return {text:'E — рулетка',keys:['E'],act:()=>this.openPanel({type:'roulette',name:b.name})};
+    if (action === 'casino_bar') return {text:'E — бар казино',keys:['E'],act:()=>this.openPanel({type:'bar',name:b.name,casino:true})};
     if (action === 'mine_cart') return { text: 'E — ' + label + (this.state.mineCoal ? ` (в забое: ${this.state.mineCoal} т)` : ''), keys: ['E'], act: () => this.mineLoadCart() };
     if (action === 'water') return { text: 'E — умыться и напиться из крана', keys: ['E'], act: () => { this.state.water = Math.min(100, this.state.water + 20); this.toast('💧 Вода из крана (+20)'); } };
     if (action.startsWith('pot:')) return this.plantPrompt(`${b.id}:pot:${action.slice(4)}`, true, this.interiorKind === 'greenhouse');
@@ -3295,69 +3355,6 @@ export class Game {
     if (v.model.reel) v.model.reel.rotation.x += 0.3;
     if (this.W.wheatCells.every((c) => c.done)) { this.state.money += 500; j.earned += 500; this.toast('Поле убрано полностью! Бонус $500'); setTimeout(() => this.regrow(), 60000); }
   }
-  // ================= УЛИЧНЫЕ ГОНКИ =================
-  /** старт гонки: 5 чекпоинтов вдоль дорог, лимит времени зависит от дистанции */
-  startRace() {
-    const v = this.inVeh;
-    if (!v || this.passenger) { this.toast('Гонка начинается только за рулём'); return; }
-    if (this.race) { this.race = null; this.toast('Гонка отменена'); return; }
-    const cands = this.L.nodes.filter((n) => {
-      const d = Math.hypot(n.x - v.x, n.z - v.z);
-      return d > 240 && d < 640;
-    });
-    if (!cands.length) { this.toast('Не нашёл подходящей трассы'); return; }
-    let best: { x: number; z: number }[] | null = null; let bestDist = 0;
-    for (let attempt = 0; attempt < 6 && !best; attempt++) {
-      const t = cands[Math.floor(this.rng.next() * cands.length)];
-      const ai = this.routeFor(v, { x: t.x, z: t.z });
-      if (!ai || ai.route.length < 3) continue;
-      const pts = ai.route.map((i) => ({ x: this.L.nodes[i].x, z: this.L.nodes[i].z }));
-      if (ai.final) pts.push({ x: ai.final.x, z: ai.final.z });
-      // 5 чекпоинтов равномерно по маршруту
-      const cps: { x: number; z: number }[] = [];
-      for (let k = 1; k <= 5; k++) cps.push(pts[Math.min(pts.length - 1, Math.round((pts.length - 1) * (k / 5)))]);
-      let dist = 0;
-      for (let k = 1; k < cps.length; k++) dist += Math.hypot(cps[k].x - cps[k - 1].x, cps[k].z - cps[k - 1].z);
-      dist += Math.hypot(cps[0].x - v.x, cps[0].z - v.z);
-      if (dist < 300) continue;
-      best = cps; bestDist = dist;
-    }
-    if (!best) { this.toast('Маршрут для гонки не построился, попробуйте ещё раз'); return; }
-    const limit = Math.max(45, Math.round((bestDist / Math.max(8, v.spec.maxSpeed * 0.42)) * 1.45 + 18));
-    const prize = Math.round(Math.max(700, bestDist * 5.5) / 50) * 50;
-    this.race = { cp: best, idx: 0, t: 0, limit, prize, legs: Math.round(bestDist) };
-    this.destination = null; this.gpsRoute = null; this.nav = null;
-    this.toast(`🏁 Гонка! ${best.length} чекпоинтов, ${(bestDist / 1000).toFixed(1)} км, лимит ${limit} с, приз $${prize.toLocaleString('ru')}`);
-    this.sound.coin();
-  }
-  /** весёлка гонки: вызывается каждый кадр */
-  private updateRace(dt: number) {
-    const r = this.race;
-    if (!r) return;
-    const v = this.inVeh;
-    if (!v || this.passenger) { this.race = null; this.toast('Гонка прервана: вы не за рулём'); return; }
-    r.t += dt;
-    const cp = r.cp[r.idx];
-    if (Math.hypot(cp.x - v.x, cp.z - v.z) < 12) {
-      r.idx++;
-      if (r.idx >= r.cp.length) {
-        const time = r.t;
-        this.state.money += r.prize;
-        this.gainAmt += r.prize;
-        this.state.raceBest = this.state.raceBest ? Math.min(this.state.raceBest, time) : time;
-        this.daily().race += 1;
-        this.toast(`🏆 Финиш! ${time.toFixed(1)} с · приз $${r.prize.toLocaleString('ru')}`);
-        this.sound.coin(); this.race = null;
-        return;
-      }
-      this.toast(`✅ Чекпоинт ${r.idx}/${r.cp.length} · ${r.t.toFixed(1)} с`);
-      this.sound.coin();
-    }
-    if (r.t > r.limit) {
-      this.toast(`⌛ Время вышло — гонка провалена (${r.idx}/${r.cp.length})`);
-      this.sound.error(); this.race = null;
-    }
-  }
   private updateJobs(dt: number) {
     this.updateShift(dt); this.updateDoctor(dt);
     this.updateBusJob(dt);
@@ -3373,7 +3370,6 @@ export class Game {
       const st = r ? r.stops[jb.next % r.stops.length] : null;
       if (st) { mx = st.x; mz = st.z; }
     }
-    else if (this.race) { const cp = this.race.cp[this.race.idx]; mx = cp.x; mz = cp.z; }
     else if (this.destination && !this.taxi) { mx = this.destination.x; mz = this.destination.z; }
     if (mx !== null && !this.interior) { this.marker.visible = true; this.marker.position.set(mx, 0, mz); (this.marker.material as THREE.MeshBasicMaterial).opacity = 0.35 + Math.sin(performance.now() / 300) * 0.1; }
     else this.marker.visible = false;
@@ -4025,6 +4021,18 @@ export class Game {
       for (const o of [-2.3, 0, 2.3]) this.plantMesh(g, bed.x + (alongZ ? 0 : o), 0.37, bed.z + (alongZ ? o : 0), pl[key].crop, pr);
     }
   }
+  setVehicleSideText(raw: string) {
+    if(this.online){this.toast('Надписи пока доступны только в одиночной игре');return;}
+    if(this.interior || this.inVeh){this.toast('Выйдите и подойдите к своему автобусу или грузовику');return;}
+    const v=this.vehicles.filter(car=>car.owned && this.state.vehicles.includes(car.owned) && car.model.group.visible && Math.abs(car.speed)<0.3 && ['bus','truck','semi'].includes(car.spec.body))
+      .map(car=>({car,d:Math.hypot(this.px-car.x,this.pz-car.z)})).filter(x=>x.d<x.car.spec.len/2+2).sort((a,b)=>a.d-b.d)[0]?.car;
+    if(!v?.owned){this.toast('Подойдите к своему неподвижному автобусу или грузовику');return;}
+    const text=raw.replace(/\s+/g,' ').trim();const problem=checkChat(text);
+    if(text.length>48 || problem){this.toast(problem || 'Максимум 48 символов');return;}
+    const old=v.owned.sideText;v.owned.sideText=text;
+    try {localStorage.setItem(SAVE_KEY,JSON.stringify(this.state));}catch{v.owned.sideText=old;this.toast('Не удалось сохранить надпись');return;}
+    v.model.setSideText(text);this.toast(text?'Надпись установлена':'Надпись удалена');
+  }
   /** Visual-only test. Does not move or store any items or synchronize online. */
   testTrunkCommand() {
     if (this.inVeh || this.interior) { this.toast('Выйдите из машины и подойдите к её задней части'); return; }
@@ -4515,6 +4523,20 @@ export class Game {
   private reportBigMoney(from: string, amt: number) {
     sendTicket({ category: '💸 Крупное получение', text: `Игрок «${from}» перевёл $${amt.toLocaleString('ru')}. Баланс получателя: $${this.state.money.toLocaleString('ru')}. Изъятий нет — информация к сведению.`, nick: this.state.nick ?? '?', online: true, place: this.interiorKind ? ('помещение: ' + this.interiorKind) : 'город', money: this.state.money }).catch(() => { /* поддержка оффлайн — молча */ });
   }
+  casinoRoulette(bet: number, choice: RouletteBet) {
+    if(this.interiorKind!=='casino') return {ok:false as const,error:'location'};
+    if(this.online) return {ok:false as const,error:'online'};
+    try {return spinRouletteSolo(this.state,bet,choice,localStorage,()=>randomRouletteNumber(crypto));}
+    catch {return {ok:false as const,error:'storage'};}
+  }
+  casinoBuyItem(id: keyof typeof CASINO_ITEMS): boolean {
+    if (this.interiorKind!=='casino' || this.online || !Object.prototype.hasOwnProperty.call(CASINO_ITEMS,id)) {this.toast('Покупка пока доступна только в одиночном казино');return false;}
+    const price=CASINO_ITEMS[id], count=this.state.inventory[id]??0;
+    if(!Number.isSafeInteger(this.state.money)||this.state.money<price||!Number.isSafeInteger(count)||count<0||count>=2147483647){this.toast('Недостаточно денег или инвентарь заполнен');return false;}
+    const inventory={...this.state.inventory,[id]:count+1},money=this.state.money-price;
+    try {localStorage.setItem(SAVE_KEY,JSON.stringify({...this.state,inventory,money}));} catch {this.toast('Не удалось сохранить покупку');return false;}
+    this.state.inventory=inventory;this.state.money=money;this.sound.coin();this.toast(`Куплено: ${ITEMS[id].name}`);return true;
+  }
   casinoStart(bet: number): boolean {
     if (bet < Game.CASINO_MIN || bet > Game.CASINO_MAX) { this.toast(`Ставка от $${(Game.CASINO_MIN).toLocaleString('ru')} до $${(Game.CASINO_MAX).toLocaleString('ru')}`); return false; }
     if (this.state.money < bet) { this.sound.error(); this.routeToBank(`💳 Для ставки не хватает $${(bet - this.state.money).toLocaleString('ru')}.`); return false; }
@@ -4862,6 +4884,12 @@ export class Game {
     if (this.service) { this.removeVehicle(this.service.v); this.service = null; }
     this.rental = null; this.emote = null; this.drugT = 0; this.renderer.domElement.style.filter = '';
     for (const v of [...this.vehicles]) if (v.owned || (v.role === 'police' && v.sirens)) this.removeVehicle(v);
+    if (this.online !== nextOnline) {
+      this.hamsterAction = null;
+      this.onlineHamsterReady = false;
+      this.hamsterWaiting = !nextOnline;
+      if (this.hamster) this.hamster.group.visible = false;
+    }
     this.online = nextOnline;
     setAuctionMode(this.online, this.W.auctionGroup, this.col, auctionBoxes(this.L.buildings, this.L.colliders));
     this.cameraSeen.clear();
@@ -4885,6 +4913,7 @@ export class Game {
     this.net.onVoice = (from, signal) => { if (this.net?.id !== null && this.net?.id !== undefined) void this.voice.receive(this.net.id,from,signal); };
     this.net.onVoiceDisconnect = () => this.voice.stop();
     this.net.onRadios = radios => this.remoteRadios.apply(radios,this.net?.id ?? null);
+    this.net.onHamsterSpawn = value => this.applyOnlineHamsterSpawn(value);
     this.net.onChange = null;
     this.net.onNews = (nm, txt) => this.toast(`📰 СМИ · ${nm}: ${txt}`);
     // объявления на щитах общие: сервер держит их и рассылает всем
@@ -5109,7 +5138,7 @@ export class Game {
   }
   private updateNet(dt: number) {
     const net = this.net; if (!net) return;
-    if (this.online && net.ready && net.voiceSupported && net.id !== null && !this.voice.active) this.voice.startListening();
+    if (this.settings.voiceEnabled && this.online && net.ready && net.voiceSupported && net.id !== null && !this.voice.active) this.voice.startListening();
     this.netT += dt; this.netMoveT += dt;
     net.setMoney(this.state.money);
     // Баланс сохраняется вместе с полным снимком аккаунта.
@@ -5155,7 +5184,7 @@ export class Game {
     this.updateCarPuppets(dt);
     if (this.pendingBuy && performance.now() - this.pendingBuy.t > 10000) { this.state.money += this.pendingBuy.price; this.pendingBuy = null; this.toast('Продавец не ответил — деньги возвращены'); }
     this.updateRemotes(dt);
-    this.voice.tick(dt, net.id, [...this.remotes.values()].map(r => ({id:r.id,near:r.ikey===this.interiorKey() && Math.hypot(r.x-this.px,r.z-this.pz)<40})));
+    this.voice.tick(dt, net.id, [...this.remotes.values()].map(r => { const distance=Math.hypot(r.x-this.px,r.z-this.pz); return {id:r.id,near:r.ikey===this.interiorKey() && distance<40,distance}; }));
   }
   private disposeRemote(r: Remote) {
     for (const lv of r.listings) this.removeVehicle(lv); r.listings = [];
@@ -5685,10 +5714,6 @@ export class Game {
           parts: v.model.parts.filter((p) => !p.attached).length, cond: Math.round(v.condition * 100),
         },
       } : null,
-      race: this.race ? (() => {
-        const cp = this.race.cp[this.race.idx]; const w = this.playerWorldPos();
-        return { idx: this.race.idx + 1, total: this.race.cp.length, left: Math.max(0, Math.round(this.race.limit - this.race.t)), limit: this.race.limit, prize: this.race.prize, dist: Math.round(Math.hypot(cp.x - w.x, cp.z - w.z)) };
-      })() : null,
       chase: (() => {
         const cops = this.vehicles.filter((cv) => cv.role === 'police' && cv.sirens && !this.interior);
         if (!cops.length) return null;

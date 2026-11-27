@@ -3,6 +3,7 @@ import menuBg from '../assets/menu.jpg';
 import { type Settings, defaultSettings, PAD_BUTTONS, PAD_DEFAULT, PAD_LABEL } from '../game/config';
 import { APP_BUILD, APP_BUILD_ID, APP_VERSION } from '../version';
 import { LATEST } from '../changelog';
+import { MicrophonePermission } from './MicrophonePermission';
 
 
 
@@ -150,7 +151,10 @@ export function SettingsPanel({ value, onChange, onClose, inGame, onResetSave, o
       </div>}
       {tab === 'sound' && <div className="lg-settings">
         <label>Громкость</label><Range k="volume" min={0} max={1} step={0.05} fmt={(v) => Math.round(v * 100) + '%'} />
+        <label>Голос игроков рядом</label><Seg k="voiceEnabled" opts={[[true, 'Включён'], [false, 'Выключен']]} />
         <label>Громкость голосового чата</label><Range k="voiceVolume" min={0} max={1} step={0.05} fmt={(v) => Math.round(v * 100) + '%'} />
+        <MicrophonePermission />
+        <p className="text-xs opacity-70">Пешком: O включает разговор, повторное O выключает. В машине O — аварийка; используйте кнопку микрофона.</p>
         <label>Звук</label><Seg k="muted" opts={[[false, 'Включён'], [true, 'Выключен']]} />
       </div>}
       {tab === 'control' && <div className="lg-settings">

@@ -1,0 +1,15 @@
+import './domstub';
+import {strict as assert} from 'node:assert';
+import {newState} from '../src/game/state';
+import {defaultTuning} from '../src/game/data';
+import {Vehicle} from '../src/game/vehicles';
+import {Game} from '../src/game/game';
+const state=newState('m',{x:0,z:0,a:0});
+const owned={uid:'1',type:'bus',color:'#ffffff',tuning:defaultTuning(),condition:1,mileage:0,year:2024,fuel:100,pos:null,missing:[],paid:1};state.vehicles=[owned];
+const v=new Vehicle('bus','owned',owned.color,owned);v.place(0,0,0);let saved='';(globalThis as any).localStorage={setItem:(_k:string,val:string)=>saved=val};let msg='';
+const g=Object.create(Game.prototype) as any;Object.assign(g,{state,vehicles:[v],online:false,interior:null,inVeh:null,px:0,pz:0,toast:(s:string)=>msg=s});
+g.setVehicleSideText('МОЙ АВТОБУС');assert.equal(JSON.parse(saved).vehicles[0].sideText,'МОЙ АВТОБУС');assert.equal(v.model.body.children.filter(o=>o.name==='vehicle-side-text').length,2);
+g.setVehicleSideText('example.com');assert(msg.includes('запрещены'));assert.equal(JSON.parse(saved).vehicles[0].sideText,'МОЙ АВТОБУС');
+g.online=true;g.setVehicleSideText('другое');assert(msg.includes('одиночной'));assert.equal(v.model.body.children.filter(o=>o.name==='vehicle-side-text').length,2);
+g.online=false;g.setVehicleSideText('');assert.equal(v.model.body.children.filter(o=>o.name==='vehicle-side-text').length,0);v.dispose();
+console.log('vehicle side text saved, removed, filtered and restricted to solo');

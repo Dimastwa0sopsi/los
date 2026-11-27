@@ -174,7 +174,7 @@ export const VEHICLES: Record<string, VSpec> = {
   gazelka: { id: 'gazelka', name: 'Курьер', body: 'van', len: 5.4, wid: 2.0, hei: 2.3, maxSpeed: 36, accel: 3.8, price: 18000, colors: ['#f5f5f5', '#2563eb', '#facc15'], forSale: 'dealer' },
   titan: { id: 'titan', name: 'Атлант грузовик', body: 'truck', len: 7.5, wid: 2.4, hei: 3.0, maxSpeed: 30, accel: 2.8, price: 45000, colors: ['#1f4e79', '#b45309', '#e5e7eb'], forSale: 'dealer' },
   semi: { id: 'semi', name: 'Тягач «Магистраль»', body: 'semi', len: 12, wid: 2.5, hei: 3.6, maxSpeed: 28, accel: 2.2, price: 90000, colors: ['#9f1239', '#1e40af', '#f8fafc'], forSale: 'none' },
-  bus: { id: 'bus', name: 'Городской автобус', body: 'bus', len: 11, wid: 2.5, hei: 3.1, maxSpeed: 22, accel: 2.2, price: 80000, colors: ['#f59e0b', '#16a34a'], forSale: 'none' },
+  bus: { id: 'bus', name: 'Городской автобус', body: 'bus', len: 11, wid: 2.5, hei: 3.1, maxSpeed: 22, accel: 2.2, price: 80000, colors: ['#f59e0b', '#16a34a'], forSale: 'dealer' },
   police: { id: 'police', name: 'Полиция', body: 'sedan', len: 4.8, wid: 1.85, hei: 1.5, maxSpeed: 55, accel: 8, price: 0, service: 'police', colors: ['#f8fafc'], forSale: 'none' },
   taxi: { id: 'taxi', name: 'Такси', body: 'sedan', len: 4.7, wid: 1.8, hei: 1.48, maxSpeed: 42, accel: 5.5, price: 18000, service: 'taxi', colors: ['#facc15'], forSale: 'dealer' },
   ambulance: { id: 'ambulance', name: 'Скорая', body: 'van', len: 5.4, wid: 2.0, hei: 2.4, maxSpeed: 42, accel: 4.5, price: 0, service: 'ambulance', colors: ['#ffffff'], forSale: 'none' },

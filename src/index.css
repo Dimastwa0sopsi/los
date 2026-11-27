@@ -905,20 +905,6 @@ button.tb-card:hover { background: rgba(255,255,255,.09); } button.tb-card:activ
 }
 @media (prefers-reduced-motion: reduce) { .hx-wshield, .hx-chase { animation: none; } }
 
-/* карточка уличной гонки */
-.hx-race {
-  position: fixed; top: 92px; left: 50%; transform: translateX(-50%); z-index: 8;
-  display: flex; flex-direction: column; gap: 3px; min-width: 168px; padding: 7px 12px; border-radius: 13px;
-  background: linear-gradient(150deg, rgba(250, 204, 21, .22), rgba(10, 14, 20, .88));
-  border: 1px solid rgba(250, 204, 21, .5); box-shadow: 0 8px 22px rgba(0, 0, 0, .4); color: #fff7d6;
-}
-.hx-race-top { display: flex; align-items: center; gap: 10px; font-size: 12px; }
-.hx-race-top b { font-size: 14px; }
-.hx-race-top em { margin-left: auto; font-style: normal; color: #fde68a; font-weight: 700; }
-.hx-race-bar { height: 4px; border-radius: 3px; background: rgba(255, 255, 255, .14); overflow: hidden; }
-.hx-race-bar i { display: block; height: 100%; background: linear-gradient(90deg, #fde047, #f97316); }
-.hx-race small { font-size: 10px; color: #ffe9a8; }
-.hx.mob .hx-race { top: 74px; min-width: 150px; padding: 6px 10px; }
 
 /* карточки планшета: задания и достижения */
 .tb-pad { display: flex; flex-direction: column; gap: 8px; padding: 10px 10px 24px; overflow: auto; }

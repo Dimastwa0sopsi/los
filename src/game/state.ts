@@ -13,6 +13,8 @@ export interface OwnedVehicle {
   hydro?: boolean;
   /** Будущее хранилище багажника; перенос предметов пока не подключён в игре. */
   trunk?: Record<string,number>;
+  /** Текст на боках автобуса или грузовика. */
+  sideText?: string;
 }
 /** услуги города: залоги в ломбарде, садок, платная парковка, штрафстоянка */
 export interface PawnTicket { id: string; item: string; n: number; pay: number; buy: number; t: number }
@@ -33,6 +35,8 @@ export interface GameState {
   vehicles: OwnedVehicle[]; kiosks: KioskOwn[]; promoUsed: boolean;
   wanted: number; pos: { x: number; z: number; a: number }; location: Location | null; gameTime: number; playTime: number;
   cameraFines?: CameraFine[];
+  /** Одиночная награда и время возвращения хомяка; не серверная защита. */
+  hamsterRewardClaimed?: boolean; hamsterHiddenUntil?: number;
   /** Номерные таблички одиночного сохранения; не серверный реестр. */
   plateInventory?: StoredPlate[];
   lastCar: string | null; created: boolean; nick?: string; mag?: number; ammoBy?: Record<string, number>; magBy?: Record<string, number>;

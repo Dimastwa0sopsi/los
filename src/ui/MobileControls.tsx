@@ -236,7 +236,6 @@ export function MobileControls({ g, hud }: { g: Game; hud: HudState }) {
   }];
   if (v && !v.passenger) groups.push({
     title: `Машина · ${v.name}`, tiles: [
-      { ico: '🏁', label: hud.race ? 'Стоп гонку' : 'Уличная гонка', on: () => g.startRace() },
       ...(v?.beltAvailable ? [{ ico: '🔒', label: v.belt ? 'Снять ремень' : 'Пристегнуть ремень', on: () => g.toggleSeatbelt() }] : []),
       { ico: '📻', label: 'Радио', on: () => g.openVehicleRadio() },
       { ico: '↯', label: hud.driftAssist ? 'Дрифт: вкл' : 'Дрифт-помощник', on: () => g.toggleDrift() },

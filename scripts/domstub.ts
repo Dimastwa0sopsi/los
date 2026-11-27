@@ -25,7 +25,7 @@ function makeCanvas(w = 256, h = 256) {
   return canvas;
 }
 (globalThis as any).document = {
-  createElement: (tag: string) => (tag === 'canvas' ? makeCanvas() : { style: {}, appendChild() { /* */ } }),
+  createElement: (tag: string) => (tag === 'canvas' ? makeCanvas() : tag === 'video' ? { style: {}, play: () => Promise.resolve(), pause() {}, load() {}, removeAttribute() {}, addEventListener() {}, removeEventListener() {} } : { style: {}, appendChild() { /* */ } }),
   createElementNS: () => makeCanvas(),
   body: { appendChild() { /* */ }, style: {} },
 };

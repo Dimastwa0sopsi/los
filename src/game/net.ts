@@ -168,7 +168,7 @@ interface Msg {
   token?: string; pass?: string;
   /** что умеет сервер (наш сервер пересылает §-протокол и умеет админ-команды) */
   caps?: { state?: number; peds?: number; adm?: number; relay?: number; accounts?: number; saveIds?: number; voice?: number; radio?: number };
-  radios?: unknown;
+  radios?: unknown; hamster?: unknown;
   /** реклама на щитах: полный список от сервера и ответ на покупку */
   ads?: Record<string, RemoteAd>; ok?: boolean; error?: string;
   from?: number; signal?: VoiceSignal;
@@ -299,6 +299,7 @@ export class NetClient {
   voiceSupported = false;
   radioSupported = false;
   onRadios: ((radios:NetworkRadio[])=>void) | null = null;
+  onHamsterSpawn: ((spawn: unknown)=>void) | null = null;
   onVoice: ((from:number, signal:VoiceSignal)=>void) | null = null;
   onVoiceDisconnect: (()=>void) | null = null;
   onPeds: ((from: number, list: number[][], vehs: (string | number)[][]) => void) | null = null;
@@ -571,6 +572,7 @@ export class NetClient {
     this.loggedOnce = true;
     if (first) this.sys(`Вы вошли как ${this.nick}`);
     this.onLogin?.(this.me, first, m.accountState);
+    this.onHamsterSpawn?.(m.hamster);
     if (this.flight && !this.conflict) this.send({ type: 'account_save', revision: this.flight.revision, saveId: this.flight.id, state: JSON.parse(this.flight.json) });
     else this.flushAccount();
     this.onChange?.();

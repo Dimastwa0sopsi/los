@@ -56,9 +56,10 @@ export const COMMANDS: Cmd[] = [
     const action = arg.toLowerCase();
     if (!g.online || !g.net?.ready) { say(g, 'Голос доступен только при подключении к онлайн-серверу'); return; }
     if (!g.net.voiceSupported) { say(g, 'Голос недоступен: сервер необходимо обновить'); return; }
-    if (!action || action === 'status' || action === 'статус') { say(g, `🎙 Микрофон: ${g.voice.starting ? 'ожидание разрешения' : g.voice.micOn ? 'включён' : 'выключен'}. Голос рядом слышен автоматически.`); return; }
+    if (!action || action === 'status' || action === 'статус') { say(g, `🎙 Микрофон: ${g.voice.starting ? 'ожидание разрешения' : g.voice.micOn ? 'включён' : 'выключен'}. ${g.settings?.voiceEnabled === false ? 'Голос рядом выключен в настройках.' : 'Голос рядом слышен автоматически.'}`); return; }
     if (action === 'on' || action === 'вкл') {
       if (g.voice.micOn || g.voice.starting) { say(g, 'Микрофон уже включён или запрашивается'); return; }
+      if (g.settings?.voiceEnabled === false) { say(g, 'Включите голос рядом в настройках звука'); return; }
       g.toggleVoice(); say(g, 'Запрашиваем доступ к микрофону'); return;
     }
     if (action === 'off' || action === 'выкл') {
@@ -117,6 +118,7 @@ export const COMMANDS: Cmd[] = [
 
   // ---------- транспорт ----------
   { name: 'trunk', cat: 'car', desc: 'тест крышки: у задней части своего седана, спорткара или закрытого грузовика', run: (g) => g.testTrunkCommand() },
+  { name: 'cartext', args: '[текст]', cat: 'car', desc: 'надпись на своём автобусе или грузовике; без текста — убрать (одиночная игра)', run: (g,a) => g.setVehicleSideText(a) },
   { name: 'sellcar', args: '[номер]', cat: 'car', desc: 'сдать машину в трейд-ин (60%)', run: (g, a) => g.sellCarCmd(a) },
   { name: 'mycars', cat: 'car', desc: 'список машин с состоянием', run: (g) => {
     const c = g.getState().vehicles;
