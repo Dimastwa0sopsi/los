@@ -1,0 +1,485 @@
+{
+  "schema": 1,
+  "vehicles": [
+    {
+      "id": "altair",
+      "body": "sedan"
+    },
+    {
+      "id": "ambulance",
+      "body": "van"
+    },
+    {
+      "id": "arktika",
+      "body": "suv"
+    },
+    {
+      "id": "ataman",
+      "body": "suv"
+    },
+    {
+      "id": "aurum",
+      "body": "sedan"
+    },
+    {
+      "id": "avrora",
+      "body": "sedan"
+    },
+    {
+      "id": "baron",
+      "body": "sedan"
+    },
+    {
+      "id": "barrakuda",
+      "body": "sport"
+    },
+    {
+      "id": "bizon",
+      "body": "pickup"
+    },
+    {
+      "id": "briz21",
+      "body": "sedan"
+    },
+    {
+      "id": "buran",
+      "body": "suv"
+    },
+    {
+      "id": "bus",
+      "body": "bus"
+    },
+    {
+      "id": "buyvolhd",
+      "body": "pickup"
+    },
+    {
+      "id": "combine",
+      "body": "combine"
+    },
+    {
+      "id": "dalnoboy",
+      "body": "semi"
+    },
+    {
+      "id": "drakon",
+      "body": "sedan"
+    },
+    {
+      "id": "eclipse",
+      "body": "sport"
+    },
+    {
+      "id": "elektrarod",
+      "body": "sport"
+    },
+    {
+      "id": "ezhik",
+      "body": "hatch"
+    },
+    {
+      "id": "fantom",
+      "body": "sport"
+    },
+    {
+      "id": "fenghuang",
+      "body": "suv"
+    },
+    {
+      "id": "feniks",
+      "body": "suv"
+    },
+    {
+      "id": "fermer",
+      "body": "pickup"
+    },
+    {
+      "id": "ferrato",
+      "body": "sport"
+    },
+    {
+      "id": "gazelka",
+      "body": "van"
+    },
+    {
+      "id": "gepard",
+      "body": "sport"
+    },
+    {
+      "id": "gorny",
+      "body": "suv"
+    },
+    {
+      "id": "gorod_e",
+      "body": "hatch"
+    },
+    {
+      "id": "grandtour",
+      "body": "sedan"
+    },
+    {
+      "id": "granit",
+      "body": "suv"
+    },
+    {
+      "id": "hlebovoz",
+      "body": "van"
+    },
+    {
+      "id": "imperial",
+      "body": "sedan"
+    },
+    {
+      "id": "iskrasport",
+      "body": "hatch"
+    },
+    {
+      "id": "k_c1",
+      "body": "scooter"
+    },
+    {
+      "id": "k_g1",
+      "body": "scooter"
+    },
+    {
+      "id": "k_g2pro",
+      "body": "scooter"
+    },
+    {
+      "id": "k_gbooster",
+      "body": "scooter"
+    },
+    {
+      "id": "k_gmax",
+      "body": "scooter"
+    },
+    {
+      "id": "k_m4",
+      "body": "scooter"
+    },
+    {
+      "id": "k_m4pro",
+      "body": "scooter"
+    },
+    {
+      "id": "k_s1",
+      "body": "scooter"
+    },
+    {
+      "id": "k_s1pro",
+      "body": "scooter"
+    },
+    {
+      "id": "k_s3",
+      "body": "scooter"
+    },
+    {
+      "id": "k_s3pro",
+      "body": "scooter"
+    },
+    {
+      "id": "kaban",
+      "body": "moto"
+    },
+    {
+      "id": "kazak",
+      "body": "pickup"
+    },
+    {
+      "id": "kemper",
+      "body": "van"
+    },
+    {
+      "id": "kolibri",
+      "body": "hatch"
+    },
+    {
+      "id": "kometamini",
+      "body": "hatch"
+    },
+    {
+      "id": "kometas",
+      "body": "sport"
+    },
+    {
+      "id": "kordon",
+      "body": "suv"
+    },
+    {
+      "id": "kosmos",
+      "body": "sedan"
+    },
+    {
+      "id": "kovboy",
+      "body": "pickup"
+    },
+    {
+      "id": "kroha",
+      "body": "hatch"
+    },
+    {
+      "id": "kuriermax",
+      "body": "van"
+    },
+    {
+      "id": "lada",
+      "body": "sedan"
+    },
+    {
+      "id": "lesnik",
+      "body": "pickup"
+    },
+    {
+      "id": "losx",
+      "body": "sport"
+    },
+    {
+      "id": "magistral2",
+      "body": "semi"
+    },
+    {
+      "id": "maxspeed",
+      "body": "scooter"
+    },
+    {
+      "id": "medvedclassic",
+      "body": "suv"
+    },
+    {
+      "id": "megapolis",
+      "body": "sedan"
+    },
+    {
+      "id": "molnia",
+      "body": "moto"
+    },
+    {
+      "id": "molot",
+      "body": "sport"
+    },
+    {
+      "id": "monarch",
+      "body": "suv"
+    },
+    {
+      "id": "nb_max",
+      "body": "scooter"
+    },
+    {
+      "id": "noir",
+      "body": "sport"
+    },
+    {
+      "id": "nord05",
+      "body": "sedan"
+    },
+    {
+      "id": "orion",
+      "body": "sedan"
+    },
+    {
+      "id": "pantera",
+      "body": "sport"
+    },
+    {
+      "id": "pchelka",
+      "body": "hatch"
+    },
+    {
+      "id": "phoenix",
+      "body": "sport"
+    },
+    {
+      "id": "pochta",
+      "body": "van"
+    },
+    {
+      "id": "police",
+      "body": "sedan"
+    },
+    {
+      "id": "president",
+      "body": "sedan"
+    },
+    {
+      "id": "pulya",
+      "body": "hatch"
+    },
+    {
+      "id": "quadro",
+      "body": "quad"
+    },
+    {
+      "id": "raketa01",
+      "body": "sedan"
+    },
+    {
+      "id": "ranger",
+      "body": "pickup"
+    },
+    {
+      "id": "refr",
+      "body": "semi"
+    },
+    {
+      "id": "s_1s",
+      "body": "scooter"
+    },
+    {
+      "id": "s_ess",
+      "body": "scooter"
+    },
+    {
+      "id": "s_m365",
+      "body": "scooter"
+    },
+    {
+      "id": "s_m365pro",
+      "body": "scooter"
+    },
+    {
+      "id": "s_pro2",
+      "body": "scooter"
+    },
+    {
+      "id": "s_ultra4",
+      "body": "scooter"
+    },
+    {
+      "id": "scooter",
+      "body": "scooter"
+    },
+    {
+      "id": "scorpiongt",
+      "body": "sport"
+    },
+    {
+      "id": "semi",
+      "body": "semi"
+    },
+    {
+      "id": "semya",
+      "body": "van"
+    },
+    {
+      "id": "sever7",
+      "body": "suv"
+    },
+    {
+      "id": "severyanin",
+      "body": "semi"
+    },
+    {
+      "id": "shustrik",
+      "body": "hatch"
+    },
+    {
+      "id": "shuttle",
+      "body": "van"
+    },
+    {
+      "id": "sinitsa",
+      "body": "hatch"
+    },
+    {
+      "id": "sirius",
+      "body": "sedan"
+    },
+    {
+      "id": "sokol3110",
+      "body": "sedan"
+    },
+    {
+      "id": "solstice",
+      "body": "sport"
+    },
+    {
+      "id": "strekoza",
+      "body": "heli"
+    },
+    {
+      "id": "strela",
+      "body": "sport"
+    },
+    {
+      "id": "strizh",
+      "body": "moto"
+    },
+    {
+      "id": "taiga",
+      "body": "suv"
+    },
+    {
+      "id": "taxi",
+      "body": "sedan"
+    },
+    {
+      "id": "tayfun7",
+      "body": "suv"
+    },
+    {
+      "id": "titan",
+      "body": "truck"
+    },
+    {
+      "id": "titanxl",
+      "body": "semi"
+    },
+    {
+      "id": "tornado",
+      "body": "sport"
+    },
+    {
+      "id": "tundra",
+      "body": "suv"
+    },
+    {
+      "id": "turtle",
+      "body": "sport"
+    },
+    {
+      "id": "tyagun",
+      "body": "pickup"
+    },
+    {
+      "id": "vega",
+      "body": "sedan"
+    },
+    {
+      "id": "velaris",
+      "body": "sport"
+    },
+    {
+      "id": "veter",
+      "body": "moto"
+    },
+    {
+      "id": "veterok",
+      "body": "hatch"
+    },
+    {
+      "id": "vezdehod",
+      "body": "suv"
+    },
+    {
+      "id": "vihr",
+      "body": "sport"
+    },
+    {
+      "id": "virazhrs",
+      "body": "hatch"
+    },
+    {
+      "id": "volga",
+      "body": "sedan"
+    },
+    {
+      "id": "volta",
+      "body": "sedan"
+    },
+    {
+      "id": "x1",
+      "body": "scooter"
+    }
+  ]
+}

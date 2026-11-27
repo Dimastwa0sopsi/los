@@ -1,6 +1,7 @@
 // Процедурные текстуры (Canvas) и кэш материалов
 import * as THREE from 'three';
 import { RNG } from './config';
+import { MEME_PICTURES, memeUrl } from './memePictures';
 
 export const GFX = { pbr: true };
 const texCache = new Map<string, THREE.Texture>();
@@ -120,7 +121,8 @@ export function getTex(key: string): THREE.Texture {
       else if (key === 'road_highway') { line(6, 5, paint); line(245, 5, paint); line(121, 4, yel); line(131, 4, yel); line(63, 4, paint, 120, 136); line(189, 4, paint, 120, 136); }
       else if (key === 'road_highway6') { line(6, 6, paint); line(244, 6, paint); line(120, 5, yel); line(130, 5, yel); for (const x of [84, 170]) line(x, 4, paint, 120, 136); }
       else if (key === 'road_village') { line(126, 4, 'rgba(235,235,230,0.8)', 110, 146); g.fillStyle = 'rgba(110,90,60,0.35)'; g.fillRect(0, 0, 10, 512); g.fillRect(246, 0, 10, 512); }
-      else { line(8, 5, yel); line(243, 5, yel); }
+      // Промзона: видимые края и прерывистое разделение встречных направлений.
+      else { line(8, 5, paint); line(243, 5, paint); line(125, 6, paint, 128, 128); }
       // износ разметки и кромки полотна
       g.fillStyle = 'rgba(56,57,61,0.5)'; for (let i = 0; i < 520; i++) g.fillRect(r.range(0, 256), r.range(0, 512), 2, 2);
       const edge = g.createLinearGradient(0, 0, 14, 0);
@@ -767,6 +769,23 @@ export function mat(key: string): THREE.Material {
   } else if (key === 'lamp') {
     m = L({ color: 0xf5f5f0, emissive: new THREE.Color(0xffe2a0), emissiveIntensity: 0 });
     (m as THREE.MeshLambertMaterial).userData.night = true;
+  } else if (key.startsWith('meme:')) {
+    const index=Number(key.slice(5));
+    if (!Number.isInteger(index) || index < 0 || index >= MEME_PICTURES.length) m=L({color:0x555555});
+    else {
+      // Fit the entire image on a square canvas without distorting it. Cached
+      // materials share one texture; a failed load leaves a neutral background.
+      const [c,g]=canvas(512,512);g.fillStyle='#e7e1d5';g.fillRect(0,0,512,512);
+      const texture=toTex(c,false); texCache.set(key,texture);
+      if (typeof Image !== 'undefined') {
+        const image=new Image();
+        image.onload=()=>{const scale=Math.min(512/image.naturalWidth,512/image.naturalHeight);
+          const w=image.naturalWidth*scale,h=image.naturalHeight*scale;
+          g.drawImage(image,(512-w)/2,(512-h)/2,w,h);texture.needsUpdate=true;};
+        image.src=memeUrl(index);
+      }
+      m=new THREE.MeshBasicMaterial({map:texture});
+    }
   } else if (key.startsWith('sign:')) m = new THREE.MeshBasicMaterial({ map: getTex('sign_' + key.slice(5)) });
   else if (key.startsWith('tex:')) {
     const k = key.slice(4);

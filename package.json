@@ -1,7 +1,7 @@
 {
   "name": "react-vite-tailwind",
   "private": true,
-  "version": "0.6.36",
+  "version": "0.6.37",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -42,6 +42,7 @@
     "check:plate-readiness": "python3 scripts/plate_readiness_check.py",
     "check:colab-economy-audit": "python3 scripts/colab_economy_audit_check.py",
     "check:account-client": "esbuild scripts/account-client-check.ts --bundle --platform=node --format=cjs --outfile=.check/account-client.cjs --log-level=error --define:import.meta.env={} && node .check/account-client.cjs",
+    "check:vehicle-visual-catalogue": "esbuild scripts/export-vehicle-visual-catalogue.ts --bundle --platform=node --format=cjs --outfile=.check/export-vehicle-visual-catalogue.cjs --log-level=error && node .check/export-vehicle-visual-catalogue.cjs --check",
     "check:auction-catalogue": "esbuild scripts/export-auction-catalogue.ts --bundle --platform=node --format=cjs --outfile=.check/export-auction-catalogue.cjs --log-level=error && node .check/export-auction-catalogue.cjs --check",
     "check:auction-panel": "esbuild scripts/auction-panel-check.tsx --bundle --platform=node --format=cjs --outfile=.check/auction-panel.cjs --log-level=error --loader:.png=empty --loader:.jpg=empty --loader:.md=text --define:import.meta.env={} && node .check/auction-panel.cjs",
     "check:shop-catalogue": "esbuild scripts/export-shop-catalogue.ts --bundle --platform=node --format=cjs --outfile=.check/export-shop-catalogue.cjs --log-level=error && node .check/export-shop-catalogue.cjs --check",

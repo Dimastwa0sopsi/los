@@ -1,0 +1,13 @@
+import {strict as assert} from 'node:assert';
+import {parseHamsterWorld,hamsterWorldPose} from '../src/game/hamsterOnlineWorld';
+const server=require('../server/hamster-world.cjs');const world=server.createHamsterWorld({x:10,z:5});
+const allow=(x:number,z:number)=>x===10&&z===5;
+assert.equal(world.pet(1,{x:30,z:5},100).error,'too_far');const sent=world.pet(1,{x:9,z:5},100);assert(sent.ok);
+const w=parseHamsterWorld(sent.world,allow);assert(w);
+assert.equal(hamsterWorldPose(w,899).phase,'pet');assert.equal(hamsterWorldPose(w,900).phase,'running');
+assert.equal(hamsterWorldPose(w,1600).x,11);assert.equal(hamsterWorldPose(w,2300).phase,'hidden');
+assert.equal(hamsterWorldPose(w,122299).phase,'hidden');assert.equal(hamsterWorldPose(w,122300).phase,'idle');
+assert.equal(world.pet(2,{x:10,z:5},101).error,'busy');assert.equal(world.snapshot(122400).event,null);
+assert.equal(parseHamsterWorld({...sent.world,event:{...sent.world.event,returnAt:101}},allow),null);
+assert.equal(parseHamsterWorld({...sent.world,x:100},allow),null);assert.equal(parseHamsterWorld({...sent.world,event:{...sent.world.event,dx:10}},allow),null);
+console.log('✓ общий хомяк: серверная последовательность, бег, исчезновение на две минуты и проверка снимка');

@@ -1,12 +1,14 @@
 // Состояние игры, экономика, сохранение с версионированием и миграцией
 import type { Documents } from './documents';
+import type { CustodyState } from './policeCustodyLab';
 import { SOSNOVKA_DZ, inOldSosnovka } from './sosnovka';
 import { SAVE_KEY, SAVE_KEY_ONLINE, SAVE_VERSION, START_MONEY, RNG } from './config';
 import { type Look, type Tuning, defaultLook, defaultTuning, VEHICLES, SELLER_NAMES } from './data';
 
 export interface OwnedVehicle {
   uid: string; type: string; color: string; tuning: Tuning; condition: number; mileage: number; year: number; fuel: number;
-  pos: { x: number; z: number; a: number } | null; missing: string[]; paid: number; locked?: boolean;
+  /** y is optional for older saves; retained so elevated parking can be restored. */
+  pos: { x: number; z: number; a: number; y?: number } | null; missing: string[]; paid: number; locked?: boolean;
   /** загрязнение кузова 0 (чисто) … 1 (по уши в грязи) — смывается на автомойке */
   dirt?: number;
   /** куплен и установлен комплект гидравлической подвески */
@@ -34,6 +36,8 @@ export interface GameState {
   homeSpeakers?: Record<string,string>;
   vehicles: OwnedVehicle[]; kiosks: KioskOwn[]; promoUsed: boolean;
   wanted: number; pos: { x: number; z: number; a: number }; location: Location | null; gameTime: number; playTime: number;
+  /** Локальное задержание в одиночной игре; не является защитой онлайн-режима. */
+  soloCustody?: CustodyState;
   cameraFines?: CameraFine[];
   /** Одиночная награда и время возвращения хомяка; не серверная защита. */
   hamsterRewardClaimed?: boolean; hamsterHiddenUntil?: number;

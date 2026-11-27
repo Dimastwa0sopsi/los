@@ -6,6 +6,7 @@ import type { Box } from './worldgen';
 import { INTERIOR_ORIGIN } from './config';
 import { dressInterior } from './interiorDetail';
 import { HomeTv } from './homeTv';
+import { memeIndex, memeSeed } from './memePictures';
 
 export interface Interact { x: number; z: number; r: number; label: string; action: string; y?: number }
 export type InteriorSeat = { x: number; z: number; a: number; kind: 'computer' | 'toilet' | 'sofa'; label: string };
@@ -44,6 +45,7 @@ export class IB {
   /** сколько вывесок, светильников и дверей нарисовали — для проверок */
   signs = 0; fixtures = 0; doors = 0; windows = 0;
   residential = false; retail = false;
+  memePictureIndex = 0;
 
   floor(x0: number, z0: number, x1: number, z1: number, mk: string, s = 2, y = 0) { this.b.add(mk, T.box, M(this.ox + (x0 + x1) / 2, y - 0.05, this.oz + (z0 + z1) / 2, 0, x1 - x0, 0.1, z1 - z0), s); }
   ceil(x0: number, z0: number, x1: number, z1: number, h: number, c = '#f4f4f0') { this.b.add('c:' + c, T.box, M(this.ox + (x0 + x1) / 2, h + 0.05, this.oz + (z0 + z1) / 2, 0, x1 - x0, 0.1, z1 - z0)); }
@@ -103,9 +105,9 @@ export class IB {
   private fixtureGeom(x: number, y: number, z: number, panel: boolean) {
     if (panel) {
       // офисная панель: широкий короб под потолком, светящаяся плёнка снизу
-      this.b.add('c:#e5e7eb', T.box, M(this.ox + x, y + 0.16, this.oz + z, 0, 1.35, 0.1, 1.35));
-      this.b.add('glow:#fffaf0', T.box, M(this.ox + x, y + 0.1, this.oz + z, 0, 1.24, 0.03, 1.24));
-      this.b.add('c:#cbd5e1', T.box, M(this.ox + x, y + 0.22, this.oz + z, 0, 1.4, 0.04, 1.4));
+      this.b.add('c:#e5e7eb', T.box, M(this.ox + x, y + 0.16, this.oz + z, 0, 0.82, 0.08, 0.82));
+      this.b.add('glow:#fffaf0', T.box, M(this.ox + x, y + 0.105, this.oz + z, 0, 0.74, 0.03, 0.74));
+      this.b.add('c:#cbd5e1', T.box, M(this.ox + x, y + 0.21, this.oz + z, 0, 0.86, 0.03, 0.86));
     } else {
       // подвес: трос, чашка, плафон, лампочка
       this.b.add('c:#57534e', T.box, M(this.ox + x, y + 0.42, this.oz + z, 0, 0.04, 0.5, 0.04));
@@ -296,12 +298,19 @@ export class IB {
     this.act(x + s * 1.1, z + c * 1.1, 1.0, label, action);
     if (person) this.npc(x + s * 0.72, z + c * 0.72, ry + Math.PI, 'worker');
   }
-  plant(x: number, z: number) { this.cyl('c:#a16207', x, 0, z, 0.22, 0.45); this.b.add('c:#16a34a', T.ico, M(this.ox + x, 0.95, this.oz + z, 0, 0.45, 0.6, 0.45)); this.b.add('c:#15803d', T.ico, M(this.ox + x + 0.18, 1.2, this.oz + z - 0.12, 0.7, 0.3, 0.4, 0.3)); this.col(x - 0.25, z - 0.25, x + 0.25, z + 0.25, 0, 1); }
+  plant(x: number, z: number) {
+    // Компактное растение с соразмерным горшку коллайдером.
+    this.cyl('c:#a16207', x, 0, z, 0.16, 0.32);
+    this.b.add('c:#16a34a', T.ico, M(this.ox + x, 0.66, this.oz + z, 0, 0.3, 0.4, 0.3));
+    this.b.add('c:#15803d', T.ico, M(this.ox + x + 0.12, 0.83, this.oz + z - 0.08, 0.7, 0.2, 0.27, 0.2));
+    this.col(x - 0.16, z - 0.16, x + 0.16, z + 0.16, 0, 0.32);
+  }
   rug(x: number, z: number, w: number, d: number, c: string) { this.f('c:' + c, x, 0.004, z, w, 0.012, d, false); }
   painting(x: number, y: number, z: number, ry: number, c: string) {
-    this.plane('c:' + c, x, y, z, 1.0, 0.7, ry);
-    this.plane('c:#1c1917', x, y, z - Math.cos(ry) * 0.01, 1.12, 0.82, ry);
-    this.plane('c:' + c, x, y, z - Math.cos(ry) * 0.015, 1.0, 0.7, ry);
+    // Рамка позади полотна по нормали стены, включая боковые стены.
+    this.plane('c:#1c1917', x - Math.sin(ry) * 0.01, y, z - Math.cos(ry) * 0.01, 0.86, 0.86, ry);
+    this.plane('meme:' + memeIndex(this.memePictureIndex++), x, y, z, 0.76, 0.76, ry);
+    void c; // сохранён прежний интерфейс вызовов
   }
   /** Единственное окно — в офисе: непрозрачный спокойный небесно-голубой цвет. */
   officeWindow(x: number, y: number, z: number, w: number, h: number) {
@@ -405,6 +414,7 @@ export class IB {
 
 export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?: boolean[]; units?: number; name?: string } = {}): Interior {
   const ib = new IB();
+  ib.memePictureIndex = memeIndex(memeSeed(kind + ':' + (opts.seed ?? 0)));
   ib.residential = ['apt_eco', 'apt_mid', 'apt_lux', 'house_city', 'house_village'].includes(kind);
   ib.retail = ['shop24', 'vshop', 'supermarket', 'pharmacy', 'vpharmacy', 'gunshop', 'vguntruck', 'clothes', 'gas', 'fishshop', 'scootershop'].includes(kind);
   const seed = opts.seed ?? 1;
@@ -710,6 +720,9 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
         ib.col(x - 1.3, -D / 2 + 2.9, x + 1.2, -D / 2 + 3.1, 0, 2.5);
         ib.f('c:#a1a1aa', x - 0.3, 0, -D / 2 + 1.3, 0.9, 0.45, 1.9, true); // шконка
       }
+      // Точка внутри камеры, не внутри шконки или решётки. Пока используется
+      // только проверками: механика задержания ещё не подключена.
+      ib.doorSpots.custody = {x:ib.ox - 5.45, z:ib.oz - 5.25, a:0, y:0};
       // пост, доска розыска, шкафчики, скамьи
       ib.f('c:#1e293b', W / 2 - 0.4, 0, -5.4, 0.5, 1.5, 3.0, true); ib.npc(W / 2 - 1.4, -5.4, -Math.PI / 2, 'police');
       for (let i = 0; i < 4; i++) ib.f('c:#334155', 6.6, 0, -1.4 + i * 0.7, 1.4, 2.1, 0.6, true);
@@ -1358,13 +1371,13 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
         house ? 'Выйти на крыльцо' : 'Выйти в подъезд', 'wood', house ? '#252920' : '#f4f4f0');
       if (house) {
         // Тёмные деревянные рейки и вставки в полу, как на референсе.
-        for (let x = left + .22; x < bathX - .18; x += .28)
-          ib.f('c:#47271c', x, 0.12, back + .115, .045, H - .24, .035, false);
-        for (let z = bathZ + .25; z < front - .2; z += .28)
-          ib.f('c:#47271c', right - .115, .12, z, .035, H - .24, .045, false);
-        for (let z = back + .8; z < front - .7; z += 1.6)
-          for (let x = left + .9; x < right - .7; x += 2.4)
-            ib.f('c:#241b19', x, .002, z, .38, .006, .28, false);
+        for (let x = left + .22; x < bathX - .18; x += .4)
+          ib.f('c:#47271c', x, 0.12, back + .115, .025, H - .24, .02, false);
+        for (let z = bathZ + .25; z < front - .2; z += .4)
+          ib.f('c:#47271c', right - .115, .12, z, .02, H - .24, .025, false);
+        for (let z = back + .8; z < front - .7; z += 2.0)
+          for (let x = left + .9; x < right - .7; x += 2.8)
+            ib.f('c:#241b19', x, .002, z, .22, .006, .16, false);
       }
 
       // Слева отдельная спальня; широкий дверной проём ведёт из прихожей.
@@ -1430,11 +1443,11 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
         ib.f('c:#eee6d6', tx-.35, .44, tz-.12, .18, .14, .18, false);
         ib.f('c:#327349', tx-.35, .58, tz-.12, .16, .18, .16, false);
         // Торшер у дивана: только геометрия, освещение остаётся у потолочных ламп.
-        ib.f('c:#262321', right-.48, 0, front-2.7, .32, .05, .32, false);
-        ib.f('c:#262321', right-.48, .05, front-2.7, .06, 1.45, .06, false);
-        ib.f('glow:#ffe2ab', right-.48, 1.48, front-2.7, .44, .4, .35, false);
-        ib.f('c:#4b2d22', right-.16, 1.85, front-2.1, .25, .08, 1.3, false);
-        for (let i=0;i<4;i++) ib.f(i%2 ? 'c:#e5ddc9' : 'c:#b69b7a', right-.17, 1.93, front-2.5+i*.16, .18, .28, .1, false);
+        ib.f('c:#262321', right-.48, 0, front-2.7, .24, .04, .24, false);
+        ib.f('c:#262321', right-.48, .04, front-2.7, .035, 1.4, .035, false);
+        ib.f('glow:#ffe2ab', right-.48, 1.42, front-2.7, .3, .28, .3, false);
+        ib.f('c:#4b2d22', right-.16, 1.85, front-2.1, .18, .05, 1.0, false);
+        for (let i=0;i<4;i++) ib.f(i%2 ? 'c:#e5ddc9' : 'c:#b69b7a', right-.17, 1.9, front-2.4+i*.16, .12, .2, .08, false);
         ib.painting(right-.13, 2.05, -.5, -Math.PI/2, '#9d765a');
         // Люк не создаёт коллайдера: через него можно спуститься и вернуться.
         ib.f('c:#5b3a1e', 0.1, 0.005, 2.0, 1.0, 0.02, 1.0, false);

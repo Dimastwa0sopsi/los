@@ -48,8 +48,8 @@ function floorBorder(ib: IB, W: number, D: number, c = '#94a3b8') {
 
 /** деревянные балки под потолком — деревня, бар, рыбалка, шахта */
 function beams(ib: IB, W: number, D: number, H: number, step = 2.8, c = '#57534e') {
-  for (let x = -W / 2 + step / 2; x < W / 2 - 0.4; x += step) ib.f('c:' + c, x, H - 0.42, 0, 0.22, 0.3, D - 0.3, false);
-  ib.f('c:' + c, 0, H - 0.3, -D / 2 + 0.4, W - 0.4, 0.18, 0.24, false);
+  for (let x = -W / 2 + step / 2; x < W / 2 - 0.4; x += step) ib.f('c:' + c, x, H - 0.24, 0, 0.12, 0.18, D - 0.3, false);
+  ib.f('c:' + c, 0, H - 0.18, -D / 2 + 0.4, W - 0.4, 0.1, 0.14, false);
 }
 
 /** решётка подвесного потолка — магазины, офисы, больница */
@@ -60,8 +60,8 @@ function ceilingGrid(ib: IB, W: number, D: number, H: number, step = 2.4, c = '#
 
 /** короб вентиляции вдоль потолка — кафе, офисы, склады */
 function duct(ib: IB, W: number, D: number, H: number, z = 0, c = '#a1a1aa') {
-  ib.f('c:' + c, 0, H - 0.55, z, W - 0.6, 0.34, 0.42, false);
-  for (let x = -W / 2 + 1.4; x < W / 2 - 1; x += 3.1) ib.f('c:#71717a', x, H - 0.73, z, 0.5, 0.03, 0.3, false);
+  ib.f('c:' + c, 0, H - 0.33, z, W - 0.6, 0.2, 0.26, false);
+  for (let x = -W / 2 + 1.4; x < W / 2 - 1; x += 3.1) ib.f('c:#71717a', x, H - 0.35, z, 0.35, 0.02, 0.2, false);
 }
 
 /* ─────────────── настенное: таблички, плакаты, щиты, зеркала ─────────────── */
@@ -70,9 +70,9 @@ function duct(ib: IB, W: number, D: number, H: number, z = 0, c = '#a1a1aa') {
 function serviceDoor(ib: IB, x: number, z: number, ry: number, label: string, c = '#5b3a1e') {
   const along = Math.abs(Math.sin(ry)) > 0.5;
   const w = 1.0;
-  ib.f('c:' + c, x, 0, z, along ? 0.08 : w, 2.1, along ? w : 0.08, false, ry);
-  for (const s2 of [-1, 1]) ib.f('c:#e7e5e4', x + (along ? 0 : s2 * (w / 2 + 0.05)), 1.1, z + (along ? s2 * (w / 2 + 0.05) : 0), along ? 0.12 : 0.1, 2.2, along ? 0.1 : 0.12, false, ry);
-  ib.f('c:#e7e5e4', x, 2.16, z, along ? 0.12 : w + 0.2, 0.1, along ? w + 0.2 : 0.12, false, ry);
+  ib.f('c:' + c, x, 0, z, along ? 0.08 : w, 2.1, along ? w : 0.08, false);
+  for (const s2 of [-1, 1]) ib.f('c:#e7e5e4', x + (along ? 0 : s2 * (w / 2 + 0.05)), 1.1, z + (along ? s2 * (w / 2 + 0.05) : 0), along ? 0.12 : 0.1, 2.2, along ? 0.1 : 0.12, false);
+  ib.f('c:#e7e5e4', x, 2.16, z, along ? 0.12 : w + 0.2, 0.1, along ? w + 0.2 : 0.12, false);
   ib.f('chrome', x + (along ? -0.07 : w / 2 - 0.14), 1.02, z + (along ? w / 2 - 0.14 : -0.07), 0.1, 0.05, 0.1, false);
   ib.f('c:#18181b', x + (along ? -0.05 : 0), 1.62, z + (along ? 0 : -0.05), 0.09, 0.12, 0.04, false);
   ib.plane(`sign:${label}|#334155`, x + (along ? (Math.sin(ry) > 0 ? 0.06 : -0.06) : 0), 2.36, z + (along ? 0 : 0.07), 0.94, 0.26, ry);
@@ -83,9 +83,9 @@ function serviceDoor(ib: IB, x: number, z: number, ry: number, label: string, c 
 function fireHose(ib: IB, x: number, z: number, ry: number) {
   const along = Math.abs(Math.sin(ry)) > 0.5;
   const out = Math.sin(ry) > 0 ? 0.03 : -0.03;
-  ib.f('c:#b91c1c', x + (along ? out : 0), 0.35, z + (along ? 0 : out), along ? 0.16 : 1.3, 0.95, along ? 1.3 : 0.16, false, ry);
-  ib.f('c:#f8fafc', x + (along ? out * 3 : 0), 0.66, z + (along ? 0 : out * 3), along ? 0.02 : 1.1, 0.28, along ? 1.1 : 0.02, false, ry);
-  ib.f('c:#f8fafc', x + (along ? out * 3 : 0), 1.02, z + (along ? 0 : out * 3), along ? 0.02 : 1.1, 0.1, along ? 1.1 : 0.02, false, ry);
+  ib.f('c:#b91c1c', x + (along ? out : 0), 0.35, z + (along ? 0 : out), along ? 0.16 : 1.3, 0.95, along ? 1.3 : 0.16, false);
+  ib.f('c:#f8fafc', x + (along ? out * 3 : 0), 0.66, z + (along ? 0 : out * 3), along ? 0.02 : 1.1, 0.28, along ? 1.1 : 0.02, false);
+  ib.f('c:#f8fafc', x + (along ? out * 3 : 0), 1.02, z + (along ? 0 : out * 3), along ? 0.02 : 1.1, 0.1, along ? 1.1 : 0.02, false);
   ib.plane('sign:ПОЖАРНЫЙ ЩИТ · 01|#b91c1c', x + (along ? out * 2 : 0), 1.5, z + (along ? 0 : out * 2), 1.2, 0.24, ry);
 }
 
@@ -93,11 +93,11 @@ function fireHose(ib: IB, x: number, z: number, ry: number) {
 function noticeBoard(ib: IB, x: number, z: number, ry: number, w = 1.5) {
   const along = Math.abs(Math.sin(ry)) > 0.5;
   const out = Math.sin(ry) > 0 ? 0.04 : -0.04;
-  ib.f('c:#78350f', x, 1.25, z, along ? 0.06 : w, 0.95, along ? w : 0.06, false, ry);
-  ib.f('c:#c8a97a', x + (along ? out : 0), 1.25, z + (along ? 0 : out), along ? 0.02 : w - 0.12, 0.82, along ? w - 0.12 : 0.02, false, ry);
+  ib.f('c:#78350f', x, 1.25, z, along ? 0.06 : w, 0.95, along ? w : 0.06, false);
+  ib.f('c:#c8a97a', x + (along ? out : 0), 1.25, z + (along ? 0 : out), along ? 0.02 : w - 0.12, 0.82, along ? w - 0.12 : 0.02, false);
   for (let i = 0; i < 5; i++) {
     const t = -w / 2 + 0.24 + (i * (w - 0.5)) / 4;
-    ib.f('c:' + ['#f8fafc', '#fef3c7', '#fde68a', '#e0f2fe', '#fecaca'][i], x + (along ? out * 2 : t), 1.28 + (i % 2) * 0.09, z + (along ? t : out * 2), along ? 0.01 : 0.28, 0.32, along ? 0.28 : 0.01, false, ry);
+    ib.f('c:' + ['#f8fafc', '#fef3c7', '#fde68a', '#e0f2fe', '#fecaca'][i], x + (along ? out * 2 : t), 1.28 + (i % 2) * 0.09, z + (along ? t : out * 2), along ? 0.01 : 0.28, 0.32, along ? 0.28 : 0.01, false);
   }
   ib.plane('sign:ОБЪЯВЛЕНИЯ|#334155', x, 1.8, z, Math.min(w, 1.2), 0.2, ry);
 }
@@ -110,8 +110,11 @@ function posterRow(ib: IB, x: number, z: number, ry: number, n = 3, y = 1.9) {
   for (let i = 0; i < n; i++) {
     const t = (i - (n - 1) / 2) * 0.86;
     const px = along ? x : x + t, pz = along ? z + t : z;
-    ib.f('c:#1c1917', px, y, pz, along ? 0.05 : 0.56, 0.72, along ? 0.56 : 0.05, false, ry);
-    ib.f('c:' + cols[(i + 2) % cols.length], px + (along ? out : 0), y + 0.04, pz + (along ? 0 : out), along ? 0.02 : 0.46, 0.6, along ? 0.46 : 0.02, false, ry);
+    if (i === 0) ib.painting(px + (along ? out : 0), y + 0.36, pz + (along ? 0 : out), ry, cols[(i + 2) % cols.length]);
+    else {
+      ib.f('c:#1c1917', px, y, pz, along ? 0.05 : 0.56, 0.72, along ? 0.56 : 0.05, false);
+      ib.f('c:' + cols[(i + 2) % cols.length], px + (along ? out : 0), y + 0.04, pz + (along ? 0 : out), along ? 0.02 : 0.46, 0.6, along ? 0.46 : 0.02, false);
+    }
   }
 }
 
@@ -119,21 +122,21 @@ function posterRow(ib: IB, x: number, z: number, ry: number, n = 3, y = 1.9) {
 function mirrorPanel(ib: IB, x: number, z: number, ry: number, w = 1.1, h = 1.6, y = 1.0) {
   const along = Math.abs(Math.sin(ry)) > 0.5;
   const out = Math.sin(ry) > 0 ? 0.035 : -0.035;
-  ib.f('chrome', x, y, z, along ? 0.05 : w + 0.08, h + 0.08, along ? w + 0.08 : 0.05, false, ry);
+  ib.f('chrome', x, y, z, along ? 0.05 : w + 0.08, h + 0.08, along ? w + 0.08 : 0.05, false);
   ib.plane('glass:0.55', x + (along ? out : 0), y + h / 2, z + (along ? 0 : out), w, h, ry);
-  ib.f('glow:#fef9c3', x, y + h + 0.14, z, along ? 0.08 : w, 0.06, along ? w : 0.08, false, ry);
+  ib.f('glow:#fef9c3', x, y + h + 0.14, z, along ? 0.08 : w, 0.06, along ? w : 0.08, false);
 }
 
 /** настенные крючки с куртками у входа */
 function coatHooks(ib: IB, x: number, z: number, ry: number, n = 4) {
   const along = Math.abs(Math.sin(ry)) > 0.5;
   const out = Math.sin(ry) > 0 ? 0.05 : -0.05;
-  ib.f('c:#78350f', x, 1.6, z, along ? 0.06 : 0.9, 0.1, along ? 0.9 : 0.06, false, ry);
+  ib.f('c:#78350f', x, 1.6, z, along ? 0.06 : 0.9, 0.1, along ? 0.9 : 0.06, false);
   for (let i = 0; i < n; i++) {
     const t = (i - (n - 1) / 2) * 0.26;
     const px = along ? x + out : x + t, pz = along ? z + t : z + out;
     ib.f('chrome', px, 1.54, pz, 0.04, 0.08, 0.06, false, ry);
-    if (i % 2 === 0) ib.f('c:' + ['#334155', '#7c2d12'][i % 2], px + (along ? out * 2 : 0), 1.19, pz + (along ? 0 : out * 2), along ? 0.12 : 0.34, 0.6, along ? 0.34 : 0.12, false, ry);
+    if (i % 2 === 0) ib.f('c:' + ['#334155', '#7c2d12'][i % 2], px + (along ? out * 2 : 0), 1.19, pz + (along ? 0 : out * 2), along ? 0.12 : 0.34, 0.6, along ? 0.34 : 0.12, false);
   }
 }
 
@@ -225,10 +228,10 @@ function queue(ib: IB, x0: number, z0: number, x1: number, z1: number, n = 3) {
 function chalkboard(ib: IB, x: number, z: number, ry: number, text: string, color = '#0f766e') {
   const along = Math.abs(Math.sin(ry)) > 0.5;
   const out = Math.sin(ry) > 0 ? 0.05 : -0.05;
-  ib.f('c:#78350f', x, 1.5, z, along ? 0.06 : 1.15, 0.95, along ? 1.15 : 0.06, false, ry);
-  ib.f('c:#1c1917', x + (along ? out : 0), 1.5, z + (along ? 0 : out), along ? 0.02 : 1.02, 0.82, along ? 1.02 : 0.02, false, ry);
+  ib.f('c:#78350f', x, 1.5, z, along ? 0.06 : 1.15, 0.95, along ? 1.15 : 0.06, false);
+  ib.f('c:#1c1917', x + (along ? out : 0), 1.5, z + (along ? 0 : out), along ? 0.02 : 1.02, 0.82, along ? 1.02 : 0.02, false);
   ib.plane(`sign:${text}|${color}`, x + (along ? out * 2 : 0), 1.5, z + (along ? 0 : out * 2), 0.98, 0.76, ry);
-  ib.f('c:#92400e', x, 1.06, z, along ? 0.11 : 1.2, 0.05, along ? 1.2 : 0.11, false, ry);
+  ib.f('c:#92400e', x, 1.06, z, along ? 0.11 : 1.2, 0.05, along ? 1.2 : 0.11, false);
 }
 
 /** подвесная табличка-указатель под потолком */
@@ -254,7 +257,7 @@ function baskets(ib: IB, x: number, z: number) {
 /** скамья у стены */
 function bench(ib: IB, x: number, z: number, w: number, ry = 0) {
   ib.f('c:#78350f', x, 0, z, Math.abs(Math.sin(ry)) > 0.5 ? 0.5 : w, 0.44, Math.abs(Math.sin(ry)) > 0.5 ? w : 0.5, true, ry);
-  ib.f('c:#92400e', x, 0.44, z, Math.abs(Math.sin(ry)) > 0.5 ? 0.12 : w, 0.42, Math.abs(Math.sin(ry)) > 0.5 ? w : 0.12, false, ry);
+  ib.f('c:#92400e', x, 0.44, z, Math.abs(Math.sin(ry)) > 0.5 ? 0.12 : w, 0.42, Math.abs(Math.sin(ry)) > 0.5 ? w : 0.12, false);
 }
 
 export function dressInterior(ib: IB, kind: string, o: DressInfo): void {

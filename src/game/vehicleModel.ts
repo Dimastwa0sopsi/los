@@ -270,19 +270,23 @@ export class VehicleModel {
     const ev = !!s.ev, old = !!s.old;
     // --- шасси/кузов
     this.part('chassis', false);
-    const prof: Record<string, [number, number][]> = {
-      sedan: [[-0.5, 0.08], [-0.5, 0.8], [-0.48, 1], [0.47, 1], [0.5, 0.72], [0.5, 0.08]],
-      hatch: [[-0.5, 0.08], [-0.5, 0.95], [-0.49, 1], [0.47, 1], [0.5, 0.7], [0.5, 0.08]],
-      suv: [[-0.5, 0.05], [-0.5, 1], [0.47, 1], [0.5, 0.75], [0.5, 0.05]],
-      pickup: [[-0.5, 0.05], [-0.5, 1], [0.47, 1], [0.5, 0.75], [0.5, 0.05]],
-      sport: [[-0.5, 0.1], [-0.5, 0.85], [-0.45, 1], [0.35, 0.95], [0.5, 0.45], [0.5, 0.1]],
-      van: [[-0.5, 0.03], [-0.5, 1], [0.5, 1], [0.5, 0.03]],
-    };
     const bodyTop = s.body === 'pickup' ? beltY - 0.3 : beltY;
-    this.add(PAINT, profile(s.body, prof[s.body] ?? prof.sedan), M(0, clear, 0, 0, W, bodyTop - clear, L));
+    // Пол и боковины вместо цельного блока: пространство сидений и багажника
+    // не должно заполняться окрашенной геометрией кузова.
+    const floorH = 0.10, wall = 0.13, shellHeight = bodyTop - clear - floorH;
+    this.box(PAINT, 0, clear + floorH / 2, 0, W, floorH, L);
+    for (const side of [-1, 1]) this.box(PAINT, side * (W - wall) / 2, clear + floorH + shellHeight / 2, 0, wall, shellHeight, L);
+    // Моторный отсек остаётся закрытым; салон начинается за ним.
+    this.box(PAINT, 0, (clear + bodyTop) / 2, (z1 + L / 2) / 2, W - 2 * wall, bodyTop - clear, L / 2 - z1);
+    if (s.body === 'sedan' || s.body === 'sport') {
+      // Торцевая стенка и перегородка отделяют полую нишу от салона.
+      this.box(PAINT, 0, (clear + bodyTop) / 2, -L / 2 + 0.06, W - 2 * wall, bodyTop - clear, 0.12);
+      this.box('c:#292b30', 0, (clear + bodyTop) / 2, z0 - 0.03, W - 2 * wall, bodyTop - clear, 0.08);
+      this.box('c:#292b30', 0, clear + floorH + 0.01, (-L / 2 + z0) / 2, W - 2 * wall, 0.02, z0 + L / 2 - 0.18);
+    }
     if (s.body === 'pickup') {
-      // передняя часть до пояса + кузов-платформа
-      this.box(PAINT, 0, (bodyTop + beltY) / 2, (z0 + L / 2) / 2, W, beltY - bodyTop, L / 2 - z0);
+      // Капот выше борта, но не перекрывает кабину.
+      this.box(PAINT, 0, (bodyTop + beltY) / 2, (z1 + L / 2) / 2, W, beltY - bodyTop, L / 2 - z1);
       this.box(DARK, 0, bodyTop + 0.02, (-L / 2 + z0) / 2, W - 0.16, 0.04, z0 + L / 2 - 0.2);
       this.box(PAINT, W / 2 - 0.04, beltY - 0.15, (-L / 2 + z0) / 2 - 0.05, 0.08, 0.3, z0 + L / 2 - 0.2);
       this.box(PAINT, -W / 2 + 0.04, beltY - 0.15, (-L / 2 + z0) / 2 - 0.05, 0.08, 0.3, z0 + L / 2 - 0.2);
@@ -631,7 +635,9 @@ export class VehicleModel {
       const belt = H * 0.49, roof = H * 0.88;
       // Задний нижний отсек отделён от основного кузова и имеет крышку.
       const bayDepth = 0.32, bayW = W * 0.6, hatchBottom = 0.64, hatchTop = Math.min(belt - 0.1, 1.32), rearZ = -L / 2 + bayDepth / 2;
-      this.box(PAINT, 0, (0.4 + belt) / 2, bayDepth / 2, W, belt - 0.4, L - bayDepth);
+      // Низ автобуса не должен заполнять пассажирский салон целиком.
+      this.box(PAINT, 0, 0.48, bayDepth / 2, W, 0.16, L - bayDepth);
+      for (const sx of [-1, 1]) this.box(PAINT, sx * (W / 2 - 0.08), (0.56 + belt) / 2, bayDepth / 2, 0.16, belt - 0.56, L - bayDepth);
       for (const sx of [-1,1]) this.box(PAINT, sx * (W + bayW) / 4, (0.4 + belt) / 2, rearZ, (W-bayW)/2, belt-0.4, bayDepth);
       this.box(PAINT, 0, (0.4+hatchBottom)/2, rearZ, bayW, hatchBottom-.4, bayDepth);
       this.box(PAINT, 0, (hatchTop+belt)/2, rearZ, bayW, belt-hatchTop, bayDepth);
@@ -672,8 +678,17 @@ export class VehicleModel {
         this.box('chrome', 0, 1.35, L / 2 + 0.03, W * 0.62, 1.1, 0.05); for (let i = 0; i < 7; i++) this.box('c:#111', 0, 0.9 + i * 0.13, L / 2 + 0.06, W * 0.6, 0.03, 0.02);
         for (const sx of [1, -1]) { this.cyl('chrome', sx * (W / 2 - 0.05), H + 0.2, cz - cabL / 2 + 0.15, 0.08, 1.6, 'y'); this.box(PAINT, sx * (W / 2 - 0.2), 0.95, L / 2 - nose / 2, 0.45, 0.08, nose * 0.9); } // трубы и крылья
       }
-      this.box(PAINT, 0, 0.7 + (H - 0.7) / 2 - 0.1, cz, W, H - 0.9, cabL);
-      this.box(PAINT, 0, H - 0.15, cz - 0.2, W, 0.3, cabL - 0.4);
+      // Кабина грузовика: пол, боковины и стойки вместо сплошного блока за стеклом.
+      this.box(PAINT, 0, 0.78, cz, W, 0.16, cabL);
+      this.box(PAINT, 0, 1.1, cz + cabL / 2 - 0.07, W, 0.5, 0.14);
+      this.box(PAINT, 0, (0.86 + H - 0.3) / 2, cz - cabL / 2 + 0.07, W, H - 1.16, 0.14);
+      for (const sx of [-1, 1]) {
+        const x = sx * (W / 2 - 0.07);
+        this.box(PAINT, x, (0.86 + H * 0.52) / 2, cz, 0.14, H * 0.52 - 0.86, cabL);
+        this.box(PAINT, x, (H * 0.52 + H - 0.3) / 2, cz + cabL / 2 - 0.07, 0.14, H - 0.3 - H * 0.52, 0.14);
+        this.box(PAINT, x, (H * 0.52 + H - 0.3) / 2, cz - cabL / 2 + 0.07, 0.14, H - 0.3 - H * 0.52, 0.14);
+      }
+      this.box(PAINT, 0, H - 0.15, cz, W, 0.3, cabL);
       this.glassPane(0, H * 0.5, cz + cabL / 2, H * 0.86, cz + cabL / 2, W - 0.2);
       for (const sx of [1, -1]) this.sideGlass(sx * (W / 2 + 0.015), H * 0.52, H * 0.84, cz + 0.1, cz + cabL / 2 - 0.15);
       if (!nose) this.box('chrome', 0, 1.0, L / 2 + 0.02, W * 0.6, 0.6, 0.04);
@@ -1064,8 +1079,7 @@ export class VehicleModel {
     if (k === 'TRIM') return 'c:#222';
     return k;
   }
-  /** Sedan lids and cargo shutters are separately modelled. The sedan chassis
-   * remains solid beneath its lid; the cargo body is hollow. */
+  /** Lids and cargo shutters are modelled separately from the body shell. */
   setExperimentalTrunkAnimation(enabled: boolean): boolean {
     const supported = trunkMotionKind(this.spec.body, this.spec.variant) !== null;
     const next = enabled && supported;

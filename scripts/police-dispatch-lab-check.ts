@@ -1,0 +1,13 @@
+import {strict as assert} from 'node:assert';
+import {planCustodyRoute} from '../src/game/policeRouteLab';
+const p={x:0,z:0,speed:0,role:'police',sirens:true};
+const station=(id:number,x:number)=>({id,kind:'police',enter:true,door:{x,z:0}});
+const near=station(1,10), far=station(2,20), calls:number[]=[];
+const result=planCustodyRoute([p],[far,near],{x:0,z:0},(_,d)=>{calls.push(d.x);return d.x===10?null:{destination:d.x};});
+assert.deepEqual(calls,[10,20]);assert.equal(result?.station.id,2);
+assert.equal(planCustodyRoute([p],[near],{x:0,z:0},()=>null),null);
+for(const bad of [{...p,speed:3},{...p,x:8},{...p,sirens:false},{...p,role:'taxi'},{...p,x:NaN}])assert.equal(planCustodyRoute([bad],[near],{x:0,z:0},()=>({})),null);
+for(const bad of [{...near,enter:false},{...near,removed:true},{...near,kind:'shop'},{...near,door:{x:NaN,z:0}}])assert.equal(planCustodyRoute([p],[bad],{x:0,z:0},()=>({})),null);
+assert.equal(planCustodyRoute([p],[near],{x:NaN,z:0},()=>({})),null);
+const second={...p,x:1};assert.equal(planCustodyRoute([p,second],[near],{x:0,z:0},car=>car===p?null:'route')?.patrol,second);
+console.log('✓ прототип диспетчеризации: неподвижный патруль рядом, запасной участок и отсутствие маршрута');

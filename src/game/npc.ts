@@ -192,7 +192,7 @@ export class PedSystem {
       else { p.char.root.visible = true; p.x = -165; p.z = 480; p.state = 'walk'; p.tx = p.homeX; p.tz = p.homeZ; p.timer = -1; }
     }
   }
-  update(dt: number, t: number, ctx: { px: number; pz: number; py: number; playerVisible: boolean; lightState: (node: number, ew: boolean) => string; hitPlayer: (dmg: number, fx: number, fz: number, heavy: boolean) => boolean; foePos?: (id: number) => { x: number; z: number } | null; suppress?: (x: number, z: number) => boolean; hitFoe?: (id: number, dmg: number, fx: number, fz: number, heavy: boolean) => void; inside: boolean; viewDist: number; obstacles: (x: number, z: number) => boolean; vehicles: { x: number; z: number; speed: number; r: number; mine?: boolean }[] }) {
+  update(dt: number, t: number, ctx: { px: number; pz: number; py: number; playerVisible: boolean; otherPlayers?: readonly {x:number;z:number}[]; lightState: (node: number, ew: boolean) => string; hitPlayer: (dmg: number, fx: number, fz: number, heavy: boolean) => boolean; foePos?: (id: number) => { x: number; z: number } | null; suppress?: (x: number, z: number) => boolean; hitFoe?: (id: number, dmg: number, fx: number, fz: number, heavy: boolean) => void; inside: boolean; viewDist: number; obstacles: (x: number, z: number) => boolean; vehicles: { x: number; z: number; speed: number; r: number; mine?: boolean }[] }) {
     for (const p of this.peds) {
       if (p.state === 'gone') { p.char.root.visible = false; continue; }
       if (this.onlineMode && p.kind !== 'puppet' && p.role !== 'police') { p.active = false; p.char.root.visible = false; continue; }
@@ -209,11 +209,27 @@ export class PedSystem {
       if (p.scareT && p.scareT > 0) p.scareT -= dt;
       let moving = false; let pose: Pose = 'idle'; let ph = -1; let mv = 0;
       // ---- steering: идём к цели, а встречную преграду объезжаем стороной ----
-      const nearVeh = (x: number, z: number) => {
+      // Если уже оказались внутри чужого радиуса, разрешаем уходить наружу,
+      // иначе два персонажа, появившиеся рядом, могут навсегда застрять.
+      const enters = (x: number, z: number, ox: number, oz: number, radius: number) => {
+        const next = Math.hypot(x - ox, z - oz);
+        return next < radius && next <= Math.hypot(p.x - ox, p.z - oz) + 1e-5;
+      };
+      const nearDynamic = (x: number, z: number) => {
         for (const v of ctx.vehicles) {
-          if (Math.abs(v.x - x) > 7 || Math.abs(v.z - z) > 7) continue;
-          const rr = (v.r ?? 1.1) + 0.45;
-          if (Math.hypot(v.x - x, v.z - z) < rr) return true;
+          if (Math.abs(v.x - x) > v.r + 1 || Math.abs(v.z - z) > v.r + 1) continue;
+          if (enters(x, z, v.x, v.z, v.r + 0.45)) return true;
+        }
+        if (ctx.playerVisible && enters(x, z, ctx.px, ctx.pz, 0.85)) return true;
+        for (const other of ctx.otherPlayers ?? []) if (enters(x, z, other.x, other.z, 0.85)) return true;
+        for (const other of this.peds) {
+          if (other === p || other.state === 'gone' || other.state === 'down' || other.state === 'knocked') continue;
+          if (this.onlineMode && other.kind !== 'puppet' && other.role !== 'police') continue;
+          if (other.kind !== 'static' && other.kind !== 'puppet' && ctx.suppress?.(other.x, other.z)) continue;
+          if ((other.kind === 'static') !== ctx.inside && other.kind !== 'puppet') continue;
+          if (other.kind === 'puppet' && (ctx.inside || performance.now() - (other.netT ?? 0) >= 3000)) continue;
+          if (Math.abs(other.x-x)>1.2 || Math.abs(other.z-z)>1.2) continue;
+          if (enters(x, z, other.x, other.z, 0.8)) return true;
         }
         return false;
       };
@@ -229,7 +245,7 @@ export class PedSystem {
         }
         const probe = (ang: number, dist = step) => {
           const nx = p.x + Math.sin(ang) * dist, nz = p.z + Math.cos(ang) * dist;
-          if (ctx.obstacles(nx, nz) || nearVeh(nx, nz)) return null;
+          if (ctx.obstacles(nx, nz) || nearDynamic(nx, nz)) return null;
           return { x: nx, z: nz };
         };
         // 1) продолжаем уже начатый обход: он «прилипает» на ~0.8 с, чтобы NPC не дёргался
