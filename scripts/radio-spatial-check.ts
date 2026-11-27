@@ -8,7 +8,7 @@ assert.equal(radioGain(car,{...listener,x:10+RADIO_RADIUS/2},0.8,0.4),0.2);
 assert.equal(radioGain(car,{...listener,vehicleId:'car1'},0,0.4),0.4);
 assert.equal(radioGain(car,{...listener,buildingId:42},1,1),0);
 const pc: RadioPlace = {kind:'computer',x:1,z:2,buildingId:7,exteriorX:100,exteriorZ:100};
-assert.equal(radioGain(pc,{x:1,z:2,buildingId:7,vehicleId:null},0.75,1),0.75);
+assert.equal(radioGain(pc,{x:1,z:2,buildingId:7,vehicleId:null},0.75,1),1);
 assert.equal(radioGain(pc,{x:100,z:100,buildingId:null,vehicleId:null},0.75,1),0.75);
 assert.equal(radioGain(pc,{x:1,z:2,buildingId:8,vehicleId:null},1,1),0);
 assert.equal(radioGain(car,{...listener,x:Infinity},1,1),0);

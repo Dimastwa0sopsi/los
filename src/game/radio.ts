@@ -70,6 +70,7 @@ export class Radio {
   }
 
   state(): RadioState { return { station: this.station, playing: this.playing, loading: this.loading, error: this.error }; }
+  getPosition(callback:(milliseconds:number)=>void) { this.cloud?.getPosition(callback); }
 
   setVolume(v: number) {
     this.volume = Math.max(0, Math.min(1, v));

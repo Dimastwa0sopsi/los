@@ -1,5 +1,4 @@
-/* Building blocks for spatial radio. Not connected to the live game yet.
- * Remote audio is untrusted: callers must validate server events and must not
+/* Spatial radio helpers. Remote audio is untrusted: callers must validate server events and must not
  * fetch arbitrary links, bypass autoplay, or proxy SoundCloud audio. */
 export type RadioPlace = { kind: 'vehicle'; x: number; z: number; vehicleId: string }
   | { kind: 'computer'; x: number; z: number; exteriorX: number; exteriorZ: number; buildingId: number };
@@ -21,7 +20,8 @@ export function radioGain(source: RadioPlace, listener: RadioListener, outsideVo
   const z = source.kind === 'computer' && listener.buildingId === null ? source.exteriorZ : source.z;
   const distance = Math.hypot(listener.x - x, listener.z - z);
   const attenuation = Math.max(0, 1 - distance / RADIO_RADIUS);
-  return clamp(outsideVolume) * attenuation * attenuation;
+  const volume = source.kind === 'computer' && listener.buildingId === source.buildingId ? insideVolume : outsideVolume;
+  return clamp(volume) * attenuation * attenuation;
 }
 
 /** Public SoundCloud track or playlist only; never accept an arbitrary iframe URL. */
@@ -43,6 +43,6 @@ export function soundCloudUrl(raw: string): string | null {
 export function soundCloudEmbed(raw: string): string | null {
   const url = soundCloudUrl(raw);
   if (!url) return null;
-  const params = new URLSearchParams({url, auto_play:'false', show_artwork:'true'});
+  const params = new URLSearchParams({url, auto_play:'false', show_artwork:'true', single_active:'false'});
   return `https://w.soundcloud.com/player/?${params.toString()}`;
 }
