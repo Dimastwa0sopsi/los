@@ -10,6 +10,7 @@ g.state = { vehicles: [o], money: 1000 }; g.vehicles = [car]; g.toast = () => {}
 g.pay = (n: number) => { if (n > g.state.money) return false; paid += n; g.state.money -= n; return true; };
 const test = (name: string, ok: boolean) => { console.log(`${ok ? '✓' : '✗'} ${name}`); if (!ok) process.exitCode = 1; };
 test('радужные фары имеют стоимость', g.tuningCost(original, { ...original, rainbow: true }) === 12000);
+test('сабвуфер оплачивается один раз', g.tuningCost(original, { ...original, subwoofer: true }) === 1500 && g.tuningCost({ ...original, subwoofer: true }, { ...original, subwoofer: true }) === 0);
 test('нет денег — установка не проходит', !g.applyTuning('car', { ...original, rainbow: true }) && !o.tuning.rainbow && !saved);
 test('бесплатное снятие неона сохраняется', g.applyTuning('car', { ...original, neon: null, plate: undefined }) && o.tuning.neon === null && o.tuning.plate === 'А123ВС77' && saved === 1 && rendered.neon === null && paid === 0);
 test('нет автомобиля — установка не проходит', !g.applyTuning('missing', original));

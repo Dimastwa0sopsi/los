@@ -32,8 +32,9 @@ import { eyeSees, recognitionEye, POLICE_EYE, PED_EYE, type Eye } from './police
 import { Radio } from './radio';
 import { hamsterSpot, makeHamster } from './hamster';
 import { nextImmersion } from './vehicleSinking';
-import { radioGain, soundCloudUrl, type RadioPlace } from './radioSpatial';
+import { carRadioVolume, radioGain, soundCloudUrl, type RadioPlace } from './radioSpatial';
 import { RemoteRadios } from './remoteRadio';
+import { setSoundCloudMobile } from './soundCloudWidget';
 import { allMaterials, disposeTextures, mat, GFX, getTex } from './textures';
 import { T, M } from './geom';
 import { LIMITED, limitedAvailable, CROPS, EMOTES, SCOOTER_RATE, HYDRO_PRICE, WEAPONS, WEAPON_ORDER, AMMO_NAMES, ITEMS, VEHICLES, TRAFFIC_TYPES, TRAFFIC_WEIGHTS, KIOSK_TYPES, KIOSK_PERIOD, KIOSK_MAX_PERIODS, SHOP_ITEMS, randomPlate, plateKey, type ShopKind, type Look, type Tuning, defaultTuning, TUNE_PRICES, TUNE_CATALOG, HAIR_STYLES, TOPS, BOTTOMS, BAR_DRINKS } from './data';
@@ -64,7 +65,7 @@ export type Panel =
   | { type: 'shop'; kind: ShopKind; title: string; items: string[] } | { type: 'kiosk'; id: number } | { type: 'market'; sellUid?: string }
   | { type: 'cityhall' } | { type: 'auction' } | { type: 'tuning'; uid: string } | { type: 'clothes' } | { type: 'barber' } | { type: 'hospital' } | { type: 'police'; title: string }
   | { type: 'property'; b: number; unit: number } | { type: 'garage'; id: number } | { type: 'vadmin'; village: string } | { type: 'factory' } | { type: 'bank' }
-  | { type: 'pc'; mode: 'office' | 'home' } | { type: 'officehr' } | { type: 'livestock' } | { type: 'dealer'; scooter?: boolean } | { type: 'trucker' } | { type: 'emotes'; dance?: boolean } | { type: 'passport' } | { type: 'trade' } | { type: 'tradeInvite' } | { type: 'plant'; key: string; basement: boolean } | { type: 'quest' } | { type: 'editor'; fresh: boolean } | { type: 'listing'; uid: string; slot: number } | { type: 'info'; title: string; text: string } | { type: 'map'; mode: 'waypoint' | 'taxi' | 'autopilot' } | { type: 'phone'; tab?: string } | { type: 'onlineJoin' } | { type: 'inventory' } | { type: 'promo' } | { type: 'settings' } | { type: 'help'; tab?: string } | { type: 'farm' } | { type: 'radio' } | { type: 'bar'; name?: string } | { type: 'ozgim' } | { type: 'casino'; name?: string } | { type: 'svc'; kind: SvcKind } | { type: 'ads' };
+  | { type: 'pc'; mode: 'office' | 'home' } | { type: 'officehr' } | { type: 'livestock' } | { type: 'dealer'; scooter?: boolean } | { type: 'trucker' } | { type: 'emotes'; dance?: boolean } | { type: 'passport' } | { type: 'trade' } | { type: 'tradeInvite' } | { type: 'plant'; key: string; basement: boolean } | { type: 'quest' } | { type: 'editor'; fresh: boolean } | { type: 'listing'; uid: string; slot: number } | { type: 'info'; title: string; text: string } | { type: 'map'; mode: 'waypoint' | 'taxi' | 'autopilot' } | { type: 'phone'; tab?: string } | { type: 'onlineJoin' } | { type: 'inventory' } | { type: 'promo' } | { type: 'settings' } | { type: 'help'; tab?: string } | { type: 'farm' } | { type: 'radio'; listenOnly?: boolean } | { type: 'bar'; name?: string } | { type: 'ozgim' } | { type: 'casino'; name?: string } | { type: 'svc'; kind: SvcKind } | { type: 'ads' };
 /** городские услуги: мойка, шиномонтаж, доставка, парковка, автомат, ломбард, садок, стоянка, запчасти */
 export type SvcKind = 'wash' | 'tire' | 'food' | 'park' | 'slot' | 'pawn' | 'fish' | 'impound' | 'parts' | 'charge';
 interface Prompt { text: string; keys: string[]; act: () => void; r?: () => void; l?: () => void }
@@ -318,7 +319,7 @@ export class Game {
   private tmpV = new THREE.Vector3();
   private hamster: ReturnType<typeof makeHamster> | null = null;
   constructor(private container: HTMLElement, settings: Settings, cb: GameCallbacks) {
-    this.cb = cb; this.settings = { ...settings }; this.mobile = resolveMobile(settings);
+    this.cb = cb; this.settings = { ...settings }; this.mobile = resolveMobile(settings); setSoundCloudMobile(this.mobile);
   }
   // ================= ЗАГРУЗКА =================
   async init(opts: { newGame: boolean; gender: 'm' | 'f' }) {
@@ -487,7 +488,7 @@ export class Game {
   }
   updateSettings(s: Settings) {
     const shadowsChanged = s.shadows !== this.settings.shadows;
-    this.settings = { ...s }; this.mobile = resolveMobile(s);
+    this.settings = { ...s }; this.mobile = resolveMobile(s); setSoundCloudMobile(this.mobile);
     if (this.input) { this.input.wantLock = !this.mobile; this.input.touchMode = this.mobile; }
     this.applyRenderSettings(); this.sound.setVolume(s.volume, s.muted); this.voice.setVolume(s.voiceVolume);
     this.trafficGoal = Math.round(s.traffic * (this.mobile ? 28 : 50));
@@ -732,6 +733,7 @@ export class Game {
     else if (code === K.promo) this.togglePanel({ type: 'promo' });
   }
   togglePanel(p: Panel) { if (this.panel && this.panel.type === p.type) this.closePanel(); else this.openPanel(p); }
+  openNearbyRadio() { this.openPanel({type:'radio',listenOnly:true}); }
   openVehicleRadio() {
     const v=this.inVeh;
     if (!v) { this.toast('📻 Радио доступно в машине или на домашнем компьютере'); return; }
@@ -748,7 +750,9 @@ export class Game {
     radio.getPosition(position=>{
       if(this.net!==net || this.radioSource!==source || this.radio.station!==station || !radio.playing)return;
       const place=source.kind==='vehicle'?{kind:'vehicle',x:source.vehicle.x,z:source.vehicle.z}:source.place;
-      net.sendRadio({...place,url:station.url,position,outside:radio.volume,inside:radio.insideVolume,playing:true});
+      const outside=source.kind==='vehicle'?carRadioVolume(radio.volume,!!source.vehicle.owned?.tuning.subwoofer):radio.volume;
+      const inside=source.kind==='vehicle'?carRadioVolume(radio.insideVolume,!!source.vehicle.owned?.tuning.subwoofer):radio.insideVolume;
+      net.sendRadio({...place,url:station.url,position,outside,inside,playing:true});
     });
   }
   openComputerRadio() {
@@ -817,7 +821,9 @@ export class Game {
       else {
         const place: RadioPlace=source.kind==='vehicle' ? {kind:'vehicle',x:source.vehicle.x,z:source.vehicle.z,vehicleId:String(source.vehicle.id)} : source.place;
         const listener={x:this.px,z:this.pz,buildingId:this.interior ? this.state.location?.b ?? null : null,vehicleId:this.inVeh ? String(this.inVeh.id) : null};
-        this.radio.setOutputVolume(radioGain(place,listener,this.radio.volume,this.radio.insideVolume));
+        const outside=source.kind==='vehicle'?carRadioVolume(this.radio.volume,!!source.vehicle.owned?.tuning.subwoofer):this.radio.volume;
+        const insideVolume=source.kind==='vehicle'?carRadioVolume(this.radio.insideVolume,!!source.vehicle.owned?.tuning.subwoofer):this.radio.insideVolume;
+        this.radio.setOutputVolume(radioGain(place,listener,outside,insideVolume));
       }
     }
     const radioListener={x:this.px,z:this.pz,buildingId:this.interior ? this.state.location?.b ?? null : null,vehicleId:null};
@@ -5806,6 +5812,7 @@ export class Game {
     if (a.neon !== b.neon && b.neon) c += TUNE_PRICES.neon;
     if (a.lights !== b.lights) c += TUNE_PRICES.lights;
     if (!a.rainbow && b.rainbow) c += 12000;
+    if (!a.subwoofer && b.subwoofer) c += TUNE_PRICES.subwoofer;
     if (a.kit !== b.kit && b.kit) c += TUNE_CATALOG.find(item => item.patch.kit === b.kit)?.price ?? 0;
     return c;
   }
@@ -5815,7 +5822,7 @@ export class Game {
     cancelAnimationFrame(this.raf);
     this.net?.close(); this.net = null;
     try { this.save(); } catch { /* */ }
-    this.input?.dispose(); this.sound.dispose(); this.radio.dispose(); this.remoteRadios.clear(); this.resizeObs?.();
+    this.input?.dispose(); this.sound.dispose(); this.radio.dispose(); this.remoteRadios.clear(); setSoundCloudMobile(false); this.resizeObs?.();
     this.interior?.dispose();
     this.scene.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh && m.geometry && !Object.values(T).includes(m.geometry as never)) m.geometry.dispose(); });
     disposeTextures();

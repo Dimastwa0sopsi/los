@@ -4,6 +4,10 @@ export type RadioPlace = { kind: 'vehicle'; x: number; z: number; vehicleId: str
   | { kind: 'computer'; x: number; z: number; exteriorX: number; exteriorZ: number; buildingId: number };
 export type RadioListener = { x: number; z: number; buildingId: number | null; vehicleId: string | null };
 export const RADIO_RADIUS = 40;
+/** Normal car stereo outputs at 70%; the installed subwoofer unlocks full output. */
+export function carRadioVolume(volume:number, subwoofer:boolean):number {
+  return Number.isFinite(volume) ? Math.max(0,Math.min(1,volume)) * (subwoofer ? 1 : 0.7) : 0;
+}
 
 /** The source slider affects the outside; the local inside slider is separate. */
 export function radioGain(source: RadioPlace, listener: RadioListener, outsideVolume: number, insideVolume: number): number {

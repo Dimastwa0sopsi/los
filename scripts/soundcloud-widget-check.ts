@@ -6,7 +6,8 @@ let positionCallback: ((value:number)=>void) | null = null;
 const widget={bind:(e:string,cb:()=>void)=>{callbacks[e]=cb;},play:()=>{played++;},pause:()=>{paused++;},setVolume:(v:number)=>{volume=v;},seekTo:(v:number)=>{seek=v;},getPosition:(cb:(v:number)=>void)=>{positionCallback=cb;}};
 const factory=Object.assign((_frame:unknown)=>widget,{Events:{READY:'ready',PLAY:'play',PAUSE:'pause',FINISH:'finish',ERROR:'error'}});
 (globalThis as any).window={SC:{Widget:factory}};
-(globalThis as any).document={createElement:(tag:string)=>{assert.equal(tag,'iframe');created++;return {remove:()=>removed++};},body:{appendChild:()=>{}},head:{appendChild:()=>{}}};
+const host={appendChild:()=>{}};
+(globalThis as any).document={getElementById:()=>host,createElement:(tag:string)=>{assert.equal(tag,'iframe');created++;return {remove:()=>removed++};},body:{appendChild:()=>{}},head:{appendChild:()=>{}}};
 (async()=>{
   const states:boolean[]=[], errors:string[]=[];const player=new SoundCloudWidget(s=>states.push(s),e=>errors.push(e));
   await player.open('https://example.com/artist/song',0.6);assert.equal(created,0);assert.equal(errors.length,1);
