@@ -2,6 +2,7 @@
 import { N, CELL, ROAD_W, SIDEWALK, CITY_SIZE, RNG, WORLD_SEED, assertBlock, inGrid, segDist, clamp } from './config';
 import { KIOSK_TYPES, VILLAGE_NAMES } from './data';
 import { SOSNOVKA_DZ, inOldSosnovka } from './sosnovka';
+import {applyBusinessCity} from './businessCity';
 
 export type RoadKind = 'city' | 'avenue' | 'highway' | 'village' | 'dirt' | 'industrial';
 export const AVENUE_J = 9; // главное шоссе — улица z = 9 * CELL
@@ -22,6 +23,8 @@ export interface Building {
   bathOwner?: number;
   /** Зарезервированный номер удалённого объекта для совместимости сохранений. */
   removed?: boolean;
+  /** Existing central tower redesigned without changing its persistent ID. */
+  businessCity?: boolean; observation?: boolean;
 }
 export type PropType = 'tree' | 'pine' | 'bush' | 'lamp' | 'bench' | 'hydrant' | 'trash' | 'swing' | 'slide' | 'sandbox' | 'carousel' |
   'fence' | 'bed' | 'banya' | 'porch' | 'gate' | 'umbrella' | 'towel' | 'lounger' | 'container' | 'tank' | 'crane' | 'dock' | 'booth' |
@@ -2096,6 +2099,10 @@ export function generateLayout(): WorldLayout {
   // Дописываем после остальных построек: сохранённые ID домов остаются прежними.
   addBuilding({ kind: 'auction', name: SIGN.auction, x: 514, z: 530, w: 8, d: 6, h: 5,
     door: doorFor(514, 530, 8, 6, 's'), facade: 'civic', roof: 'flat', enter: true, color: '#315e73' });
+  applyBusinessCity(buildings,colliders);
+  const flag=props.find(p=>p.t==='flag');
+  const highest=buildings.filter(b=>b.kind!=='factory' && b.kind!=='warehouse').reduce<Building|null>((best,b)=>!best || b.h>best.h?b:best,null);
+  if(flag && highest){flag.x=highest.x+highest.w*.18;flag.z=highest.z-highest.d*.18;flag.h=highest.h+.3;}
   void beachRoad; void wh; void clamp;
   return {
     nodes, edges, adj, buildings, props, colliders, kiosks, villages, blocks, parks, bigParks, parkRides, billboards, pools, staticVehicles, garages, parked: [...parked, ...parkedLot], scooterDocks, livestock, bazaarSlots, vendors, lots, parkades, depot, truckDests,
