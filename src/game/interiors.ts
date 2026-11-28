@@ -26,6 +26,7 @@ export interface Interior {
   dispose: () => void;
 }
 export type EntrStyle = 'glass' | 'wood' | 'metal';
+export const MALL_SHOP_KINDS = ['clothes','mallfood','pharmacy','barber','shop24','gunshop','supermarket','fishshop','clothes','cafe'] as const;
 export type InteriorKind = 'shop24' | 'supermarket' | 'cafe' | 'pharmacy' | 'gunshop' | 'clothes' | 'barber' | 'police' | 'hospital' | 'cityhall' | 'bank' | 'auction' | 'fishshop' |
   'dealer' | 'service' | 'mall' | 'hall' | 'apt_eco' | 'apt_mid' | 'apt_lux' | 'house_city' | 'house_village' | 'vshop' | 'vpharmacy' | 'vguntruck' | 'vadmin' | 'checkpoint' | 'fire' | 'gas' | 'mallfood' | 'basement' | 'banya' | 'truckoffice' | 'office' | 'scootershop' | 'greenhouse' | 'bar' | 'ozgim' | 'mine' | 'casino';
 
@@ -1263,9 +1264,12 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
       ib.f('c:#cbd5e1', 0, 4.2, -D / 2 + 1.5, W, 0.25, 3, false);
       ib.f('glass:0.3', 0, 4.45, -D / 2 + 3, W, 1.0, 0.05, false);
       for (const x of [-12, 0, 12]) { ib.f('glow:#e0f2fe', x, H - 0.09, 0, 6, 0.02, 6, false); ib.f('c:#94a3b8', x, H - 0.12, 0, 6.4, 0.04, 6.4, false); }
-      const shops: [string, string, string][] = [['clothes', 'Одежда «Стиль»', '#8b5cf6'], ['mallfood', 'Фуд-корт «Вкусно»', '#f97316'], ['pharmacy', 'Аптека «Здоровье»', '#10b981'], ['barber', 'Барбершоп', '#ec4899'], ['shop24', 'Продукты 24/7', '#e11d48'], ['gunshop', 'Охота и рыбалка', '#374151']];
+      const shops: [string, string, string][] = [['clothes', 'Одежда «Стиль»', '#8b5cf6'], ['mallfood', 'Фуд-корт «Вкусно»', '#f97316'], ['pharmacy', 'Аптека «Здоровье»', '#10b981'], ['barber', 'Барбершоп', '#ec4899'], ['shop24', 'Продукты 24/7', '#e11d48'], ['gunshop', 'Охота и рыбалка', '#374151'], ['supermarket','Супермаркет «Лукошко»','#f59e0b'], ['fishshop','Рыбалка и туризм','#0e7490'], ['clothes','Бутик «Город»','#6366f1'], ['cafe','Кофейня «Высота»','#a16207']];
       shops.forEach(([k, name, color], i) => {
-        const left = i < 3; const z = -10 + (i % 3) * 8;
+        // Preserve old shop indices in account saves while using five storefronts per side.
+        const left = i<3 || i===6 || i===7;
+        const slot = i<3 ? i : i<6 ? i-3 : i===6 || i===8 ? 3 : 4;
+        const z = -12 + slot * 6;
         const x = left ? -W / 2 + 0.25 : W / 2 - 0.25;
         const ry = left ? Math.PI / 2 : -Math.PI / 2;
         ib.f('glass:0.35', x + (left ? 0.1 : -0.1), 0.3, z - 2.2, 0.08, 2.6, 3, false);
@@ -1282,6 +1286,7 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
       for (let i = 0; i < 8; i++) ib.f('c:#94a3b8', 4.6, 0.1 + i * 0.42, -D / 2 + 6.0 - i * 0.6, 3.0, 0.1, 0.6, false);
       for (const [x, z] of [[-6, 6], [6, 6], [-6, -6], [6, -6]]) { ib.sofa(x, z, 2.4, x > 0 ? -Math.PI / 2 : Math.PI / 2, '#334155'); ib.plant(x, z + (z > 0 ? 2 : -2)); ib.cyl('c:#78350f', x + 2, 0, z, 0.4, 0.7); }
       ib.npc(-8, 3, 1, 'shopper'); ib.npc(9, -3, -2, 'shopper'); ib.npc(3, 9, 3, 'shopper'); ib.npc(-3, -9, 0.4, 'shopper');
+      for(const [x,z,a] of [[-16,-9,1],[-14,-3,1],[-15,4,1],[-15,10,1],[15,-10,-1],[14,-4,-1],[15,3,-1],[15,10,-1]] as const)ib.npc(x,z,a,'shopper');
       ib.plane('sign:ТЦ «ОРБИТА» · 2 ЭТАЖА|#0ea5e9', 0, 6.0, D / 2 - 0.2, 8, 1.1, Math.PI);
       ib.rug(0, 3.4, 8, 3, '#0f172a');
       ib.light(-12, H - 0.5, 0, 1.6, 0xffffff, 26); ib.light(12, H - 0.5, 0, 1.6, 0xffffff, 26); ib.light(0, H - 0.5, 8, 1.4, 0xffffff, 22); ib.light(0, H - 0.5, -8, 1.4, 0xffffff, 22);
