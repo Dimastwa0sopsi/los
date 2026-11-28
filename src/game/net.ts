@@ -108,6 +108,8 @@ export interface RemoteState {
   /** Visible parked trunk animations, cosmetic and valid only while owner is online. */
   tr?: import('./parkedTrunkVisual').ParkedTrunkVisual[];
   th?: string; // id of the car whose lid this player is pulling, cosmetic only
+  camp?: import('./camping').CampPosition | null; // cosmetic while owner is online
+  fl?: 1; // cosmetic flashlight
   fish?: 1;                                      // только визуальная удочка, не улов
   cr?: number;                                    // присед
   lk?: number;                                    // машина заперта

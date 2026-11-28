@@ -19,5 +19,6 @@ const hand=o=>JSON.parse(cleanVehicleStateMessage('§LG'+JSON.stringify(o)).slic
 assert.equal(hand({tr:[trunk],th:'a'}).th,'a');
 assert.equal(hand({tr:[trunk],th:'@spam'}).th,undefined);
 assert.equal(hand({tr:[],th:'a'}).th,undefined);
+assert.deepEqual(hand({camp:{x:12,y:0,z:1300,a:1,secret:'x'},fl:1}).camp,{x:12,y:0,z:1300,a:1});assert.equal(hand({camp:{x:99999,y:0,z:1,a:0},fl:2}).camp,null);assert.equal(hand({fl:2}).fl,undefined);
 assert.equal(cleanVehicleStateMessage('§LGN{}'),'§LGN{}');assert.equal(cleanVehicleStateMessage('§LG{broken'),'§LG{broken');
 console.log('✓ фильтр надписей в серверном relay');

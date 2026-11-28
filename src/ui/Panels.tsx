@@ -88,7 +88,7 @@ export function GamePanel({ g, panel, close }: { g: Game; panel: Panel; close: (
         <p className="lg-money-line">Ваши деньги: <b>{$(s.money)}</b></p>
         <div className="lg-list">{panel.items.map((id) => { const it = ITEMS[id]; return (
           <div key={id} className="lg-row"><span className="lg-ico">{it.icon}</span><div className="flex-1"><b>{it.name}</b><small>{[it.food && `🍗+${it.food}`, it.drink && `💧${it.drink > 0 ? '+' : ''}${it.drink}`, it.energy && `⚡+${it.energy}`, it.health && `❤${it.health > 0 ? '+' : ''}${it.health}`].filter(Boolean).join(' ')}</small></div>
-            <button className="lg-btn sm" onClick={wrap(() => g.buy(id))}>{$(it.price)}</button>{!it.weapon && <button className="lg-btn sm" onClick={wrap(() => g.buy(id, 5))}>×5</button>}</div>); })}</div>
+            <button className="lg-btn sm" onClick={wrap(() => g.buy(id))}>{$(it.price)}</button>{!it.weapon && id !== 'camp_kit' && id !== 'flashlight' && <button className="lg-btn sm" onClick={wrap(() => g.buy(id, 5))}>×5</button>}</div>); })}</div>
         {(panel.kind === 'vshop' || panel.kind === 'supermarket') && <button className="ui-btn mt-2" onClick={wrap(() => g.sellProduce('veg'))}>🧺 Продать урожай с огорода</button>}
         {panel.kind === 'gunshop' && <button className="ui-btn danger mt-2" onClick={wrap(() => g.sellProduce('drug'))}>🍁 Сбыть «дурман» из-под прилавка (риск розыска)</button>}
         <p className="text-xs opacity-70 mt-2">У кассы нажмите E и выберите действие. Для ограбления прицельтесь в кассира.</p>
@@ -312,7 +312,7 @@ function Inventory({ g, close }: { g: Game; close: () => void }) {
     <div className={fridge ? 'grid md:grid-cols-2 gap-3' : ''}>
       <div><h3 className="font-bold mb-1">С собой</h3>
         <div className="lg-list">{inv.map(([id, n]) => { const it = ITEMS[id]; if (!it) return null; return <div className="lg-row" key={id}><span className="lg-ico">{it.icon}</span><span className="flex-1">{it.name} ×{n}</span>
-          <button className="lg-btn sm" onClick={() => { g.useItem(id); r(); }}>{it.weapon ? 'Взять' : it.smoke ? 'Закурить' : 'Исп.'}</button>
+          <button className="lg-btn sm" onClick={() => { g.useItem(id); r(); }}>{id === 'camp_kit' ? 'Поставить' : id === 'flashlight' ? (g.flashlightOn ? 'Выключить' : 'Включить') : it.weapon ? 'Взять' : it.smoke ? 'Закурить' : 'Исп.'}</button>
           {fridge && it.fridge && <button className="lg-btn sm" onClick={() => { g.toFridge(id); r(); }}>→ ❄</button>}
           <button className="lg-btn sm" onClick={() => { g.dropItem(id); r(); }}>🗑</button></div>; })}{!inv.length && <p className="opacity-70">Пусто</p>}</div></div>
       {fridge && <div><h3 className="font-bold mb-1">❄ Холодильник</h3><div className="lg-list">{Object.entries(fridge).map(([id, n]) => { const it = ITEMS[id]; return <div className="lg-row" key={id}><span className="lg-ico">{it.icon}</span><span className="flex-1">{it.name} ×{n}</span>
