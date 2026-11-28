@@ -756,14 +756,6 @@ function buildingDetails(b: Batcher, bd: Building) {
     b.box('c:#bfc5cc', x, 4.6, z, w + 0.5, 0.35, d + 0.5);
     b.box('c:#c9ced4', x, h - 0.2, z, w + 0.4, 0.5, d + 0.4); // венчающий пояс
     if (GFX.pbr) for (const sx of [-1, 1]) { b.box('c:#aab2bc', x + sx * (w / 2 + 0.12), 4.9, z, 0.18, h - 5.1, 0.6); b.box('c:#aab2bc', x, 4.9, z + sx * (d / 2 + 0.12), 0.6, h - 5.1, 0.18); }
-    if(bd.businessCity){
-      const neon=bd.id%3===0?'glow:#38bdf8':bd.id%3===1?'glow:#c084fc':'glow:#2dd4bf';
-      for(const s of [-1,1]){
-        b.box(neon,x+s*(w/2+.14),5,z-d/2,.12,h-5,.12);
-        b.box(neon,x+s*(w/2+.14),5,z+d/2,.12,h-5,.12);
-        b.box(neon,x,h-2,z+s*(d/2+.15),w,.12,.12);
-      }
-    }
     return;
   }
   if (bd.kind === 'factory' || bd.kind === 'warehouse' || bd.facade === 'kiosk') return;
@@ -855,8 +847,34 @@ const FACADE_TINTS: Record<string, string[]> = {
   brick: ['#ffffff', '#d9c4b6', '#c8a08c', '#e8d8cf'], office: ['#ffffff', '#e2e8f0', '#d6d3d1', '#f5ecd9'], glass: ['#ffffff', '#c7ddff', '#b6f0d8', '#e9d5ff', '#ffe2c2'],
   luxres: ['#ffffff', '#ece7e2', '#e2ece9'], wood: ['#ffffff', '#d9b38c', '#b48a6a'],
 };
+function buildComfortBuilding(b:Batcher,bd:Building) {
+  const {x,z,w,d,h}=bd;
+  // Segmented dark-blue glazing and light, offset framing inspired by modern residential towers.
+  b.box('facade:glass:#c7ddff',x,0,z,w,h,d,0,[FACADE_TILE.w,FACADE_TILE.h]);
+  b.box('c:#273343',x,0,z,w+.2,3.4,d+.2);
+  for(const side of [-1,1]){
+    for(let i=0;i<3;i++){
+      const xx=x+(i-1)*(w/3), width=w/3-.3, offset=((i+bd.id)%2)*3.2;
+      b.box(i===1?'facade:office:#d6d3d1':'facade:glass:#c7ddff',xx,3.4,z+side*(d/2+.03),width,h-3.4,.09,0,[FACADE_TILE.w,FACADE_TILE.h]);
+      for(let y=5+offset;y<h-3;y+=12.8){
+        b.box('c:#e5e8e8',xx,y,z+side*(d/2+.14),width,.16,.13);
+        b.box('c:#e5e8e8',xx-width/2,y,z+side*(d/2+.14),.16,9.6,.13);
+        b.box('c:#e5e8e8',xx+width/2,y,z+side*(d/2+.14),.16,9.6,.13);
+        b.box('c:#e5e8e8',xx,y+9.45,z+side*(d/2+.14),width,.16,.13);
+      }
+    }
+    b.box('c:#e2e8e8',x+side*(w/2+.1),3.5,z,.15,h-3.5,.18);
+    for(let y=6;y<h-3;y+=12.8)b.box('c:#e2e8e8',x+side*(w/2+.1),y,z,.15,.16,d);
+  }
+  b.box('c:#202b37',x,h,z,w+.25,.4,d+.25);
+  b.box('glass:0.32',x,0,z+d/2+.08,3.2,2.5,.12);
+  b.box('c:#e6e7e5',x,2.5,z+d/2+.12,4.3,.14,.2);
+  b.box('c:#d8d9d7',x,2.85,z+d/2+.75,5.2,.14,1.6);
+  b.add('sign:УЮТНЫЙ · ПОДЪЕЗД|#334155',T.plane,M(x,3.35,z+d/2+.14,0,4,.55,1));
+}
 function buildBuilding(b: Batcher, bd: Building) {
   const { x, z, w, d, h } = bd;
+  if(bd.comfort){buildComfortBuilding(b,bd);return;}
   if (bd.kind === 'vguntruck') return;   // оружейный грузовик рисуется как реквизит (prop guntruck)
   if (bd.kind === 'greenhouse') { buildGreenhouse(b, bd); return; }
   const tints = FACADE_TINTS[bd.facade];
@@ -878,25 +896,7 @@ function buildBuilding(b: Batcher, bd: Building) {
       b.box(pc, x - w / 2, h + 0.35, z, 0.3, 0.55, d + 0.3); b.box(pc, x + w / 2, h + 0.35, z, 0.3, 0.55, d + 0.3);
       if (bd.kind === 'apartment') { b.box('c:#b0b4ba', x - w * 0.25, h + 0.35, z, 1.4, 0.9, 1.0); b.add('c:#9ca3af', T.cylB, M(x + w * 0.28, h + 0.35, z + d * 0.1, 0, 0.9, 1.8, 0.9)); b.box('c:#57534e', x + w * 0.05, h + 0.35, z - d * 0.2, 1.6, 2.2, 1.6); }
     }
-    if (h > 25 && !bd.observation) { b.box('c:#9ca3af', x + w * 0.2, h + 0.35, z - d * 0.15, 3, 2.2, 3); b.box('c:#6b7280', x - w * 0.25, h + 0.35, z + d * 0.2, 2, 3, 2); }
-    if(bd.observation){
-      // A glazed top floor in the actual world, so the windows show the real city.
-      for(const s of [-1,1]){
-        b.box('glass:0.16',x,h+.35,z+s*(d/2-.12),w,3.8,.12);
-        b.box('glass:0.16',x+s*(w/2-.12),h+.35,z,.12,3.8,d);
-        b.box('glow:#38bdf8',x,h+.55,z+s*(d/2-.17),w,.1,.13);
-        b.box('glow:#c084fc',x+s*(w/2-.17),h+.55,z,.13,.1,d);
-        for(const t of [-1,0,1]){
-          b.box('c:#50677a',x+t*(w/2-.25),h+.35,z+s*(d/2-.12),.1,3.8,.15);
-          b.box('c:#50677a',x+s*(w/2-.12),h+.35,z+t*(d/2-.25),.15,3.8,.1);
-        }
-      }
-      b.box('c:#243447',x,h+4.15,z,w,.22,d);
-      b.box('glow:#8bdfff',x,h+4.08,z,w*.45,.06,.07);
-      b.box('c:#26394a',x,h+.35,z,3,.2,3);
-      b.box('glow:#38bdf8',x,h+.55,z-1.5,3,.06,.06);
-      b.add('sign:ЛОС-СИТИ · СМОТРОВАЯ|#155e75',T.plane,M(x,h+3,z+d/2-.2,Math.PI,5,.7,1));
-    }
+    if (h > 25) { b.box('c:#9ca3af', x + w * 0.2, h + 0.35, z - d * 0.15, 3, 2.2, 3); b.box('c:#6b7280', x - w * 0.25, h + 0.35, z + d * 0.2, 2, 3, 2); }
   }
   // дверь и козырёк
   const a = bd.door.a, ox = Math.sin(a), oz = Math.cos(a);

@@ -89,15 +89,6 @@ export class PedSystem {
   /** создать пул пешеходов */
   init(cityCount: number, playerX: number, playerZ: number) {
     for (let i = 0; i < cityCount; i++) { const p = this.make('city'); this.respawnCity(p, playerX, playerZ, true); }
-    // Additional local pedestrians on the sidewalks around the central business district.
-    // They use the existing line-walking/obstacle logic and remain bounded by density.
-    const downtownCount=Math.min(24,Math.max(4,Math.round(cityCount*.7)));
-    for(let k=0;k<downtownCount;k++){
-      const i=8+(k%3),j=9+(Math.floor(k/3)%3), side=k%2;
-      const a=corner(i,j,side?0:2),b=corner(i,j,side?1:3),p=this.make('village');
-      p.role='downtown';p.lineA=a;p.lineB=b;p.homeX=(a.x+b.x)/2;p.homeZ=(a.z+b.z)/2;
-      const t=(k%4+1)/5;p.x=a.x+(b.x-a.x)*t;p.z=a.z+(b.z-a.z)*t;p.tx=b.x;p.tz=b.z;p.y=.15;p.speed=1.05+rng.next()*.55;
-    }
     // деревни: по 3 жителя
     for (const v of this.L.villages) for (let k = 0; k < 3; k++) {
       const p = this.make('village');

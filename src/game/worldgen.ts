@@ -2,10 +2,10 @@
 import { N, CELL, ROAD_W, SIDEWALK, CITY_SIZE, RNG, WORLD_SEED, assertBlock, inGrid, segDist, clamp } from './config';
 import { KIOSK_TYPES, VILLAGE_NAMES } from './data';
 import { SOSNOVKA_DZ, inOldSosnovka } from './sosnovka';
-import {applyBusinessCity} from './businessCity';
 
 export type RoadKind = 'city' | 'avenue' | 'highway' | 'village' | 'dirt' | 'industrial';
 export const AVENUE_J = 9; // главное шоссе — улица z = 9 * CELL
+export const COMFORT_TOWN = {x0:1100,x1:1260,z0:-235,z1:-32,name:'Уютный'} as const;
 export interface RNode { id: number; x: number; z: number; light: boolean; gi?: number; gj?: number; /** узел без дорог после чистки сети (на карте не рисуется) */ dead?: boolean }
 export interface REdge { id: number; a: number; b: number; kind: RoadKind; w: number }
 export interface Box { x0: number; y0: number; z0: number; x1: number; y1: number; z1: number; tag?: string }
@@ -23,8 +23,8 @@ export interface Building {
   bathOwner?: number;
   /** Зарезервированный номер удалённого объекта для совместимости сохранений. */
   removed?: boolean;
-  /** Existing central tower redesigned without changing its persistent ID. */
-  businessCity?: boolean; observation?: boolean;
+  /** Новый жилой квартал; старые идентификаторы зданий остаются прежними. */
+  comfort?: boolean;
 }
 export type PropType = 'tree' | 'pine' | 'bush' | 'lamp' | 'bench' | 'hydrant' | 'trash' | 'swing' | 'slide' | 'sandbox' | 'carousel' |
   'fence' | 'bed' | 'banya' | 'porch' | 'gate' | 'umbrella' | 'towel' | 'lounger' | 'container' | 'tank' | 'crane' | 'dock' | 'booth' |
@@ -1544,6 +1544,18 @@ export function generateLayout(): WorldLayout {
   // Прямая связка двух деревень, с узлами для навигации трафика.
   { const end = roadSeg(klenovkaEast, [[900, 1830], [950, 1700]], 'village', 8).at(-1)!; addEdge(end, olkhovkaWest, 'village', 8); }
 
+  // Дорожная сеть небольшого жилого района на северо-востоке, соединена с городом.
+  // Узлы только добавляются в конец, а не заменяют старые.
+  {
+    const n=roadSeg(cid(18,0),[[1110,-30],[1110,-65]],'village',9).at(-1)!;
+    const east=roadSeg(n,[[1250,-65]],'village',9).at(-1)!;
+    const southeast=roadSeg(east,[[1250,-125]],'village',9).at(-1)!;
+    const northeast=roadSeg(southeast,[[1250,-190]],'village',9).at(-1)!;
+    const northwest=roadSeg(northeast,[[1110,-190]],'village',9).at(-1)!;
+    const middle=roadSeg(n,[[1110,-125]],'village',9).at(-1)!;
+    addEdge(middle,northwest,'village',9);addEdge(middle,southeast,'village',9);
+  }
+
   // пункты доставки дальнобойщика
   truckDests.push({ name: 'Завод «Сталь»', x: 1600, z: 560 }, { name: 'Агрохолдинг «Нива»', x: 1470, z: 1140 });
   for (const b of buildings) if (b.kind === 'vshop') truckDests.push({ name: 'Сельмаг · ' + (b.village ?? ''), x: b.door.x, z: b.door.z });
@@ -2099,10 +2111,30 @@ export function generateLayout(): WorldLayout {
   // Дописываем после остальных построек: сохранённые ID домов остаются прежними.
   addBuilding({ kind: 'auction', name: SIGN.auction, x: 514, z: 530, w: 8, d: 6, h: 5,
     door: doorFor(514, 530, 8, 6, 's'), facade: 'civic', roof: 'flat', enter: true, color: '#315e73' });
-  applyBusinessCity(buildings,colliders);
-  const flag=props.find(p=>p.t==='flag');
-  const highest=buildings.filter(b=>b.kind!=='factory' && b.kind!=='warehouse').reduce<Building|null>((best,b)=>!best || b.h>best.h?b:best,null);
-  if(flag && highest){flag.x=highest.x+highest.w*.18;flag.z=highest.z-highest.d*.18;flag.h=highest.h+.3;}
+
+  // «Уютный» добавлен после всех прежних зданий: IDs аккаунтов не меняются.
+  // Удаляем только случайную растительность внутри нового квартала вместе с её коллайдерами.
+  for(let i=props.length-1;i>=0;i--){
+    const p=props[i];if(!['tree','pine','bush'].includes(p.t) || p.x<COMFORT_TOWN.x0 || p.x>COMFORT_TOWN.x1 || p.z<COMFORT_TOWN.z0 || p.z>COMFORT_TOWN.z1)continue;
+    const ci=colliders.findIndex(c=>!c.tag && Math.abs((c.x0+c.x1)/2-p.x)<.001 && Math.abs((c.z0+c.z1)/2-p.z)<.001);
+    if(ci>=0)colliders.splice(ci,1);props.splice(i,1);
+  }
+  for(const [row,z] of [-90,-160].entries())for(const [i,x] of [1140,1180,1220].entries()){
+    addBuilding({kind:'apartment',name:`ЖК «Уютный» · дом ${row*3+i+1}`,x,z,w:22,d:18,h:[35,42,39,38,46,34][row*3+i],
+      door:doorFor(x,z,22,18,'s'),facade:'glass',roof:'flat',enter:true,cls:'mid',comfort:true});
+  }
+  const shops=[['shop24','Продукты «Уютный»','#e11d48'],['supermarket','Супермаркет «Уютный»','#f59e0b'],['pharmacy','Аптека «Уютный»','#10b981'],['cafe','Кафе «Уютный»','#a16207']] as const;
+  shops.forEach(([kind,name,color],i)=>{const x=1130+i*35,z=-215;addBuilding({kind,name,x,z,w:19,d:12,h:5.5,door:doorFor(x,z,19,12,'s'),facade:'shop',roof:'flat',enter:true,color});});
+  const spaces: {x:number;z:number;a:number}[]=[];
+  for(let i=0;i<30;i++)spaces.push({x:1128+i*3.5,z:-48,a:0});
+  lots.push({x0:1123,x1:1237,z0:-57,z1:-35,spaces,name:'Парковка «Уютный»'});
+  addProp({t:'driveway',x:1180,z:-46,w:114,d:22,c:'#424954'});
+  for(let i=0;i<spaces.length;i++)if(i%4===0){const s=spaces[i];parkedLot.push({type:['lada','volta','kolibri','taiga'][Math.floor(i/4)%4],x:s.x,z:s.z,a:s.a,tag:'lot'});}
+  for(const x of [1120,1160,1200,1240])for(const z of [-75,-135,-200])addProp({t:'lamp',x,z,r:Math.PI},{w:.3,d:.3,h:6});
+  for(const x of [1157,1197])for(const z of [-105,-175]){
+    addProp({t:'tree',x,z,h:.9},{w:.5,d:.5,h:3});
+    addProp({t:'bench',x:x+5,z:z-2,r:0},{w:1.8,d:.6,h:.5});
+  }
   void beachRoad; void wh; void clamp;
   return {
     nodes, edges, adj, buildings, props, colliders, kiosks, villages, blocks, parks, bigParks, parkRides, billboards, pools, staticVehicles, garages, parked: [...parked, ...parkedLot], scooterDocks, livestock, bazaarSlots, vendors, lots, parkades, depot, truckDests,

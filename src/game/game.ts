@@ -50,7 +50,6 @@ import {parseParkedTrunks,remoteTrunkHandReach, MAX_PARKED_TRUNKS, type ParkedTr
 import {parseParkedVehicles,parseParkedPlates,MAX_PARKED_VEHICLES,type ParkedVehicleVisual,type ParkedVehiclePlate} from './parkedVehicleVisual';
 import {parseOfflineVehicles} from './offlineVehicles';
 import {campOutsideCity,parseCamp,makeCamp,disposeCamp,type CampPosition} from './camping';
-import {observationTower,onObservationDeck} from './businessCity';
 import { applyFishingVisual } from './fishingVisual';
 import { transferTrunkSolo } from './trunkSolo';
 import { trunkCount } from './trunk';
@@ -347,7 +346,6 @@ export class Game {
   private hamster: ReturnType<typeof makeHamster> | null = null;
   private hamsterAction: { start:number; x:number; z:number; dx:number; dz:number } | null = null;
   private hamsterWaiting = false;
-  private deckTower:Building|undefined;
   private onlineHamsterReady = false;
   private hamsterWorld: {world:HamsterWorld;received:number} | null = null; private hamsterPetRequestAt = -Infinity;
   constructor(private container: HTMLElement, settings: Settings, cb: GameCallbacks) {
@@ -371,7 +369,6 @@ export class Game {
     await new Promise((r) => setTimeout(r, 0));
     P(0.06, 'Генерация города 18×18');
     this.L = generateLayout();
-    this.deckTower=observationTower(this.L.buildings);
     this.speedCameras = generateSpeedCameras(this.L.roadSegments);
     await new Promise((r) => setTimeout(r, 0));
     P(0.1, 'Коллизии');
@@ -510,11 +507,7 @@ export class Game {
     this.camera.far = this.drawDist() + 60; this.camera.updateProjectionMatrix();
     if (this.scene.fog instanceof THREE.Fog) { this.scene.fog.far = this.drawDist(); this.scene.fog.near = this.drawDist() * 0.5; }
   }
-  drawDist() {
-    const normal=Math.max(160, this.settings.drawDistance * (this.settings.quality === 'ultra' ? 1.15 : 1) * (this.qualityLevel >= 3 ? 0.75 : 1));
-    return this.onDeck() ? Math.max(normal,this.mobile?300:450) : normal;
-  }
-  private onDeck() {return !this.interior && onObservationDeck(this.deckTower,this.px,this.py,this.pz);}
+  drawDist() { return Math.max(160, this.settings.drawDistance * (this.settings.quality === 'ultra' ? 1.15 : 1) * (this.qualityLevel >= 3 ? 0.75 : 1)); }
   /** колбэк для синхронизации настроек с React-состоянием (ставит GameView) */
   settingsCb: ((s: Settings) => void) | null = null;
   /** сменить настройки из планшета: применить, сохранить и обновить UI */
@@ -643,19 +636,6 @@ export class Game {
   }
   private placeOutsideAt(b: Building) {
     this.px = b.door.x; this.pz = b.door.z; this.pa = b.door.a; this.py = this.col.groundAt(b.door.x, b.door.z, 2, 3); this.camYaw = b.door.a;
-  }
-  private useObservationLift(up:boolean) {
-    const b=this.deckTower;if(!b || this.interior || this.inVeh || this.rideRemote || this.rideOn)return;
-    if(up){
-      if(this.py>3 || Math.hypot(this.px-b.door.x,this.pz-b.door.z)>3)return;
-      this.px=b.x;this.pz=b.z;this.py=b.h+.35;this.pa=b.door.a;this.camYaw=this.pa;
-      this.toast('🏙 Лос-Сити: смотровой этаж');
-    } else {
-      if(!this.onDeck() || Math.hypot(this.px-b.x,this.pz-b.z)>2.5)return;
-      this.placeOutsideAt(b);this.toast('Лифт: выход на улицу');
-    }
-    this.pvy=0;this.lastSpeed=0;this.camera.position.set(this.px-Math.sin(this.camYaw)*4,this.py+2.5,this.pz-Math.cos(this.camYaw)*4);
-    this.sound.door();this.save();
   }
   private setInterior(it: Interior, kind: InteriorKind, spot?: { x: number; z: number; a: number; y?: number }) {
     this.furnitureSeat = null;
@@ -2427,10 +2407,7 @@ export class Game {
     if (changed && W.bulbs.instanceColor) W.bulbs.instanceColor.needsUpdate = true;
   }
   private updateChunks() {
-    const distance=this.drawDist();
-    if(this.camera.far!==distance+60){this.camera.far=distance+60;this.camera.updateProjectionMatrix();}
-    if(!this.fogSaved && this.scene.fog instanceof THREE.Fog){this.scene.fog.far=distance;this.scene.fog.near=distance*.5;}
-    const cx = this.camera.position.x, cz = this.camera.position.z, dd = distance + CHUNK * 0.71;
+    const cx = this.camera.position.x, cz = this.camera.position.z, dd = this.drawDist() + CHUNK * 0.71;
     for (const c of this.W.chunks) c.group.visible = Math.hypot(c.cx - cx, c.cz - cz) < dd;
     const vd = this.drawDist() * 0.75;
     for (const v of this.vehicles) if (v.role === 'parked' || v.role === 'rental' || v.role === 'deco' || v.role === 'job' || (v.owned && v !== this.inVeh)) v.model.group.visible = Math.abs(v.x - cx) + Math.abs(v.z - cz) < vd;
@@ -2773,7 +2750,6 @@ export class Game {
       return best;
     }
     if (this.rideOn) return { text: `E — сойти (${this.rideOn.name})`, keys: ['E'], act: () => this.leaveRide() };
-    if(this.onDeck() && this.deckTower && Math.hypot(px-this.deckTower.x,pz-this.deckTower.z)<2.5)return {text:'E — лифт: вниз на улицу',keys:['E'],act:()=>this.useObservationLift(false)};
     const ownCamp=parseCamp(this.state.camp);
     if(ownCamp && Math.hypot(px-ownCamp.x,pz-ownCamp.z)<3 && Math.abs(this.py-ownCamp.y)<2)return {text:'Y / E — собрать мини-лагерь ⛺',keys:['E'],act:()=>this.packCamp()};
     const trunkCar = this.nearbyTrunkVehicle();
@@ -2863,7 +2839,6 @@ export class Game {
     }
     if (best) {
       const b = best;
-      if(b.observation && this.py<3)return {text:'E — лифт на смотровой этаж Лос-Сити',keys:['E'],act:()=>this.useObservationLift(true)};
       if (b.kind === 'market') return { text: 'E — Авторынок: б/у машины', keys: ['E'], act: () => this.openPanel({ type: 'market' }) };
       if (b.kind === 'casino') {
         const ok = this.state.money >= 50000;
@@ -2975,7 +2950,12 @@ export class Game {
     }
     if (action === 'ozgim') return { text: 'E — OZGIM: маркетплейс одежды', keys: ['E'], act: () => this.openPanel({ type: 'ozgim' }) };
     if (action === 'ozgimwear') return { text: 'E — примерочная OZGIM: переодеться', keys: ['E'], act: () => this.openPanel({ type: 'ozgim' }) };
-    if (action === 'lift') return { text: label, keys: [], act: () => this.toast('Лифт не работает — поднимайтесь по лестнице') };
+    if (action === 'lift') return { text: `E — ${label}`, keys: ['E'], act: () => {
+      const spot = this.interior?.doorSpots[this.py < 1.5 ? 'lift1' : 'lift0'];
+      if (!spot) return;
+      this.px = spot.x; this.pz = spot.z; this.py = spot.y; this.pa = spot.a; this.pvy = 0;
+      this.sound.door();
+    } };
     if (action === 'dj') return { text: this.discoOn ? 'E — выключить диско-свет' : 'E — включить диско-свет и музыку', keys: ['E'], act: () => this.toggleDisco() };
     if (action === 'dance') return { text: this.emote ? 'E — хватит танцевать' : 'E — зажигать на танцполе', keys: ['E'], act: () => this.danceHere() };
     if (action === 'doctorhire') return { text: this.job?.type === 'doctor' ? 'E — завершить смену врача' : 'E — нанять смену врача: приём 5 пациентов', keys: ['E'], act: () => { if (this.job?.type === 'doctor') this.quitJob(); else this.startDoctorShift(); } };
@@ -3937,7 +3917,6 @@ export class Game {
     for (const sl of this.L.bazaarSlots) if (sl.id % 4 === 0) out.push({ x: sl.x + 12, z: sl.z - 12, icon: '🏷', color: '#0f766e', size: 0.85 });
     for (const k of this.L.kiosks) { const own = this.state.kiosks.some((o) => o.id === k.id); out.push({ x: k.x, z: k.z, icon: own ? '💰' : '🏪', color: own ? '#ca8a04' : '#0d9488', size: 0.75 }); }
     for (const g of this.L.garages) if (g.id % 3 === 0 || this.state.garages.includes(g.id)) out.push({ x: g.x, z: g.z, icon: this.state.garages.includes(g.id) ? '🅿️' : '🏚️', color: '#475569', size: 0.75 });
-    if(this.deckTower)out.push({x:this.deckTower.door.x,z:this.deckTower.door.z,icon:'🏙️',color:'#06b6d4',size:1,label:'Лос-Сити · смотровая'});
     out.push({ x: this.L.beach.x0 + 40, z: (this.L.beach.z0 + this.L.beach.z1) / 2, icon: '🏖️', color: POI_COLOR.beach, size: 0.85 });
     out.push({ x: this.L.helipad.x, z: this.L.helipad.z, icon: '🚁', color: '#334155', size: 0.75 });
     for (const d of this.L.scooterDocks) out.push({ x: d.x, z: d.z, icon: '🛴', color: '#16a34a', size: 0.7, small: true, label: 'Аренда' });
@@ -5136,7 +5115,7 @@ export class Game {
   }
   // ================= ОНЛАЙН =================
   toggleOnline() { if (this.online) this.leaveOnline(); else this.openPanel({ type: 'onlineJoin' }); }
-  interiorKey() { const l = this.state.location; return this.interior && l ? `${l.b}:${l.unit ?? ''}:${l.sub ?? ''}` : this.onDeck() ? `deck:${this.deckTower!.id}` : ''; }
+  interiorKey() { const l = this.state.location; return this.interior && l ? `${l.b}:${l.unit ?? ''}:${l.sub ?? ''}` : ''; }
   onlineInfo() {
     let nick = '';
     try { nick = localStorage.getItem('losgorod_nick') || ''; } catch { /* */ }
@@ -6186,11 +6165,7 @@ export class Game {
   save() {
     if (this.economyLabPaused || !this.state || (this.onlineRequired && !this.online)) return;
     const s = this.state;
-    if (!this.interior) {
-      const p = this.playerWorldPos(), b=this.onDeck()?this.deckTower:undefined;
-      // Older snapshots have no player Y: restart safely at the lift entrance.
-      s.pos = b ? {x:b.door.x,z:b.door.z,a:b.door.a} : { x: p.x, z: p.z, a: p.a };
-    }
+    if (!this.interior) { const p = this.playerWorldPos(); s.pos = { x: p.x, z: p.z, a: p.a }; }
     for (const v of this.vehicles) if (v.owned) { v.owned.pos = { x: v.x, z: v.z, a: v.heading, ...(Number.isFinite(v.y) && v.y>=-100 && v.y<=1000 ? {y:v.y} : {}) }; v.owned.condition = v.condition; v.owned.fuel = v.fuel; v.owned.mileage = Math.round(v.mileage); v.owned.missing = v.model.missingParts(); }
     saveState(s, this.online, s.nick);
     if (this.online) this.net?.saveAccount(s);

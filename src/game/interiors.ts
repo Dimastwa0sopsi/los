@@ -1321,15 +1321,15 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
         ib.doorSpots['apt' + u] = { x: ib.ox + ax, z: ib.oz + az, a: ry ? Math.PI / 2 : 0, y };
       });
       // ---- лестница: 12 ступеней от входа к площадке второго этажа ----
-      const steps = 12, rise = 3.0 / steps, depth = 0.36, x0st = 2.9;
+      const steps = 12, rise = 3.0 / steps, depth = 0.60, x0st = 2.9;
       for (let st = 0; st < steps; st++) {
-        const z = 3.0 - st * depth;
-        ib.f('c:#a8a29e', x0st, 0, z, 2.6, rise * (st + 1), depth, st > 0);
+        const z = 5.1 - st * depth;
+        ib.f('c:#a8a29e', x0st, 0, z, 2.6, rise * (st + 1), depth, true);
         ib.f('c:#78716c', x0st, rise * (st + 1) - 0.02, z + depth / 2 - 0.03, 2.6, 0.04, 0.06, false);
       }
       // перила вдоль марша
-      ib.f('c:#78350f', 4.15, 0.9, 1.4, 0.07, 0.07, 4.0, false, 0.09);
-      for (let st = 0; st < steps; st += 2) ib.f('c:#44403c', 4.15, rise * (st + 1), 3.0 - st * depth, 0.05, 0.95, 0.05, false);
+      ib.f('c:#78350f', 4.15, 0.9, 1.8, 0.07, 0.07, 7.2, false, 0.09);
+      for (let st = 0; st < steps; st += 2) ib.f('c:#44403c', 4.15, rise * (st + 1), 5.1 - st * depth, 0.05, 0.95, 0.05, false);
       // ---- площадка второго этажа ----
       ib.f('c:#a8a29e', 0, 2.85, -4.1, 9.6, 0.15, 5.8, false);
       ib.col(-4.8, -7.0, 4.8, -1.2, 2.85, 3.0);
@@ -1343,7 +1343,8 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
         ib.f('c:#334155', W / 2 - 0.2, y, -4.6, 0.06, 2.0, 1.0, false);
         ib.f('chrome', W / 2 - 0.1, y + 1.0, -4.0, 0.1, 0.12, 0.06, false);
         ib.plane('sign:ЛИФТ|#0f172a', W / 2 - 0.22, y + 2.35, -4.6, 0.9, 0.22, -Math.PI / 2);
-        ib.act(W / 2 - 1.2, -4.6, 1.2, 'Лифт не работает — только лестница', 'lift', y);
+        ib.act(W / 2 - 1.2, -4.6, 1.2, y === 0 ? 'Лифт на второй этаж' : 'Лифт на первый этаж', 'lift', y);
+        ib.doorSpots[y === 0 ? 'lift0' : 'lift1'] = { x: ib.ox + W / 2 - 1.2, z: ib.oz - 4.6, a: -Math.PI / 2, y };
       }
       // ---- указатели этажей и свет ----
       ib.plane('sign:1 ЭТАЖ|#334155', -3.9, 2.55, D / 2 - 0.15, 1.5, 0.34, Math.PI);
@@ -1353,7 +1354,7 @@ export function buildInterior(kind: InteriorKind, opts: { seed?: number; owned?:
       ib.light(-1.4, 6.1, -4.4, 1.2, 0xfff3d6, 12);
       ib.light(2.6, 6.1, 0.6, 1.0, 0xfff3d6, 11);
       // ---- бытовые мелочи подъезда: велосипед, коляска, скамейка, доска объявлений ----
-      ib.f('chrome', 3.7, 0, 5.4, 0.1, 1.0, 1.5, true); ib.cyl('c:#111827', 3.1, 0, 5.4, 0.32, 0.08);
+      ib.f('chrome', -4.4, 0, 1.7, 0.1, 1.0, 1.5, false); ib.cyl('c:#111827', -4.1, 0, 1.7, 0.32, 0.08);
       ib.f('c:#f8fafc', -3.7, 0, 5.2, 1.4, 0.9, 0.55, false); ib.f('c:#94a3b8', -3.7, 0.9, 5.2, 1.4, 0.3, 0.55, false);
       ib.f('c:#78350f', -1.2, 0, 4.6, 1.6, 0.45, 0.5); ib.f('c:#78350f', -1.2, 0.45, 4.85, 1.6, 0.5, 0.1, false);
       ib.f('c:#166534', W / 2 - 0.22, 1.35, 2.6, 0.06, 1.0, 1.8, false);
