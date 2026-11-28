@@ -39,7 +39,7 @@ async function main(){
   assert.deepEqual(other.players.get(net.id!)!.st!.tr,[tr]);assert.deepEqual(other.players.get(net.id!)!.st!.pv,[pv]);assert.deepEqual(other.players.get(net.id!)!.st!.pp,[pp]);assert.equal(other.players.get(net.id!)!.st!.th,'car1');
   const socket=(net as any).ws;
   const ack=new Promise<void>((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('save timeout')),5000);socket.addEventListener('message',(e:any)=>{const m=JSON.parse(e.data);if(m.type==='account_saved'){clearTimeout(timer);assert(m.ok);resolve();}},{once:false});});
-  net.saveAccount({money:24500,inventory:{water:2}});await ack;assert(net.accountSaved);
+  net.saveAccount({money:24500,inventory:{water:2},vehicles:[{uid:'saved-car',type:'lada',color:'#aabbcc',pos:{x:initial.x,z:initial.z,y:2.5,a:0},tuning:{plate:'А123ВС 77',plateFront:true,plateBack:false},trunk:{water:7}}],privateNote:'must-not-leak'});await ack;assert(net.accountSaved);
   const rejoinedWorld=eventFor(net);logged=login();const closed=new Promise<void>(resolve=>socket.once('close',()=>resolve()));socket.terminate();await closed;assert(!net.sessionReady);
   assert.equal(await logged,false);assert(net.sessionReady);assert(opens>=2,'после переподключения готовность не должна наступать до авторизации');assert(net.accountSaved);
   assert.deepEqual((await rejoinedWorld).event,ev1.event);
@@ -51,7 +51,13 @@ async function main(){
   const rejoined=new Promise<void>((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('second client rejoin timeout')),10000);other!.onLogin=()=>{clearTimeout(timer);resolve();};});other.connect();await rejoined;
   await new Promise<void>((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('rejoined player timeout')),3000);net!.onChange=()=>{if(net!.players.has(otherId)){clearTimeout(timer);net!.onChange=null;resolve();}};if(net!.players.has(otherId)){clearTimeout(timer);net!.onChange=null;resolve();}});
   assert.equal(net.players.get(otherId)!.st,null,'старые визуальные снимки не должны переживать повторный вход');
-  console.log('✓ реальный сервер: два клиента, хомяк и багажник, переподключение, выход и возврат без старых снимков');
+  const ownerId=net.id!;await waitOther(()=>other!.players.has(ownerId));
+  const ownerGone=waitOther(()=>!other!.players.has(ownerId));net.close();await ownerGone;
+  const offline=new Promise<void>((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('offline vehicle timeout')),5000);const sock=(other as any).ws;const handler=(data:any)=>{const m=JSON.parse(String(data));if(m.type==='offline_vehicles'){clearTimeout(timer);sock.off('message',handler);resolve();}};sock.on('message',handler);});
+  other.sendMove(initial.x,initial.z,0);other.requestOfflineVehicles();await offline;
+  const parked=other.offlineVehicles as any[];assert.equal(parked.length,1);assert.equal(parked[0].owner,ownerId);assert.equal(parked[0].vehicles[0][0],'saved-car');assert.equal(parked[0].vehicles[0][4],2.5);assert.deepEqual(parked[0].plates[0],['saved-car','А123ВС 77',1,0]);
+  assert(!JSON.stringify(parked).includes('must-not-leak'));assert(!JSON.stringify(parked).includes('water'));
+  console.log('✓ реальный сервер: два клиента, общий хомяк, переподключение и машина после выхода владельца');
  } finally {net?.close();other?.close();proc.kill();await new Promise<void>(resolve=>proc.once('exit',()=>resolve()));rmSync(dir,{recursive:true,force:true});}
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});

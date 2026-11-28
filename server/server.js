@@ -30,6 +30,7 @@ const { readKioskOwners } = require('./business-owners.cjs');
 const { createRadioRegistry } = require('./radio-sync.cjs');
 const { hamsterSpawn } = require('./hamster-spawn.cjs');
 const { createHamsterWorld } = require('./hamster-world.cjs');
+const { createOfflineVehicles } = require('./offline-vehicles.cjs');
 const { cleanVehicleStateMessage } = require('./vehicle-side-text.cjs');
 const radioRegistry = createRadioRegistry();
 
@@ -124,6 +125,9 @@ const q = {
   house: db.prepare('UPDATE players SET house_id = ? WHERE name = ?'),
   inv: db.prepare('UPDATE players SET inventory = ? WHERE name = ?'),
 };
+let offlineVehicles=null;
+try { offlineVehicles=createOfflineVehicles(db);offlineVehicles.load(); }
+catch(e) { console.error('[vehicles] offline visuals disabled:',e.message); }
 
 /* ---------- рекламные щиты: объявления общие для всех игроков ---------- */
 db.exec(`CREATE TABLE IF NOT EXISTS ads (
@@ -708,14 +712,14 @@ const ADMIN_HANDLERS = {
   unbind_all: () => { const n = db.prepare('UPDATE players SET token = \'\'').run().changes; return { ok: true, message: `Привязки сброшены у ${n}` }; },
   delete: (a) => {
     if (!a.name) return noPlayer();
-    q.del.run(a.name);
+    q.del.run(a.name); offlineVehicles?.drop(a.name);
     kickPlayer(a.name, 'Аккаунт удалён администратором');
     return { ok: true, message: `${a.name} удалён из базы` };
   },
   delete_offline: () => {
     const online = new Set(onlineRows().map((r) => r.name));
     let n = 0;
-    for (const r of q.all.all()) if (!online.has(r.name)) { q.del.run(r.name); n++; }
+    for (const r of q.all.all()) if (!online.has(r.name)) { q.del.run(r.name); offlineVehicles?.drop(r.name); n++; }
     return { ok: true, message: `Удалено офлайн-аккаунтов: ${n}` };
   },
   // Телепорт
@@ -1247,7 +1251,7 @@ wss.on('connection', (ws) => {
       console.log(`[login] ${row.name} вошёл (онлайн: ${active.size})`);
       let hamsterSnapshot=null;
       try { hamsterSnapshot=hamsterWorld?.snapshot() ?? null; } catch (e) { console.error('[hamster] state unavailable:',e.message); }
-      send(ws, { type: 'login_success', hamster: hamsterSpawn(), hamsterWorld: hamsterSnapshot, accountState: account.state, accountRevision: account.revision, accountSaveId: account.saveId, caps: { state: 1, peds: 1, adm: 1, relay: 1, accounts: 1, saveIds: 1, voice: 1, radio: 1, fullPlayers: 1, hamsterWorld: hamsterSnapshot ? 1 : 0 }, player: {
+      send(ws, { type: 'login_success', hamster: hamsterSpawn(), hamsterWorld: hamsterSnapshot, accountState: account.state, accountRevision: account.revision, accountSaveId: account.saveId, caps: { state: 1, peds: 1, adm: 1, relay: 1, accounts: 1, saveIds: 1, voice: 1, radio: 1, fullPlayers: 1, offlineVehicles: offlineVehicles ? 1 : 0, hamsterWorld: hamsterSnapshot ? 1 : 0 }, player: {
         id: row.id, name: row.name, gender: row.gender, money: row.money,
         x: row.pos_x, z: row.pos_z, rot: row.pos_rot, number: row.car_number, carNumber: row.car_number,
       } });
@@ -1270,6 +1274,14 @@ wss.on('connection', (ws) => {
       catch (e) { console.error('[hamster] failed to save event:',e.message); send(ws,{type:'hamster_pet_result',ok:false,error:'storage'}); return; }
       if (!result.ok) { send(ws,{type:'hamster_pet_result',ok:false,error:result.error}); return; }
       for (const player of active.values()) send(player.ws,{type:'hamster_world',world:result.world});
+      return;
+    }
+
+    if (m.type === 'offline_vehicles_request') {
+      const now=Date.now();if(ws.offlineVehiclesAt && now-ws.offlineVehiclesAt<1500)return;
+      ws.offlineVehiclesAt=now;
+      try { send(ws,{type:'offline_vehicles',owners:offlineVehicles?.nearby(row.pos_x,row.pos_z,new Set(active.keys())) ?? []}); }
+      catch(e) { console.error('[vehicles] snapshot failed:',e.message);send(ws,{type:'offline_vehicles',owners:[]}); }
       return;
     }
 
@@ -1325,7 +1337,11 @@ wss.on('connection', (ws) => {
         if (r.ok && !r.replay) { row.money = money(value); q.money.run(row.money, row.name); }
         return r;
       })();
-      if (result.ok) { account.revision = result.revision; kioskOwnersCache = null; pushPlayers(); }
+      if (result.ok) {
+        account.revision = result.revision; kioskOwnersCache = null;
+        if(!result.replay)try { offlineVehicles?.refresh(row.name); } catch(e) { console.error('[vehicles] refresh failed:',e.message); }
+        pushPlayers();
+      }
       send(ws, { type: 'account_saved', ...result, saveId: m.saveId });
       return;
     }
