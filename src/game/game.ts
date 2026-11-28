@@ -49,6 +49,7 @@ import { parseParkedInscribed, MAX_PARKED_INSCRIBED, type ParkedInscribedVehicle
 import {parseParkedTrunks,remoteTrunkHandReach, MAX_PARKED_TRUNKS, type ParkedTrunkVisual} from './parkedTrunkVisual';
 import {parseParkedVehicles,parseParkedPlates,MAX_PARKED_VEHICLES,type ParkedVehicleVisual,type ParkedVehiclePlate} from './parkedVehicleVisual';
 import {parseOfflineVehicles} from './offlineVehicles';
+import {campOutsideCity,parseCamp,makeCamp,disposeCamp,type CampPosition} from './camping';
 import { applyFishingVisual } from './fishingVisual';
 import { transferTrunkSolo } from './trunkSolo';
 import { trunkCount } from './trunk';
@@ -314,6 +315,10 @@ export class Game {
   private npcCars = new Map<string, { v: Vehicle; tx: number; tz: number; ta: number; ts: number; t: number }>();
   private parkedInscribed = new Map<number, Map<string, Vehicle>>();
   private offlineParkedOwners = new Set<number>();
+  flashlightOn = false;
+  private flashlightLight:THREE.SpotLight|null=null;
+  private campVisuals = new Map<number,{key:string;group:THREE.Group}>();
+  private remoteFlashlights = new Map<number,THREE.SpotLight>();
   private smoke: { s: THREE.Sprite; life: number; vx: number; vz: number }[] = []; private smokeMat = new THREE.SpriteMaterial({ color: 0xd4d4d8, transparent: true, opacity: 0.5, depthWrite: false }); private tireSmokeT = 0;
   private engineSmokeT = 0; private engineSmokeN = 0;
   /** прижим к стене (Q): нормаль стены и блокировка после прыжка */
@@ -926,6 +931,7 @@ export class Game {
     this.updateJobs(dt);
     this.updateMine(dt);
     if (this.online) this.updateNet(dt);
+    this.updateCampingVisuals();
     // погода вокруг камеры (в помещениях дождя нет)
     if (this.interior) this.weather.group.visible = false;
     else this.weather.update(dt, this.camera.position.x, this.camera.position.z, this.settings.effects);
@@ -1068,6 +1074,7 @@ export class Game {
       if (I.pressed(K.autopilot) || I.vPressed('autopilot')) this.toggleAutopilot();
     }
     // F — посадка и выход, E — контекстные действия.
+    if (I.pressed(K.packCamp) && !this.inVeh && !this.rideRemote) this.packCamp();
     if (I.pressed(K.enterVehicle)) { if (this.inVeh) this.exitVehicle(); else if (this.rideRemote) this.exitRemoteRide(); else this.tryEnterVehicle(); }
     if ((I.pressed(K.sitFurniture) || (this.furnitureSeat && I.vPressed('jump'))) && !this.inVeh && !this.rideRemote) this.toggleFurnitureSeat();
     if (I.vPressed('enter')) { if (this.inVeh) this.exitVehicle(); else if (this.rideRemote) this.exitRemoteRide(); else this.tryEnterVehicle(); }
@@ -2743,6 +2750,8 @@ export class Game {
       return best;
     }
     if (this.rideOn) return { text: `E — сойти (${this.rideOn.name})`, keys: ['E'], act: () => this.leaveRide() };
+    const ownCamp=parseCamp(this.state.camp);
+    if(ownCamp && Math.hypot(px-ownCamp.x,pz-ownCamp.z)<3 && Math.abs(this.py-ownCamp.y)<2)return {text:'Y / E — собрать мини-лагерь ⛺',keys:['E'],act:()=>this.packCamp()};
     const trunkCar = this.nearbyTrunkVehicle();
     if (trunkCar) {
       const anim = this.testTrunks.get(trunkCar);
@@ -3012,6 +3021,7 @@ export class Game {
   // ================= МАГАЗИНЫ / ПРЕДМЕТЫ =================
   buy(itemId: string, qty = 1) {
     const it = ITEMS[itemId]; if (!it) return;
+    if ((itemId==='camp_kit' || itemId==='flashlight') && (qty!==1 || this.state.inventory[itemId]>0 || (itemId==='camp_kit' && !!parseCamp(this.state.camp)))) { this.toast('Этот предмет у вас уже есть'); return; }
     if (it.weapon && WEAPONS[it.weapon] && !WEAPONS[it.weapon].melee && !this.state.documents?.weapon) { this.toast('Для покупки огнестрельного оружия нужна лицензия в мэрии'); return; }
     const cost = it.price * qty;
     if (this.state.money < cost) { this.toast('Недостаточно денег'); this.sound.error(); return; }
@@ -3021,11 +3031,14 @@ export class Game {
     if (it.ammo) { const at = it.ammoType ?? 'p'; (this.state.ammoBy ??= {})[at] = (this.state.ammoBy[at] ?? 0) + it.ammo * qty; }
     else this.state.inventory[itemId] = (this.state.inventory[itemId] ?? 0) + qty;
     this.sound.coin(); this.toast(`Куплено: ${it.name}${qty > 1 ? ' ×' + qty : ''}`);
+    if(itemId==='camp_kit' || itemId==='flashlight')this.save();
   }
   useItem(id: string, fromFridge = false) {
     const src = fromFridge ? this.homeFridge() : this.state.inventory;
     if (!src || !src[id]) return;
     const it = ITEMS[id];
+    if(id==='camp_kit' && !fromFridge){this.placeCamp();return;}
+    if(id==='flashlight' && !fromFridge){this.flashlightOn=!this.flashlightOn;this.toast(this.flashlightOn?'🔦 Фонарик включён':'🔦 Фонарик выключен');this.closePanel();return;}
     if (id === 'mask' && !fromFridge) { this.toggleMask(); return; }
     if (!fromFridge && speakerById(id)) { this.installHomeSpeaker(id); return; }
     if (it.weapon) { this.setWeapon(it.weapon); this.closePanel(); return; }
@@ -3046,7 +3059,64 @@ export class Game {
     if (it.smoke) { this.smokeT = 8; this.dizzyT = 22; this.player.setItem('cig'); this.toast('Вы закурили… голова кружится'); }
     else this.toast(`${it.icon} ${it.name}`);
   }
-  dropItem(id: string) { const inv = this.state.inventory; if (!inv[id]) return; inv[id]--; if (!inv[id]) delete inv[id]; if (id === this.weapon) this.setWeapon('fists'); this.ensureOwnedMask(); this.toast(`Выброшено: ${ITEMS[id].name}`); }
+  dropItem(id: string) { const inv = this.state.inventory; if (!inv[id]) return; inv[id]--; if (!inv[id]) delete inv[id]; if(id==='flashlight' && !inv[id])this.flashlightOn=false; if (id === this.weapon) this.setWeapon('fists'); this.ensureOwnedMask(); this.toast(`Выброшено: ${ITEMS[id].name}`); }
+  private placeCamp() {
+    if(!this.state.inventory.camp_kit)return;
+    if(parseCamp(this.state.camp)){this.toast('Сначала соберите установленный лагерь');return;}
+    if(this.interior || this.inVeh || this.rideRemote || this.rideOn){this.toast('Лагерь можно поставить только пешком на улице');return;}
+    if(!campOutsideCity(this.px,this.pz,this.L.villages)){this.toast('Лагерь можно ставить только за городом или в деревнях');return;}
+    const ground=this.col.groundAt(this.px,this.pz,this.py,.5,.2);
+    if(Math.abs(this.py-ground)>.7 || this.isWater(this.px,this.pz) || Math.abs(this.px-this.L.river.center(this.pz))<this.L.river.half){this.toast('Найдите сухое место на земле');return;}
+    const a=Math.atan2(Math.sin(this.pa),Math.cos(this.pa)),fx=this.px+2.2*Math.cos(a),fz=this.pz-2.2*Math.sin(a);
+    const blocked=(x:number,z:number,r:number)=>this.col.query(x,z,r).some(b=>b.y1>ground+.5 && b.y0<ground+1.8);
+    if(blocked(this.px,this.pz,1.1) || blocked(fx,fz,.7) || Math.abs(this.col.groundAt(fx,fz,ground,.5,.2)-ground)>.5 || this.isWater(fx,fz) || Math.abs(fx-this.L.river.center(fz))<this.L.river.half){this.toast('Здесь мало места для палатки и костра');return;}
+    const camp=parseCamp({x:this.px,y:ground,z:this.pz,a});if(!camp){this.toast('Здесь нельзя поставить лагерь');return;}
+    this.state.camp=camp;this.state.inventory.camp_kit--;if(!this.state.inventory.camp_kit)delete this.state.inventory.camp_kit;
+    this.save();this.closePanel();this.toast('⛺ Лагерь установлен. Рядом нажмите Y или E, чтобы собрать');
+  }
+  private packCamp() {
+    const camp=parseCamp(this.state.camp);
+    if(!camp || this.interior || this.inVeh || this.rideRemote || Math.hypot(this.px-camp.x,this.pz-camp.z)>3 || Math.abs(this.py-camp.y)>2)return;
+    this.state.camp=null;this.state.inventory.camp_kit=(this.state.inventory.camp_kit??0)+1;
+    this.save();this.toast('⛺ Лагерь собран в инвентарь');
+  }
+  private updateCampingVisuals() {
+    const now=performance.now(),wanted=new Map<number,CampPosition>();
+    const own=parseCamp(this.state.camp);if(own)wanted.set(-1,own);
+    if(this.online && this.net?.sessionReady)for(const p of this.net.others()){
+      if(p.st && now-p.stT<15000){const camp=parseCamp(p.st.camp);if(camp)wanted.set(p.id,camp);}
+    }
+    for(const [id,visual] of this.campVisuals)if(!wanted.has(id)){disposeCamp(visual.group);this.campVisuals.delete(id);}
+    for(const [id,camp] of wanted){
+      let visual=this.campVisuals.get(id);const key=JSON.stringify(camp);
+      if(!visual){visual={key,group:makeCamp()};this.scene.add(visual.group);this.campVisuals.set(id,visual);}
+      if(visual.key!==key)visual.key=key;
+      visual.group.position.set(camp.x,camp.y,camp.z);visual.group.rotation.y=camp.a;
+      visual.group.visible=!this.interior && Math.hypot(camp.x-this.px,camp.z-this.pz)<this.drawDist();
+      const flame=visual.group.getObjectByName('flame');if(flame)flame.scale.y=1+.12*Math.sin(now*.01+id);
+    }
+    if(!(this.state.inventory.flashlight>0))this.flashlightOn=false;
+    const enabled=this.flashlightOn && !this.inVeh && !this.rideRemote && !this.rideOn && !this.camMode;
+    if(enabled && this.weapon==='fists' && this.fishT<0 && this.smokeT<=0 && !this.carrying && (this.player.item==='fists'||this.player.item==='none'))this.player.setItem('flashlight');
+    if(!enabled && this.player.item==='flashlight')this.player.setItem(this.weapon);
+    if(enabled && !this.flashlightLight){this.flashlightLight=this.makeFlashlightLight();}
+    if(this.flashlightLight){this.flashlightLight.visible=!!enabled;if(enabled)this.positionFlashlight(this.flashlightLight,this.px,this.py,this.pz,this.pa);}
+    const active=new Set<number>();
+    if(this.online && this.net?.sessionReady)for(const p of this.net.others()){
+      const st=p.st,r=this.remotes.get(p.id);
+      if(!st || now-p.stT>=15000 || st.fl!==1 || !r?.visible || r.inVeh)continue;
+      active.add(p.id);let light=this.remoteFlashlights.get(p.id);
+      if(!light){light=this.makeFlashlightLight();this.remoteFlashlights.set(p.id,light);}
+      light.visible=true;this.positionFlashlight(light,r.x,r.y,r.z,r.a);
+    }
+    for(const [id,light] of this.remoteFlashlights)if(!active.has(id)){light.removeFromParent();light.target.removeFromParent();light.dispose();this.remoteFlashlights.delete(id);}
+  }
+  private makeFlashlightLight() {
+    const light=new THREE.SpotLight(0xfff4d5,35,24,.32,.6,2);this.scene.add(light,light.target);return light;
+  }
+  private positionFlashlight(light:THREE.SpotLight,x:number,y:number,z:number,a:number) {
+    const dx=Math.sin(a),dz=Math.cos(a);light.position.set(x,y+1.25,z);light.target.position.set(x+dx*12,y+.5,z+dz*12);
+  }
   homeId(): string | null {
     const loc = this.state.location; if (!loc) return null;
     const b = this.L.buildings[loc.b];
@@ -5107,6 +5177,7 @@ export class Game {
     setAuctionMode(this.online, this.W.auctionGroup, this.col, auctionBoxes(this.L.buildings, this.L.colliders));
     this.cameraSeen.clear();
     this.state = next;
+    this.flashlightOn=false;
     this.weapon = 'fists'; this.player.setItem('none'); this.combat.reset(); this.combat.clearFx();
     this.player.setLook(next.look);
     this.spawnOwnedVehicles(preserveSnapshot);
@@ -5389,6 +5460,8 @@ export class Game {
         v: v ? v.spec.id : '', c: v ? (v.model.tuning.paint ?? v.model.color) : '', seat: v ? (this.passenger ? 1 : 0) : this.rideRemote?.seat ?? 0,
         i: this.interiorKey(), hp: Math.round(this.state.health),
       };
+      st.camp=parseCamp(this.state.camp);
+      if(this.flashlightOn && (this.state.inventory.flashlight ?? 0)>0 && !host)st.fl=1;
       if (this.rideRemote) st.r = this.rideRemote.id;
       if(v?.owned && !this.passenger && ['bus','truck','semi'].includes(v.spec.body)) st.vt=validVehicleSideText(v.owned.sideText) ? v.owned.sideText : '';
       const parked: ParkedInscribedVehicle[] = [];
@@ -5647,7 +5720,7 @@ export class Game {
       // scene while leaving the smaller seat scale behind.
       R.char.root.scale.setScalar(1);
       const w = st?.w ?? 0;
-      const item = st?.fish === 1 ? 'rod' : WEAPON_ORDER[w] ?? 'none';
+      const item = st?.fish === 1 ? 'rod' : st?.fl===1 && w===0 ? 'flashlight' : WEAPON_ORDER[w] ?? 'none';
       if (w !== R.weapon || R.char.item !== item) { R.weapon = w; R.char.setItem(item); }
       R.char.root.position.set(R.x, R.y, R.z); R.char.root.rotation.set(0, R.a, 0);
       const sp = Math.abs(R.spd);
@@ -6214,6 +6287,9 @@ export class Game {
     this.voice.stop();
     cancelAnimationFrame(this.raf);
     this.net?.close(); this.net = null;
+    for(const visual of this.campVisuals.values())disposeCamp(visual.group);this.campVisuals.clear();
+    for(const light of this.remoteFlashlights.values()){light.removeFromParent();light.target.removeFromParent();light.dispose();}this.remoteFlashlights.clear();
+    if(this.flashlightLight){this.flashlightLight.removeFromParent();this.flashlightLight.target.removeFromParent();this.flashlightLight.dispose();this.flashlightLight=null;}
     try { this.save(); } catch { /* */ }
     this.input?.dispose(); this.sound.dispose(); this.radio.dispose(); this.remoteRadios.clear(); setSoundCloudMobile(false); this.resizeObs?.();
     this.interior?.dispose();

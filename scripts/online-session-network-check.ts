@@ -35,7 +35,9 @@ async function main(){
   const tr:[string,string,string,number,number,number,number,number,string]=['car1','lada','#aabbcc',initial.x,0,initial.z,0,.5,''];
   const pv:[string,string,string,number,number,number,number,string]=['car1','lada','#aabbcc',initial.x,0,initial.z,0,''];
   const pp:[string,string,0|1,0|1]=['car1','А123ВС 77',1,0];
-  net.sendState({x:initial.x,y:0,z:initial.z,a:0,s:0,v:'',c:'',seat:0,tr:[tr],th:'car1',pv:[pv],pp:[pp]});await receivedTrunk;
+  const camp={x:initial.x,y:0,z:initial.z,a:1};
+  net.sendState({x:initial.x,y:0,z:initial.z,a:0,s:0,v:'',c:'',seat:0,tr:[tr],th:'car1',pv:[pv],pp:[pp],camp,fl:1});await receivedTrunk;
+  assert.deepEqual(other.players.get(net.id!)!.st!.camp,camp);assert.equal(other.players.get(net.id!)!.st!.fl,1);
   assert.deepEqual(other.players.get(net.id!)!.st!.tr,[tr]);assert.deepEqual(other.players.get(net.id!)!.st!.pv,[pv]);assert.deepEqual(other.players.get(net.id!)!.st!.pp,[pp]);assert.equal(other.players.get(net.id!)!.st!.th,'car1');
   const socket=(net as any).ws;
   const ack=new Promise<void>((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('save timeout')),5000);socket.addEventListener('message',(e:any)=>{const m=JSON.parse(e.data);if(m.type==='account_saved'){clearTimeout(timer);assert(m.ok);resolve();}},{once:false});});

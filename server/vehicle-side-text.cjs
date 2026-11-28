@@ -53,6 +53,12 @@ function cleanVehicleStateMessage(raw){
    }):[];
  }
  if(Object.prototype.hasOwnProperty.call(state,'th') && (typeof state.th!=='string' || !Array.isArray(state.tr) || !state.tr.some(row=>row[0]===state.th)))delete state.th;
+ if(Object.prototype.hasOwnProperty.call(state,'camp')) {
+   const p=state.camp;
+   if(!p || typeof p!=='object' || Array.isArray(p) || ![p.x,p.y,p.z,p.a].every(n=>typeof n==='number'&&Number.isFinite(n)) || Math.abs(p.x)>4000 || Math.abs(p.z)>4000 || p.y< -5 || p.y>1000 || Math.abs(p.a)>100)state.camp=null;
+   else state.camp={x:p.x,y:p.y,z:p.z,a:p.a};
+ }
+ if(state.fl!==1)delete state.fl;
  return '§LG'+JSON.stringify(state);
 }
 module.exports={cleanVehicleStateMessage};

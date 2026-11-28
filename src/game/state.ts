@@ -47,6 +47,8 @@ export interface GameState {
   plants?: Record<string, { crop: string; t: number }>; apps?: string[]; dms?: Record<string, { me: boolean; text: string; t: number }[]>; unread?: Record<string, number>; limited?: string[]; officeJob?: boolean; officeDone?: number; farmJob?: boolean; mineJob?: boolean; mineCoal?: number; mineDepth?: boolean; phoneNum?: string; contacts?: Record<string, string>; quest?: { step: number; done?: boolean; kills?: number }; trucker?: boolean; createdAt?: number;
   locks?: Record<string, boolean>; spawnHome?: string; customized?: boolean; svc?: SvcState;
   listings?: { slot: number; uid: string; price: number; t: number }[];
+  /** Deployed camp belongs to this account and can be packed back into inventory. */
+  camp?: import('./camping').CampPosition | null;
   /** Паспорт и лицензии, полученные в мэрии. */
   documents?: Documents;
   /** активированные промокоды (раньше был один флаг promoUsed) */
