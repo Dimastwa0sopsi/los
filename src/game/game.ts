@@ -48,6 +48,7 @@ import { stepTrunkMotion, TRUNK_OPEN_SECONDS, trunkMotionKind, trunkMotionPose, 
 import { parseParkedInscribed, MAX_PARKED_INSCRIBED, type ParkedInscribedVehicle } from './parkedInscribedVehicles';
 import {parseParkedTrunks,remoteTrunkHandReach, MAX_PARKED_TRUNKS, type ParkedTrunkVisual} from './parkedTrunkVisual';
 import {parseParkedVehicles,parseParkedPlates,MAX_PARKED_VEHICLES,type ParkedVehicleVisual,type ParkedVehiclePlate} from './parkedVehicleVisual';
+import {parseOfflineVehicles} from './offlineVehicles';
 import { applyFishingVisual } from './fishingVisual';
 import { transferTrunkSolo } from './trunkSolo';
 import { trunkCount } from './trunk';
@@ -293,6 +294,7 @@ export class Game {
   // Experimental freeze hook; no live auction action invokes it yet.
   private readonly economyLabBarrier = new EconomyBarrier();
   private economyLabPaused = false;
+  private onlineExitPending = false;
   private economyLabBase: string | null = null;
   private economyLabInstalledId: string | null = null;
   voice = new NearbyVoice((id,signal)=>this.net?.sendVoice(id,signal), text=>this.toast(text));
@@ -311,6 +313,7 @@ export class Game {
   camMode: { mode: 'selfie' | 'rear' } | null = null; flashT = 0;
   private npcCars = new Map<string, { v: Vehicle; tx: number; tz: number; ta: number; ts: number; t: number }>();
   private parkedInscribed = new Map<number, Map<string, Vehicle>>();
+  private offlineParkedOwners = new Set<number>();
   private smoke: { s: THREE.Sprite; life: number; vx: number; vz: number }[] = []; private smokeMat = new THREE.SpriteMaterial({ color: 0xd4d4d8, transparent: true, opacity: 0.5, depthWrite: false }); private tireSmokeT = 0;
   private engineSmokeT = 0; private engineSmokeN = 0;
   /** прижим к стене (Q): нормаль стены и блокировка после прыжка */
@@ -736,7 +739,7 @@ export class Game {
   }
   // ================= ГЛОБАЛЬНЫЕ КЛАВИШИ =================
   private globalKey(code: string) {
-    if (this.intro || (this.onlineRequired && (!this.online || !this.net?.sessionReady))) return;
+    if (this.intro || this.onlineExitPending || (this.onlineRequired && (!this.online || !this.net?.sessionReady))) return;
     if (this.soloDetained()) { if (code === K.pause) { if (this.panel) this.closePanel(); else this.openPanel({type:'settings'}); } return; }
     if (code === K.phone) { this.togglePanel({ type: 'phone' }); return; }
     // T — чат (Enter работает только как «отправить» внутри поля ввода)
@@ -799,7 +802,7 @@ export class Game {
     return true;
   }
   openComputerRadio() { if (this.selectComputerRadioSource()) this.openPanel({type:'radio'}); }
-  openPanel(p: Panel) { if (this.economyLabPaused) return; if (this.soloDetained() && p.type !== 'settings') { this.toast('Вы задержаны'); return; } this.beltHold = 0; this.beltTriggered = false; this.panel = p; this.input?.releaseAll(); if (this.input) this.input.enabled = false; this.input?.unlock(); this.cb.onPanel(p); this.sound.click(); }
+  openPanel(p: Panel) { if (this.economyLabPaused || this.onlineExitPending) return; if (this.soloDetained() && p.type !== 'settings') { this.toast('Вы задержаны'); return; } this.beltHold = 0; this.beltTriggered = false; this.panel = p; this.input?.releaseAll(); if (this.input) this.input.enabled = false; this.input?.unlock(); this.cb.onPanel(p); this.sound.click(); }
   closePanel() {
     if (this.panel?.type === 'trunk') {
       const uid = this.panel.uid;
@@ -832,7 +835,7 @@ export class Game {
   }
   private update(dt: number) {
     // Freeze timers, movement, jobs and autosaves while reconciling; rendering continues.
-    if (this.economyLabPaused) return;
+    if (this.economyLabPaused || this.onlineExitPending) return;
     if (this.onlineRequired && !this.intro && (!this.online || !this.net?.sessionReady)) { this.emitHud(dt); return; }
     const s = this.state;
     this.ensureOwnedMask();
@@ -5255,17 +5258,28 @@ export class Game {
   }
   async leaveOnline() {
     if (this.economyLabPaused) { this.toast('Дождитесь восстановления состояния'); return; }
-    if (!this.online) return;
-    this.save();
+    if (!this.online || this.onlineExitPending) return;
     const net = this.net;
-    if (net && !net.accountSaved) {
-      this.toast('Сохраняем прогресс на сервере…');
-      const until = Date.now() + 5000;
-      while (!net.accountSaved && this.net === net && Date.now() < until) await new Promise(resolve => setTimeout(resolve, 100));
-      if (!net.accountSaved) { this.toast('Нет подтверждения сохранения. Проверьте соединение и попробуйте снова'); return; }
+    if (!net?.sessionReady) { this.toast('Нет подтверждённого соединения. Дождитесь переподключения'); return; }
+    // Freeze the simulation before taking the final snapshot: otherwise the
+    // player or their car can move while the acknowledgement is in flight.
+    this.onlineExitPending=true;
+    if (this.panel) this.closePanel();
+    this.input?.releaseAll(); if(this.input)this.input.enabled=false;
+    try {
+      this.save();
+      if (!net.accountSaved) {
+        this.toast('Сохраняем прогресс на сервере…');
+        const until = Date.now() + 5000;
+        while (!net.accountSaved && this.net === net && Date.now() < until) await new Promise(resolve => setTimeout(resolve, 100));
+        if (!net.accountSaved) { this.toast('Нет подтверждения сохранения. Проверьте соединение и попробуйте снова'); return; }
+      }
+      if (!this.online || this.net !== net || !net.sessionReady) return;
+      if (this.onlineRequired) { this.cb.onOnlineExit?.(); return; }
+    } finally {
+      this.onlineExitPending=false;
+      if(this.input){this.input.enabled=!this.panel;this.input.releaseAll();}
     }
-    if (!this.online || this.net !== net) return;
-    if (this.onlineRequired) { this.cb.onOnlineExit?.(); return; }
     this.admFreeze = false;
     if (this.rideRemote) this.exitRemoteRide(true);
     this.voice.stop(); this.remoteRadios.clear(); this.net?.close(); this.net = null; this.onlineInitialMoney = null; this.pendingBuy = null; this.socialInvite = null; this.socialSent = null;
@@ -5438,8 +5452,22 @@ export class Game {
     }
     this.updateCarPuppets(dt);
     if (this.pendingBuy && performance.now() - this.pendingBuy.t > 10000) { this.state.money += this.pendingBuy.price; this.pendingBuy = null; this.toast('Продавец не ответил — деньги возвращены'); }
+    net.requestOfflineVehicles();
     this.updateRemotes(dt);
+    this.updateOfflineParked();
     this.voice.tick(dt, net.id, [...this.remotes.values()].map(r => { const distance=Math.hypot(r.x-this.px,r.z-this.pz); return {id:r.id,near:r.ikey===this.interiorKey() && distance<40,distance}; }));
+  }
+  private updateOfflineParked() {
+    const net=this.net;if(!net)return;
+    const groups=parseOfflineVehicles(net.offlineVehicles,(x,z)=>this.col.groundAt(x,z,0,0.6,0.5));
+    const current=new Set<number>();
+    for(const group of groups){
+      if(group.owner===net.id || net.players.has(group.owner))continue;
+      current.add(group.owner);
+      this.updateParkedInscribed(group.owner,[],[],group.vehicles,group.plates);
+    }
+    for(const owner of this.offlineParkedOwners)if(!current.has(owner) && !net.players.has(owner))this.updateParkedInscribed(owner,[]);
+    this.offlineParkedOwners=current;
   }
   private updateParkedInscribed(owner: number, raw: unknown, rawTrunks?:unknown, rawVehicles?:unknown, rawPlates?:unknown) {
     const snapshots = new Map<string,ParkedTrunkVisual>();

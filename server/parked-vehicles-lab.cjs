@@ -1,6 +1,6 @@
 'use strict';
-/* Read-only experiment. Not wired to the live server. A caller must authenticate
- * requests, determine online/offline ownership, and limit/paginate broadcasts.
+/* Read-only cosmetic projection. The network adapter must authenticate
+ * requests, determine online/offline ownership, and limit broadcasts.
  * A visual projection is not proof of ownership and cannot authorize actions.
  * The current account_save trusts clients: these coordinates remain untrusted. */
 const {normalizeLogin}=require('./account-store.cjs');

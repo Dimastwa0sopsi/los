@@ -178,7 +178,7 @@ interface Msg {
   /** авторизация онлайна: токен устройства и пароль-подсказка */
   token?: string; pass?: string;
   /** что умеет сервер (наш сервер пересылает §-протокол и умеет админ-команды) */
-  caps?: { state?: number; peds?: number; adm?: number; relay?: number; accounts?: number; saveIds?: number; voice?: number; radio?: number; fullPlayers?: number; hamsterWorld?: number };
+  caps?: { state?: number; peds?: number; adm?: number; relay?: number; accounts?: number; saveIds?: number; voice?: number; radio?: number; fullPlayers?: number; offlineVehicles?: number; hamsterWorld?: number };
   radios?: unknown; hamster?: unknown; hamsterWorld?: unknown; world?: unknown;
   /** реклама на щитах: полный список от сервера и ответ на покупку */
   ads?: Record<string, RemoteAd>; ok?: boolean; error?: string;
@@ -315,6 +315,9 @@ export class NetClient {
   onHamsterPetError: ((error: string)=>void) | null = null;
   hamsterWorldSupported = false;
   private fullPlayers = false;
+  private offlineVehiclesSupported = false;
+  private offlineVehiclesRequestedAt = -Infinity;
+  offlineVehicles:unknown = [];
   onVoice: ((from:number, signal:VoiceSignal)=>void) | null = null;
   onVoiceDisconnect: (()=>void) | null = null;
   onPeds: ((from: number, list: number[][], vehs: (string | number)[][]) => void) | null = null;
@@ -411,7 +414,7 @@ export class NetClient {
     ws.onclose = () => {
       if (this.ws !== ws) return;
       window.clearTimeout(this.connectTimer);
-      this.onVoiceDisconnect?.(); this.voiceSupported=false; this.radioSupported=false; this.hamsterWorldSupported=false; this.onRadios?.([]);
+      this.onVoiceDisconnect?.(); this.voiceSupported=false; this.radioSupported=false; this.hamsterWorldSupported=false; this.offlineVehiclesSupported=false;this.offlineVehicles=[];this.offlineVehiclesRequestedAt=-Infinity; this.onRadios?.([]);
       this.ws = null; this.id = null; this.authenticated = false; this.lastSaveMoney = NaN; this.auction = null; this.kioskOwners = null; this.kioskOwnersRequested = 0;
       if (this.dead || !this.want) { this.status = 'offline'; this.onChange?.(); return; }
       this.fail();
@@ -467,6 +470,9 @@ export class NetClient {
       case 'login_success':
         if (!this.handshake || !m.caps?.accounts || !Number.isSafeInteger(m.accountRevision)) { this.die('Сервер не поддерживает безопасные аккаунты'); return; }
         this.onLoginSuccess(m, now); return;
+      case 'offline_vehicles':
+        if(this.authenticated && this.offlineVehiclesSupported && Array.isArray(m.owners) && m.owners.length<=48)this.offlineVehicles=m.owners;
+        return;
       case 'hamster_world':
         if (this.authenticated && this.hamsterWorldSupported) this.onHamsterWorld?.(m.world);
         return;
@@ -567,6 +573,8 @@ export class NetClient {
     this.radioSupported = m.caps?.radio === 1;
     this.hamsterWorldSupported = m.caps?.hamsterWorld === 1;
     this.fullPlayers = m.caps?.fullPlayers === 1;
+    this.offlineVehiclesSupported = m.caps?.offlineVehicles === 1;
+    this.offlineVehicles=[];this.offlineVehiclesRequestedAt=-Infinity;
     const next = m.accountRevision!;
     if (this.loggedOnce && this.revision !== null) {
       const expected = this.flight?.revision ?? this.revision;
@@ -741,6 +749,11 @@ export class NetClient {
     try { ws.send(JSON.stringify(o)); } catch { /* сокет закрылся */ }
   }
 
+  requestOfflineVehicles() {
+    const now=performance.now();
+    if(!this.sessionReady || !this.offlineVehiclesSupported || now-this.offlineVehiclesRequestedAt<2000)return;
+    this.offlineVehiclesRequestedAt=now;this.send({type:'offline_vehicles_request'});
+  }
   petHamster() { if(this.sessionReady && this.hamsterWorldSupported) this.send({type:'hamster_pet'}); }
   sendRadio(radio:unknown) { if(this.authenticated && this.radioSupported) this.send({type:'radio_update',radio}); }
   requestRadios() { if(this.authenticated && this.radioSupported) this.send({type:'radio_list'}); }

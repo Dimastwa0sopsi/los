@@ -1,0 +1,16 @@
+import './domstub';
+import {strict as assert} from 'node:assert';
+import {parseOfflineVehicles} from '../src/game/offlineVehicles';
+import {Game} from '../src/game/game';
+import {Vehicle} from '../src/game/vehicles';
+const row=['saved','lada','#aabbcc',10,null,15,0,''],group={owner:2,vehicles:[row],plates:[['saved','А123ВС 77',1,0]]};
+assert.equal(parseOfflineVehicles([group],()=>.25)[0].vehicles[0][4],.25);
+assert.equal(parseOfflineVehicles([{...group,vehicles:[['saved','lada','#aabbcc',10,7,15,0,'']]}],()=>0)[0].vehicles[0][4],7);
+assert.equal(parseOfflineVehicles([{...group,vehicles:[['saved','lada','#aabbcc',10,Infinity,15,0,'']]}],()=>0).length,0);
+const g=Object.create(Game.prototype) as any;
+Object.assign(g,{parkedInscribed:new Map(),offlineParkedOwners:new Set(),vehicles:[],px:10,pz:15,interior:null,drawDist:()=>100,col:{groundAt:()=>.25},net:{id:1,players:new Map([[1,{}]]),offlineVehicles:[group]},addVehicle:(v:Vehicle)=>g.vehicles.push(v),removeVehicle:(v:Vehicle)=>{g.vehicles.splice(g.vehicles.indexOf(v),1);v.dispose();}});
+g.updateOfflineParked();assert.equal(g.vehicles.length,1);const car=g.vehicles[0];assert.equal(car.y,.25);assert.equal(car.model.tuning.plate,'А123ВС 77');
+g.net.players.set(2,{});g.updateParkedInscribed(2,[],[],[['saved','lada','#aabbcc',11,2,15,0,'']],[['saved','А123ВС 77',1,0]]);g.updateOfflineParked();assert.equal(g.vehicles.length,1);assert.equal(g.vehicles[0],car);assert.equal(car.x,11,'живое состояние важнее устаревшей офлайн-копии');
+g.net.players.delete(2);g.updateParkedInscribed(2,[]);g.updateOfflineParked();assert.equal(g.vehicles.length,1,'копия появляется снова после выхода владельца');
+g.net.offlineVehicles=[];g.updateOfflineParked();assert.equal(g.vehicles.length,0,'устаревшие модели удаляются после обновления списка');
+console.log('✓ офлайн-машины: высота, номера, переход владельца онлайн и удаление устаревших копий');

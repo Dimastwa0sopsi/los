@@ -2,7 +2,7 @@
 const fs = require('fs'), path = require('path'), os = require('os'), { spawn } = require('child_process'), assert = require('assert');
 const WebSocket = require('ws');
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'los-accounts-'));
-for (const f of ['server.js', 'ads.cjs', 'moderation.cjs', 'account-auth.cjs', 'account-store.cjs', 'account-revisions.cjs', 'auction-store.cjs', 'business-owners.cjs', 'radio-sync.cjs', 'hamster-spawn.cjs', 'hamster-world.cjs', 'vehicle-side-text.cjs']) fs.copyFileSync(path.join(__dirname, '../server', f), path.join(dir, f));
+for (const f of ['server.js', 'ads.cjs', 'moderation.cjs', 'account-auth.cjs', 'account-store.cjs', 'account-revisions.cjs', 'auction-store.cjs', 'business-owners.cjs', 'radio-sync.cjs', 'hamster-spawn.cjs', 'hamster-world.cjs', 'vehicle-side-text.cjs', 'offline-vehicles.cjs', 'parked-vehicles-lab.cjs', 'vehicle-visual-catalogue.cjs', 'vehicle-visual-catalogue.json']) fs.copyFileSync(path.join(__dirname, '../server', f), path.join(dir, f));
 fs.writeFileSync(path.join(dir, 'package.json'), '{"type":"commonjs"}');
 const db = path.join(dir, 'db.sqlite');
 const port = 23000 + Math.floor(Math.random() * 20000);
@@ -61,7 +61,7 @@ async function auth(name, mode, password, backup) { const c = client(); assert.e
   a.send({type:'auction_bid',id:catalog.lots[0].id,bid:50000});
   let dupe = await auth('tester', 'register', 'another-password'); assert.match((await dupe.next('error')).text, /занят/); dupe.ws.close();
   let bad = await auth('Tester', 'login', 'wrong-password'); assert.match((await bad.next('error')).text, /Неверный/); bad.ws.close();
-  const state = { money: 987654, health: 61, food: 42, properties:['1:2'], kiosks:[{id:3,last:0,acc:7}], vehicles:[{type:'lada'}], pos:{x:510,z:490,a:1}, inventory:{bread:3} };
+  const state = { money: 987654, health: 61, food: 42, properties:['1:2'], kiosks:[{id:3,last:0,acc:7}], vehicles:[{uid:'saved-car',type:'lada',color:'#aabbcc',pos:{x:510,z:490,a:1,y:2},tuning:{plate:'А123ВС 77',plateFront:true,plateBack:false},trunk:{water:3}}], pos:{x:510,z:490,a:1}, inventory:{bread:3} };
   const saveId = 'stable-network-request-0001';
   assert.equal(first.caps.saveIds, 1);
   a.send({type:'account_save', state, revision:0, saveId});
@@ -95,7 +95,11 @@ async function auth(name, mode, password, backup) { const c = client(); assert.e
   let banned = await auth('Tester', 'login', 'primary-password'); assert.equal((await banned.next('error')).code, 'banned'); banned.ws.close();
   const db2 = new Database(db); db2.prepare('UPDATE players SET banned_until = ? WHERE name = ?').run(Date.now()-1, 'Tester'); db2.close();
   b.ws.close(); await stop(); await start();
-  let c = await auth('tester', 'login', 'primary-password'); login = await c.next('login_success'); assert.deepStrictEqual(login.accountState, state); assert.equal(login.player.money, state.money); assert(login.hamsterWorld.event,'событие хомяка должно сохраниться после перезапуска сервера'); c.send({type:'account_save', state, revision:0, saveId}); const replay = await c.next('account_saved'); assert.equal(replay.replay,true); assert.equal(replay.saveId,saveId); assert.equal(replay.revision,1);
+  const viewer=await auth('ReplayUser','login','replay-user-password');await viewer.next('login_success');viewer.send({type:'move',x:510,z:490,rot:0});viewer.send({type:'offline_vehicles_request'});
+  const persisted=await viewer.next('offline_vehicles');const parked=persisted.owners.find(o=>o.vehicles.some(v=>v[0]==='saved-car'));assert(parked,'машина офлайн-владельца восстановлена после рестарта');assert.equal(parked.vehicles[0][4],2);assert(!JSON.stringify(parked).includes('water'));viewer.ws.close();
+  let c = await auth('tester', 'login', 'primary-password'); login = await c.next('login_success'); assert.deepStrictEqual(login.accountState, state); assert.equal(login.player.money, state.money); assert(login.hamsterWorld.event,'событие хомяка должно сохраниться после перезапуска сервера');
+  const viewer2=await auth('ReplayUser','login','replay-user-password');await viewer2.next('login_success');viewer2.send({type:'move',x:510,z:490,rot:0});viewer2.send({type:'offline_vehicles_request'});assert(!(await viewer2.next('offline_vehicles')).owners.some(o=>o.owner===login.player.id),'онлайн-владелец не получает вторую офлайн-копию');viewer2.ws.close();
+  c.send({type:'account_save', state, revision:0, saveId}); const replay = await c.next('account_saved'); assert.equal(replay.replay,true); assert.equal(replay.saveId,saveId); assert.equal(replay.revision,1);
   c.send({type:'kiosk_owners'}); assert.deepStrictEqual((await c.next('kiosk_owners')).owners,[{id:3,name:'Tester'}]); c.ws.close();
   await stop(); fs.rmSync(dir, { recursive:true, force:true }); console.log('✓ аккаунты и прогресс; мут, варн, бан и истечение срока после перезапуска');
 })().catch(e => { console.error(e); if (proc) proc.kill(); process.exitCode = 1; });

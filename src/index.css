@@ -1236,7 +1236,11 @@ button.tb-card:hover { background: rgba(255,255,255,.09); } button.tb-card:activ
 .hx-map-results button { display: flex; flex-direction: column; align-items: flex-start; width: 100%; padding: 8px 10px; border-bottom: 1px solid var(--line2); text-align: left; }
 .hx-map-results small, .hx-map-results > span { opacity: .7; font-size: 12px; padding: 4px; }
 
-.hx-voice { pointer-events: auto; cursor: pointer; color: #fff; }
+.hx-voice { pointer-events: auto; cursor: pointer; color: #fff; background: none; border: 0; padding: 0; font: inherit; text-align: left; }
+.hx-voice-panel { pointer-events: auto; display: flex; flex-direction: column; gap: 4px; max-width: 240px; }
+.hx-voice-panel small { font-size: 10px; opacity: .8; }
+.hx-voice-meter { height: 5px; background: rgba(255,255,255,.18); border-radius: 4px; overflow: hidden; }
+.hx-voice-meter i { display: block; height: 100%; background: #3ddc84; transition: width .12s; }
 
 /* Компактнее только мобильное управление; область нажатия остаётся удобной. */
 .mui-btn { width: 54px; height: 54px; }
